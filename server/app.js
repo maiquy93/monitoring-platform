@@ -121,6 +121,7 @@ function cleanMap(data) {
 
 function createApp(db, monitor, opts = {}) {
   const publicDir = opts.publicDir || path.join(__dirname, '..', 'public');
+  const agentDir = path.join(__dirname, '..', 'agents');
   const limiter = new auth.LoginLimiter();
   const secureCookie = !!opts.secureCookie;
   const sseClients = new Set();
@@ -496,6 +497,28 @@ function createApp(db, monitor, opts = {}) {
 
   // ---------- static ----------
   const serveStatic = (req, res, pathname) => {
+    const agentFiles = {
+      '/agent/install.sh': 'linux/install.sh',
+      '/agent/linux/agent.sh': 'linux/agent.sh',
+      '/agent/install.ps1': 'windows/install.ps1',
+      '/agent/windows/agent.ps1': 'windows/agent.ps1',
+      '/agent/install-macos.sh': 'macos/install.sh',
+      '/agent/macos/agent.sh': 'macos/agent.sh',
+    };
+    if (agentFiles[pathname]) {
+      const file = path.join(agentDir, agentFiles[pathname]);
+      fs.readFile(file, 'utf8', (err, source) => {
+        if (err) return send(res, 404, { error: 'Không tìm thấy file cài agent' });
+        const host = req.headers.host || 'localhost:8080';
+        const body = source.replaceAll('__SERVER_URL__', `http://${host}`);
+        res.writeHead(200, {
+          'Content-Type': pathname.endsWith('.ps1') ? 'text/plain; charset=utf-8' : 'text/x-shellscript; charset=utf-8',
+          'Cache-Control': 'no-store', ...SEC_HEADERS,
+        });
+        res.end(body);
+      });
+      return;
+    }
     let rel = pathname === '/' ? '/index.html' : pathname;
     const file = path.normalize(path.join(publicDir, rel));
     if (!file.startsWith(publicDir + path.sep) && file !== publicDir) return send(res, 403, { error: 'Forbidden' });

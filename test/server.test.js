@@ -183,6 +183,23 @@ test('agent auto-enroll with enroll key; invalid address rejected', async () => 
   } finally { t.close(); }
 });
 
+test('public agent installers are served with the server URL', async () => {
+  const t = await boot();
+  try {
+    for (const file of ['/agent/install.sh', '/agent/install.ps1', '/agent/install-macos.sh']) {
+      const r = await fetch(t.base + file);
+      const body = await r.text();
+      assert.equal(r.status, 200, file);
+      assert.ok(body.includes(t.base), file);
+      assert.ok(!body.includes('__SERVER_URL__'), file);
+    }
+    for (const file of ['/agent/linux/agent.sh', '/agent/windows/agent.ps1', '/agent/macos/agent.sh']) {
+      const r = await fetch(t.base + file);
+      assert.equal(r.status, 200, file);
+    }
+  } finally { t.close(); }
+});
+
 test('groups and maps can be managed by an admin', async () => {
   const t = await boot();
   try {
