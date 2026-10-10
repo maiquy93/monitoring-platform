@@ -341,3 +341,5 @@ Nếu truy cập từ máy khác, thay `localhost` bằng địa chỉ IP của 
 Bản hiện tại phù hợp cho thử nghiệm nội bộ. Khi triển khai thật cần tài khoản vận
 hành riêng, backup database, community SNMP riêng cho từng môi trường, agent thật
 cho Linux/Windows và cấu hình thông báo bên ngoài.
+#   M o n i t o r i n g - s e r v e r  
+ 
