@@ -19,19 +19,22 @@ async function boot(monitorOpts = {}) {
   const server = createApp(db, monitor);
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${server.address().port}`;
-  let cookie = '';
-  const api = async (method, url, body, headers = {}) => {
-    const res = await fetch(base + url, {
-      method,
-      headers: { 'content-type': 'application/json', 'x-requested-with': 'monitor', cookie, ...headers },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    const sc = res.headers.get('set-cookie');
-    if (sc) cookie = sc.split(';')[0];
-    return { status: res.status, body: await res.json().catch(() => null) };
+  const createClient = () => {
+    let cookie = '';
+    return async (method, url, body, headers = {}) => {
+      const res = await fetch(base + url, {
+        method,
+        headers: { 'content-type': 'application/json', 'x-requested-with': 'monitor', cookie, ...headers },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const sc = res.headers.get('set-cookie');
+      if (sc) cookie = sc.split(';')[0];
+      return { status: res.status, body: await res.json().catch(() => null) };
+    };
   };
+  const api = createClient();
   const close = () => { monitor.stop(); server.close(); server.closeAllConnections?.(); };
-  return { db, monitor, api, alive, close, base };
+  return { db, monitor, api, createClient, alive, close, base };
 }
 
 async function loginAdmin(t) {
@@ -40,6 +43,14 @@ async function loginAdmin(t) {
   assert.equal(r.body.user.must_change, true);
   const c = await t.api('POST', '/api/auth/password', { current: 'initial-pass-1', password: 'new-password-1' });
   assert.equal(c.status, 200);
+}
+
+async function loginUser(api, username, password, newPassword) {
+  const login = await api('POST', '/api/auth/login', { username, password });
+  assert.equal(login.status, 200);
+  assert.equal(login.body.user.must_change, true);
+  const changed = await api('POST', '/api/auth/password', { current: password, password: newPassword });
+  assert.equal(changed.status, 200);
 }
 
 test('auth: login required, must change password, rate limit', async () => {
@@ -172,7 +183,7 @@ test('agent auto-enroll with enroll key; invalid address rejected', async () => 
   } finally { t.close(); }
 });
 
-test('groups, maps and role enforcement', async () => {
+test('groups and maps can be managed by an admin', async () => {
   const t = await boot();
   try {
     await loginAdmin(t);
@@ -186,10 +197,51 @@ test('groups, maps and role enforcement', async () => {
     });
     const map = (await t.api('GET', `/api/maps/${m.body.id}`)).body;
     assert.equal(map.links.length, 1);
-    await t.api('POST', '/api/users', { username: 'viewer1', password: 'viewer-pass-1', role: 'viewer' });
     assert.ok(g.body.id);
-    const viewer = await boot();
-    viewer.close();
+  } finally { t.close(); }
+});
+
+test('roles: viewer is read-only, operator can acknowledge and edit maps, admin manages all', async () => {
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+    const device = await t.api('POST', '/api/devices', { name: 'role-device', type: 'server', address: '10.0.0.3' });
+    const map = await t.api('POST', '/api/maps', { name: 'Role map', nodes: [], links: [] });
+    assert.equal((await t.api('POST', '/api/users', {
+      username: 'viewer1', password: 'viewer-pass-1', role: 'viewer',
+    })).status, 201);
+    assert.equal((await t.api('POST', '/api/users', {
+      username: 'operator1', password: 'operator-pass-1', role: 'operator',
+    })).status, 201);
+
+    const viewer = t.createClient();
+    await loginUser(viewer, 'viewer1', 'viewer-pass-1', 'viewer-pass-2');
+    assert.equal((await viewer('PUT', `/api/devices/${device.body.id}`, { notes: 'blocked' })).status, 403);
+    assert.equal((await viewer('PUT', '/api/settings', { org_name: 'blocked' })).status, 403);
+    assert.equal((await viewer('PUT', `/api/maps/${map.body.id}`, { name: 'blocked', nodes: [], links: [] })).status, 403);
+    assert.equal((await viewer('POST', '/api/users', {
+      username: 'blocked1', password: 'blocked-pass-1', role: 'viewer',
+    })).status, 403);
+
+    const operator = t.createClient();
+    await loginUser(operator, 'operator1', 'operator-pass-1', 'operator-pass-2');
+    assert.equal((await operator('POST', `/api/devices/${device.body.id}/ack`, {})).status, 200);
+    assert.equal((await operator('PUT', `/api/maps/${map.body.id}`, {
+      name: 'Role map edited', nodes: [], links: [],
+    })).status, 200);
+    assert.equal((await operator('PUT', '/api/settings', { org_name: 'blocked' })).status, 403);
+    assert.equal((await operator('POST', '/api/users', {
+      username: 'blocked2', password: 'blocked-pass-1', role: 'viewer',
+    })).status, 403);
+
+    assert.equal((await t.api('PUT', `/api/devices/${device.body.id}`, { notes: 'admin edit' })).status, 200);
+    assert.equal((await t.api('PUT', '/api/settings', { org_name: 'Role test' })).status, 200);
+    assert.equal((await t.api('PUT', `/api/maps/${map.body.id}`, {
+      name: 'Role map admin', nodes: [], links: [],
+    })).status, 200);
+    assert.equal((await t.api('POST', '/api/users', {
+      username: 'adminmade1', password: 'adminmade-pass-1', role: 'viewer',
+    })).status, 201);
   } finally { t.close(); }
 });
 
