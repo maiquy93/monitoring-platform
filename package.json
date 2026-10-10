@@ -1,0 +1,13 @@
+{
+  "name": "monitoring-platform",
+  "version": "0.1.0",
+  "description": "Lightweight infrastructure monitoring server (ICMP, agent, SNMP) with wall-display dashboards",
+  "private": true,
+  "type": "commonjs",
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js",
+    "simulate": "node tools/simulate-agent.js"
+  }
+}
