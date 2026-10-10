@@ -27,6 +27,7 @@ $env:ADMIN_PASSWORD = "MatKhauBanDau-2026!"
 $env:HOST = "0.0.0.0"
 $env:PORT = "8080"
 $env:DB_FILE = "C:\monitoring-data\monitor.db"
+# Chạy HTTP nội bộ: không đặt COOKIE_SECURE
 npm start
 ```
 
@@ -123,7 +124,7 @@ Type=simple
 User=monitoring
 Group=monitoring
 WorkingDirectory=/opt/monitoring/app
-Environment=HOST=127.0.0.1
+Environment=HOST=0.0.0.0
 Environment=PORT=8080
 Environment=DB_FILE=/var/lib/monitoring/monitor.db
 EnvironmentFile=-/etc/monitoring/monitoring.env
@@ -148,57 +149,29 @@ sudo systemctl enable --now monitoring.service
 sudo systemctl status monitoring.service
 ```
 
-Trong triển khai production, nên đặt Nginx hoặc Caddy phía trước để cấp HTTPS,
-giữ server Node chỉ lắng nghe `127.0.0.1`.
+Với mạng nội bộ, server Node lắng nghe `0.0.0.0` để các máy trong mạng truy cập
+trực tiếp qua `http://<IP-server>:8080`. Không đặt biến `COOKIE_SECURE` khi chạy
+HTTP; nếu đặt `COOKIE_SECURE=1`, trình duyệt sẽ chỉ gửi cookie qua HTTPS và đăng
+nhập HTTP sẽ không hoạt động đúng.
 
-## 3. Chạy trên Linux bằng Docker
+## 3. Docker trên Linux (tùy chọn)
 
-Tạo `Dockerfile` tối thiểu trong thư mục dự án:
-
-```dockerfile
-FROM node:22-bookworm-slim
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends iputils-ping \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY package.json ./
-COPY server ./server
-COPY public ./public
-COPY tools ./tools
-COPY README.md ./
-ENV HOST=0.0.0.0
-ENV PORT=8080
-ENV DB_FILE=/data/monitor.db
-VOLUME ["/data"]
-EXPOSE 8080
-CMD ["node", "server/index.js"]
-```
-
-Build và chạy:
+Chỉ dùng Docker nếu đội vận hành đã có quy trình container. Cách chạy trực tiếp
+bằng Node ở mục trên là cách khuyến nghị cho hệ thống nội bộ này. Container cần
+mount `/data` để giữ database, publish cổng `8080` và cài `iputils-ping` nếu cần
+ICMP:
 
 ```bash
 docker build -t monitoring-platform .
 docker volume create monitoring-data
-docker run -d \
-  --name monitoring \
-  --restart unless-stopped \
-  -p 8080:8080 \
-  -e ADMIN_PASSWORD='MatKhauBanDau-2026!' \
-  -v monitoring-data:/data \
-  monitoring-platform
+docker run -d --name monitoring --restart unless-stopped \
+  -p 8080:8080 -e ADMIN_PASSWORD='MatKhauBanDau-2026!' \
+  -v monitoring-data:/data monitoring-platform
 ```
 
-Kiểm tra:
-
-```bash
-curl http://127.0.0.1:8080/api/health
-docker logs monitoring
-```
-
-Không dùng `--privileged` nếu chưa cần. Container cần kết nối mạng tới các thiết
-bị được theo dõi; SNMP dùng UDP port `161`. ICMP trong container có thể bị giới
-hạn bởi runtime hoặc chính sách kernel. Nếu `ping` trong container không hoạt động,
-cần kiểm tra capability mạng của Docker trước khi cân nhắc cấp quyền bổ sung.
+Kiểm tra bằng `curl http://127.0.0.1:8080/api/health` và `docker logs monitoring`.
+Không dùng `--privileged` nếu chưa cần; nếu ICMP trong container bị giới hạn, kiểm
+tra capability mạng của Docker. SNMP cần container truy cập UDP port `161`.
 
 ## 4. Đăng nhập lần đầu
 
@@ -211,7 +184,39 @@ Nếu không đặt `ADMIN_PASSWORD`, server sẽ tự tạo mật khẩu ngẫu
 trong cửa sổ chạy server hoặc log container. Hãy đổi mật khẩu ngay sau lần đăng nhập
 đầu tiên.
 
-## 5. Cấu hình agent
+## 5. Chuẩn bị SNMP trên thiết bị
+
+Phần này áp dụng cho router, switch, firewall, access point và máy in có hỗ trợ
+SNMP. Các tên menu khác nhau tùy hãng, nhưng cần cấu hình theo nguyên tắc sau:
+
+1. Bật SNMP trên thiết bị và chọn **SNMP v2c** nếu dùng đúng khả năng hiện tại
+   của server; SNMPv3 cần được xác nhận riêng trước khi triển khai.
+2. Tạo community riêng, không dùng `public`. Ví dụ:
+   `monitoring-read-2026`.
+3. Chỉ cho phép địa chỉ IP của monitoring server truy cập SNMP.
+4. Chọn quyền **read-only**, không cấp quyền ghi hoặc thay đổi cấu hình.
+5. Dùng UDP port `161` mặc định, hoặc ghi lại port riêng nếu thiết bị đã đổi.
+6. Từ monitoring server, kiểm tra firewall cho phép UDP đi tới thiết bị và thiết
+   bị cho phép UDP từ đúng IP server.
+7. Trong giao diện **Thiết bị**, nhập địa chỉ, bật SNMP, chọn port và nhập
+   community tương ứng; sau đó xem trạng thái và event để xác nhận polling.
+
+Thông tin cần ghi lại cho mỗi thiết bị:
+
+| Thông tin | Ví dụ |
+|---|---|
+| IP/hostname thiết bị | `192.168.1.10` |
+| SNMP version | `v2c` |
+| UDP port | `161` |
+| Community | `monitoring-read-2026` |
+| Quyền | `read-only` |
+| IP được phép truy cập | IP của monitoring server |
+
+Không đưa community vào Git hoặc tài liệu công khai. Repository hiện lưu community
+trong database để polling; vì vậy database và quyền truy cập máy server phải được
+bảo vệ trong phạm vi mạng nội bộ.
+
+## 6. Cấu hình agent
 
 ### Trạng thái hiện tại
 
@@ -298,11 +303,10 @@ Khi phát triển agent production cho Linux hoặc Windows, cần cấu hình t
 - Token riêng của máy.
 - Tên hostname và địa chỉ IP.
 - Chu kỳ gửi report, khuyến nghị nhỏ hơn ngưỡng timeout.
-- CA/TLS nếu server chạy HTTPS.
 - Cơ chế retry/backoff khi mất mạng.
 - Quyền đọc metric tối thiểu, không chạy quyền administrator/root nếu không cần.
 
-## 6. Chạy demo
+## 7. Chạy demo
 
 Khởi động server trước, sau đó mở PowerShell khác và chạy:
 
@@ -321,7 +325,7 @@ node tools\simulate-agent.js --server http://localhost:8080 --token <agent-token
 
 Đây chỉ là dữ liệu mô phỏng, không phải agent Linux hoặc Windows thật.
 
-## 7. Mở trên màn hình lớn
+## 8. Mở trên màn hình lớn
 
 1. Mở hệ thống bằng Chrome hoặc Edge từ máy muốn trình chiếu.
 2. Đăng nhập và chọn **Neon**, **Tối** hoặc **Sáng**.
@@ -332,8 +336,8 @@ node tools\simulate-agent.js --server http://localhost:8080 --token <agent-token
 Nếu truy cập từ máy khác, thay `localhost` bằng địa chỉ IP của máy chạy server và
 đảm bảo cổng đã chọn được phép qua firewall.
 
-## 8. Lưu ý khi dùng thật
+## 9. Lưu ý khi dùng thật
 
-Bản hiện tại phù hợp cho thử nghiệm nội bộ. Khi triển khai thật cần HTTPS/reverse
-proxy, tài khoản vận hành riêng, backup database, SNMP community hoặc SNMPv3 phù
-hợp, agent thật cho Linux/Windows và cấu hình thông báo bên ngoài.
+Bản hiện tại phù hợp cho thử nghiệm nội bộ. Khi triển khai thật cần tài khoản vận
+hành riêng, backup database, community SNMP riêng cho từng môi trường, agent thật
+cho Linux/Windows và cấu hình thông báo bên ngoài.
