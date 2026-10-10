@@ -483,7 +483,7 @@ function createApp(db, monitor, opts = {}) {
       }
       const ip = String(b.ip || '');
       const created = insertDevice(cleanDevice({
-        name, type: /server|vm/i.test(String(b.kind)) ? 'vm' : 'server', check_agent: true,
+        name, type: /^vm$/i.test(String(b.kind)) ? 'vm' : 'server', check_agent: true,
         check_icmp: ADDR_RE.test(ip), address: ADDR_RE.test(ip) ? ip : '',
       }));
       dev = { id: created.id };
@@ -492,6 +492,7 @@ function createApp(db, monitor, opts = {}) {
       monitor.emit('change');
     }
     monitor.ingestAgent(dev.id, b);
+    monitor.emit('change');
     send(ctx.res, 200, { ok: true, interval: 5, ...(enrolled ? { device_id: dev.id, token: enrolled } : {}) });
   });
 

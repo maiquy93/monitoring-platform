@@ -179,6 +179,7 @@ test('agent auto-enroll with enroll key; invalid address rejected', async () => 
     assert.equal(r.status, 200);
     assert.ok(r.body.token);
     assert.equal(t.monitor.snapshot().devices.length, 1);
+    assert.equal(t.monitor.snapshot().devices[0].type, 'server');
     assert.equal((await t.api('POST', '/api/devices', { name: 'bad', type: 'server', address: '1.1.1.1; rm -rf /' })).status, 400);
   } finally { t.close(); }
 });
