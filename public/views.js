@@ -25,7 +25,9 @@
     else sub = [d.address, d.rtt != null ? `${d.rtt} ms` : null, d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : null].filter(Boolean).join(' · ');
     let bars = '';
     if (d.status === 'up' || d.status === 'warning') {
-      if (d.cpu != null) bars = `<div class="bars">${bar('CPU', d.cpu, 'cpu')}${bar('RAM', d.ram ?? 0, 'ram')}${bar('Disk', d.disk ?? 0, 'disk')}</div>`;
+      const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram'], ['Disk', d.disk, 'disk']]
+        .filter(([, value]) => value != null);
+      if (metrics.length) bars = `<div class="bars">${metrics.map(([label, value, key]) => bar(label, value, key)).join('')}</div>`;
       else if (d.toner != null) bars = `<div class="bars"><div class="bar ${d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : ''}">Mực ${d.toner}%<i><b style="width:${d.toner}%"></b></i></div></div>`;
     }
     return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}">
