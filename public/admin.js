@@ -84,11 +84,13 @@
     render(el) {
       el.innerHTML = `<div class="row"><h1>Thiết bị</h1><span class="spacer"></span>
         <input class="inp" id="dl-q" placeholder="Tìm…" style="width:200px" value="${esc(this.q)}">
-        ${isAdmin() ? '<button class="btn primary" id="dl-add">+ Thêm thiết bị</button>' : ''}</div>
+        ${isAdmin() ? '<button class="btn" id="dl-install">+ Thêm máy mới</button><button class="btn primary" id="dl-add">+ Thêm thiết bị</button>' : ''}</div>
         <div class="panel" style="overflow:auto"><table class="tbl"><thead><tr><th>Trạng thái</th><th>Tên</th><th>Loại</th><th>Địa chỉ</th><th>Nhóm</th><th>Mức cảnh báo</th><th>Kiểm tra</th><th></th></tr></thead><tbody id="dl-body"></tbody></table></div>`;
       $('#dl-q').oninput = (e) => { this.q = e.target.value; this.paint(); };
       const add = $('#dl-add');
       if (add) add.onclick = () => M.editDevice(null);
+      const install = $('#dl-install');
+      if (install) install.onclick = () => M.showAgentInstall();
       $('#dl-body').onclick = (e) => { const b = e.target.closest('[data-edit]'); if (b) M.editDevice(Number(b.dataset.edit)); };
     },
     update() { this.paint(); },
@@ -104,6 +106,31 @@
         <td class="muted">${[d.checks.icmp && 'ICMP', d.checks.agent && 'Agent', d.checks.snmp && 'SNMP'].filter(Boolean).join(' · ')}</td>
         <td>${isAdmin() ? `<button class="btn sm" data-edit="${d.id}">Sửa</button>` : ''}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">Chưa có thiết bị</td></tr>';
     },
+  };
+
+  M.showAgentInstall = () => {
+    const key = M.S.settings && M.S.settings.enroll_key;
+    const server = location.origin;
+    if (!key) {
+      M.modal('Cần tạo enroll key', '<p>Vào Cài đặt → Đăng ký agent tự động, tạo một khóa dài ít nhất 16 ký tự rồi lưu trước khi cài máy mới.</p>', async () => {}, { submit: 'Đã hiểu' });
+      return;
+    }
+    const commands = [
+      ['Linux', `curl -fsSL ${server}/agent/install.sh | sudo bash -s -- --key ${key}`],
+      ['macOS', `curl -fsSL ${server}/agent/install-macos.sh | sudo bash -s -- --key ${key}`],
+      ['Windows PowerShell (Administrator)', `& ([scriptblock]::Create((Invoke-RestMethod ${server}/agent/install.ps1))) -Key '${key}' -Server '${server}'`],
+    ];
+    const html = `<p class="muted">Chạy trên đúng máy cần giám sát. Linux/macOS sẽ hỏi enroll key; Windows dùng khóa trong lệnh bên dưới.</p>
+      ${commands.map(([label, command], i) => `<div class="field"><label>${esc(label)}</label><div class="row"><code class="install-command" id="agent-cmd-${i}">${esc(command)}</code><button type="button" class="btn sm" data-copy-agent="${i}">Sao chép</button></div></div>`).join('')}
+      <p class="muted">Sau khi cài, máy sẽ tự xuất hiện trong dashboard với loại Máy chủ hoặc Máy ảo tùy agent báo cáo.</p>`;
+    M.modal('Thêm máy mới', html, async () => {}, { submit: 'Đóng' });
+    document.querySelectorAll('[data-copy-agent]').forEach((button) => {
+      button.onclick = async () => {
+        const text = document.querySelector(`#agent-cmd-${button.dataset.copyAgent}`).textContent;
+        await navigator.clipboard.writeText(text);
+        M.toast('Đã sao chép lệnh cài');
+      };
+    });
   };
 
   // ---------- settings ----------

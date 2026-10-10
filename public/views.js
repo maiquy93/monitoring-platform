@@ -185,7 +185,14 @@
       this.t2 = setInterval(() => this.loadEvents(), 10000);
     },
     destroy() { clearInterval(this.t1); clearInterval(this.t2); this.D = null; },
-    update() { this.load(); },
+    update(snap) {
+      const latest = snap && snap.devices.find((x) => x.id === this.id);
+      if (latest) {
+        this.D = { ...this.D, ...latest };
+        this.paint();
+      }
+      this.load();
+    },
     async load() {
       if (this.busy) return;
       this.busy = true;

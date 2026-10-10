@@ -11,6 +11,7 @@ STATE=${STATE_FILE:-/var/lib/monitoring-agent/token}
 json_escape() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g; s/$//'; }
 local_ip() {
   ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}'
+  return 0
 }
 cpu_data() {
   set -- $(awk '/^cpu / {print $2,$3,$4,$5,$6,$7,$8}' /proc/stat)
@@ -25,7 +26,7 @@ cpu_data() {
   printf '%s %s %s\n' "$percent" "$cores" "$load1"
 }
 payload() {
-  host=$(hostname 2>/dev/null || echo unknown); ip=$(local_ip); [ -n "$ip" ] || ip=
+  host=$(hostname 2>/dev/null || echo unknown); ip=$(local_ip); [ -n "$ip" ] || ip=$(hostname -I 2>/dev/null | awk '{print $1}'); [ -n "$ip" ] || ip=
   set -- $(cpu_data); cpercent=$1; cores=$2; load1=$3
   total=$(awk '/MemTotal:/ {print $2*1024}' /proc/meminfo)
   avail=$(awk '/MemAvailable:/ {print $2*1024}' /proc/meminfo)
