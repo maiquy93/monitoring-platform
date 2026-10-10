@@ -178,7 +178,8 @@ body.tv header.top { padding: 6px 18px; }
 body.tv main { max-width: none; padding: 14px 22px; }
 body.tv .kpi .val { font-size: 72px; } body.tv .kpi.big .val { font-size: 120px; }
 body.tv .grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
-body.tv .tile .t-name { font-size: 20px; } body.tv .tile .t-sub { font-size: 14px; }
+body.tv .kpi .label { font-size: 15px; }
+body.tv .tile .t-name { font-size: 20px; } body.tv .tile .t-state, body.tv .tile .t-sub { font-size: 14px; }
 body.tv .map-box svg { height: calc(100vh - 150px); }
 body.tv .banner { font-size: 24px; }
 
