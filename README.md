@@ -261,8 +261,16 @@ Trên router, switch, firewall hoặc máy in: bật SNMP v2c, tạo community r
 chỉ cho IP server truy cập, quyền read-only và UDP port 161. Không dùng
 community `public`. Sau đó vào **Thiết bị**, nhập IP, bật SNMP và nhập community.
 
-Với SNMP, server đọc thêm CPU, RAM và ổ đĩa từ HOST-RESOURCES-MIB
-(MikroTik RouterOS, Linux net-snmp...). Thiết bị không cần cài agent.
+Với SNMP, server tự nhận diện thiết bị (sysObjectID + sysDescr), chọn một
+**hồ sơ thiết bị** trong `server/profiles/` rồi đọc CPU, RAM, ổ đĩa, nhiệt độ
+và chỉ số riêng của hãng. Không khớp hãng nào thì dùng hồ sơ chung
+(HOST-RESOURCES, có dự phòng UCD-SNMP và Printer-MIB cho máy in).
+Thiết bị không cần cài agent.
+
+Trên trang chi tiết thiết bị: xem hồ sơ đang dùng, admin đổi tay nếu nhận
+diện sai, chỉ số nào không đọc được sẽ hiện kèm lý do (timeout/sai community,
+OID không tồn tại, không có dòng dữ liệu...). Nút **Xuất dữ liệu SNMP** tải
+file `.walk` để gửi cho người phát triển khi gặp thiết bị chưa hỗ trợ.
 
 **MikroTik RouterOS:**
 
@@ -273,11 +281,51 @@ Với SNMP, server đọc thêm CPU, RAM và ổ đĩa từ HOST-RESOURCES-MIB
 
 Sau đó sửa thiết bị trên dashboard, tick **Giám sát SNMP**, nhập đúng community.
 
-Nếu CPU/RAM/Disk vẫn trống, chạy công cụ chẩn đoán (in dữ liệu SNMP thật):
+Chẩn đoán (walk thiết bị thật, lưu `test/fixtures/<hãng>-<model>.walk`, rồi in
+hồ sơ được chọn và từng chỉ số):
 
 ```bash
-node tools/snmp-probe.js <IP-thiết-bị> <community>
+node tools/snmp-probe.js <IP> <community> --name <hãng>-<model>
 ```
+
+### Cách thêm hồ sơ cho một hãng mới
+
+Không sửa code, chỉ thêm file và test:
+
+1. Walk thiết bị thật bằng lệnh `snmp-probe` ở trên (hoặc nhận file `.walk` từ
+   nút **Xuất dữ liệu SNMP**) và đặt vào `test/fixtures/`. File có thể chứa
+   IP/MAC/serial của mạng bên cạnh, không chứa community.
+2. Tạo `server/profiles/<id>.json` (id trùng tên file):
+
+```json
+{
+  "id": "vi-du", "name": "Hãng Ví dụ",
+  "match": { "sysObjectID": ["1.3.6.1.4.1.12345"], "sysDescr": "regex tuỳ chọn" },
+  "priority": 10,
+  "extends": "generic",
+  "verified_with": ["vi-du-model-x"],
+  "metrics": {
+    "cpu": { "unit": "%", "sources": [
+      { "get": "1.3.6.1.4.1.12345.1.0" },
+      { "percent": { "used": "…", "total": "…" } },
+      { "table": { "columns": { "d": "…" }, "value": { "column": "d" }, "agg": "avg" } }
+    ] },
+    "fan": { "optional": true, "sources": [{ "get": "…", "map": { "1": "ok" }, "text": true }] }
+  }
+}
+```
+
+   - Mỗi chỉ số có danh sách `sources` thử lần lượt; nguồn đầu đọc được thì dừng.
+   - Nguồn: `get` (một OID), `percent` (`used` hoặc `free`, cùng `total`), `table`
+     (`columns`, `where`, `value.column` hoặc `value.percent`, `agg` = avg/max/min/sum/first).
+   - Tuỳ chọn: `scale`, `invert`, `map`, `text`, `unverified`, `optional`; `round`, `unit` ở cấp chỉ số.
+   - Chỉ số lõi: `cpu`, `ram`, `disk`, `temperature`, `toner`, `uptime`; tên khác hiện ở mục chỉ số riêng.
+   - `extends` kế thừa chỉ số; đặt `"tên": null` để bỏ chỉ số kế thừa.
+3. Thêm test với file `.walk` thật (xem `test/snmp-profiles.test.js`).
+   Bài test chung sẽ báo lỗi nếu `verified_with` thiếu hoặc không đọc được CPU/RAM/Disk.
+4. **Không đoán OID từ trí nhớ.** Chưa có dữ liệu thật thì đánh dấu
+   `"unverified": true` (giao diện sẽ ghi "chưa kiểm chứng").
+5. Khởi động lại server để nạp hồ sơ.
 
 ## 5. Chạy demo và test
 

@@ -4,20 +4,10 @@ const dgram = require('node:dgram');
 
 const OIDS = {
   sysDescr: '1.3.6.1.2.1.1.1.0',
+  sysObjectID: '1.3.6.1.2.1.1.2.0',
   sysUpTime: '1.3.6.1.2.1.1.3.0',
   sysName: '1.3.6.1.2.1.1.5.0',
-  // Printer MIB: first marker supply (toner) level / max capacity
-  tonerLevel: '1.3.6.1.2.1.43.11.1.1.9.1.1',
-  tonerMax: '1.3.6.1.2.1.43.11.1.1.8.1.1',
-  // HOST-RESOURCES-MIB
-  hrProcessorLoad: '1.3.6.1.2.1.25.3.3.1.2',
-  hrStorageType: '1.3.6.1.2.1.25.2.3.1.2',
-  hrStorageUnits: '1.3.6.1.2.1.25.2.3.1.4',
-  hrStorageSize: '1.3.6.1.2.1.25.2.3.1.5',
-  hrStorageUsed: '1.3.6.1.2.1.25.2.3.1.6',
 };
-const HR_RAM = '1.3.6.1.2.1.25.2.1.2';
-const HR_DISKS = new Set(['1.3.6.1.2.1.25.2.1.4', '1.3.6.1.2.1.25.2.1.9']); // fixed disk, flash memory
 
 function encLen(n) {
   if (n < 128) return Buffer.from([n]);
@@ -86,7 +76,12 @@ function decOid(b) {
   return parts.join('.');
 }
 
-function decodeResponse(buf, expectedReqId) {
+const TYPE_NAMES = { 0x02: 'INTEGER', 0x04: 'STRING', 0x06: 'OID', 0x40: 'IPADDR', 0x41: 'COUNTER32', 0x42: 'GAUGE32', 0x43: 'TIMETICKS', 0x46: 'COUNTER64' };
+const isPrintable = (raw) => raw.every((x) => x === 9 || x === 10 || x === 13 || (x >= 0x20 && x < 0x7f) || x >= 0x80)
+  && Buffer.from(raw).toString('utf8').indexOf('\ufffd') < 0;
+
+// `types` (optional) is filled with oid -> type name, for exact replay of walks.
+function decodeResponse(buf, expectedReqId, types) {
   const msg = readTlv(buf, 0);
   let t = readTlv(buf, msg.start); // version
   t = readTlv(buf, t.end);         // community
@@ -110,19 +105,23 @@ function decodeResponse(buf, expectedReqId) {
     let val;
     switch (valT.tag) {
       case 0x02: val = decInt(raw); break;
-      case 0x04: val = raw.toString('utf8').replace(/[\x00-\x1f\x7f]/g, '').trim(); break;
+      case 0x04:
+        if (types && !isPrintable(raw)) { val = raw.toString('hex'); types[oid] = 'HEX'; break; }
+        val = raw.toString('utf8').replace(/[\x00-\x1f\x7f]/g, '').trim();
+        break;
       case 0x41: case 0x42: case 0x43: case 0x46: val = decUInt(raw); break;
       case 0x40: val = Array.from(raw).join('.'); break; // IpAddress
       case 0x06: val = decOid(raw); break;
       default: val = null; // null, noSuchObject, noSuchInstance, endOfMibView
     }
     out[oid] = val;
+    if (types && val !== null && !types[oid]) types[oid] = TYPE_NAMES[valT.tag];
     off = vb.end;
   }
   return out;
 }
 
-function snmpGet({ host, port = 161, community = 'public', oids, timeout = 2000, next = false }) {
+function snmpGet({ host, port = 161, community = 'public', oids, timeout = 2000, next = false, types }) {
   return new Promise((resolve, reject) => {
     const reqId = Math.floor(Math.random() * 0x7ffffff) + 1;
     const sock = dgram.createSocket(host.includes(':') ? 'udp6' : 'udp4');
@@ -131,7 +130,7 @@ function snmpGet({ host, port = 161, community = 'public', oids, timeout = 2000,
     timer = setTimeout(() => done(reject, new Error('SNMP timeout')), timeout);
     sock.on('error', (e) => done(reject, e));
     sock.on('message', (msg) => {
-      try { done(resolve, decodeResponse(msg, reqId)); } catch (e) { done(reject, e); }
+      try { done(resolve, decodeResponse(msg, reqId, types)); } catch (e) { done(reject, e); }
     });
     sock.send(buildGet(community, reqId, oids, next ? 0xa1 : 0xa0), port, host, (err) => { if (err) done(reject, err); });
   });
@@ -145,15 +144,17 @@ const oidCmp = (a, b) => {
   return 0;
 };
 
-// Walks a whole subtree with GETNEXT; returns [[oid, value], ...] in order.
-async function walk({ host, port = 161, community = 'public', root, timeout = 2000, max = 3000 }) {
+// Walks a whole subtree with GETNEXT; returns [[oid, value], ...] in order
+// (with `typed`, [[oid, value, type], ...]).
+async function walk({ host, port = 161, community = 'public', root, timeout = 2000, max = 3000, typed = false }) {
   const out = [];
   let cur = root;
   while (out.length < max) {
-    const r = await snmpGet({ host, port, community, oids: [cur], timeout, next: true });
+    const types = typed ? {} : undefined;
+    const r = await snmpGet({ host, port, community, oids: [cur], timeout, next: true, types });
     const oid = Object.keys(r)[0];
     if (!oid || r[oid] === null || oidCmp(oid, cur) <= 0 || !oid.startsWith(`${root}.`)) break;
-    out.push([oid, r[oid]]);
+    out.push(typed ? [oid, r[oid], types[oid]] : [oid, r[oid]]);
     cur = oid;
   }
   return out;
@@ -182,50 +183,6 @@ async function walkColumns({ host, port, community, columns, maxRows = 64, timeo
   return rows;
 }
 
-// CPU/RAM/disk from HOST-RESOURCES-MIB (RouterOS, net-snmp, Windows SNMP...).
-async function pollResources({ host, port, community }) {
-  const out = {};
-  const cpuRows = await walkColumns({ host, port, community, columns: [OIDS.hrProcessorLoad] }).catch(() => ({}));
-  const loads = Object.values(cpuRows).map((r) => r[OIDS.hrProcessorLoad]).filter(Number.isFinite);
-  if (loads.length) out.cpu = Math.round(loads.reduce((a, b) => a + b, 0) / loads.length);
-
-  const st = await walkColumns({
-    host, port, community,
-    columns: [OIDS.hrStorageType, OIDS.hrStorageUnits, OIDS.hrStorageSize, OIDS.hrStorageUsed],
-  }).catch(() => ({}));
-  let disk = null;
-  for (const r of Object.values(st)) {
-    const size = r[OIDS.hrStorageSize];
-    const used = r[OIDS.hrStorageUsed];
-    if (!(size > 0) || !Number.isFinite(used)) continue;
-    const pct = Math.round((used / size) * 1000) / 10;
-    if (r[OIDS.hrStorageType] === HR_RAM && out.ram == null) out.ram = pct;
-    else if (HR_DISKS.has(r[OIDS.hrStorageType])) disk = Math.max(disk ?? 0, pct);
-  }
-  if (disk != null) out.disk = disk;
-  return out;
-}
-
-// Polls identity/uptime (and printer toner when available).
-async function pollDevice({ host, port, community }) {
-  const r = await snmpGet({ host, port, community, oids: [OIDS.sysDescr, OIDS.sysUpTime, OIDS.sysName] });
-  const info = {
-    sysDescr: r[OIDS.sysDescr] || '',
-    sysName: r[OIDS.sysName] || '',
-    uptime: r[OIDS.sysUpTime] != null ? Math.floor(r[OIDS.sysUpTime] / 100) : null,
-  };
-  try {
-    const p = await snmpGet({ host, port, community, oids: [OIDS.tonerLevel, OIDS.tonerMax], timeout: 1500 });
-    const lvl = p[OIDS.tonerLevel];
-    const max = p[OIDS.tonerMax];
-    if (Number.isFinite(lvl) && Number.isFinite(max) && max > 0 && lvl >= 0) {
-      info.toner = Math.round((lvl / max) * 100);
-    }
-  } catch { /* not a printer or MIB unsupported */ }
-  try {
-    Object.assign(info, await pollResources({ host, port, community }));
-  } catch { /* host resources MIB unsupported */ }
-  return info;
-}
-
-module.exports = { snmpGet, walk, oidCmp, pollDevice, pollResources, walkColumns, buildGet, decodeResponse, OIDS };
+module.exports = {
+  snmpGet, walk, walkColumns, oidCmp, buildGet, decodeResponse, encOid, encInt, tlv, readTlv, decOid, decInt, OIDS,
+};

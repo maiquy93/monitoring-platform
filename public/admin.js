@@ -13,6 +13,7 @@
   M.editDevice = async (id) => {
     const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, groups: [] };
     if (!M.S.groups.length) await M.loadGroups();
+    if (!M.profiles) M.profiles = await M.api('GET', '/api/snmp/profiles').then((r) => r.profiles).catch(() => []);
     const def = M.S.settings.type_severity;
     const { form } = M.modal(id ? `Sửa thiết bị: ${d.name}` : 'Thêm thiết bị', `
       <div class="field-grid">
@@ -25,7 +26,8 @@
       </div>
       <div class="row">${chk('check_icmp', 'Kiểm tra ICMP ping', d.check_icmp)}${chk('check_agent', 'Có cài Agent', d.check_agent)}${chk('snmp_enabled', 'Giám sát SNMP', d.snmp_enabled)}</div>
       <div class="field-grid" id="snmp-box"><div class="field"><label>SNMP community (v2c)</label><input class="inp" name="snmp_community" value="${esc(d.snmp_community || 'public')}"></div>
-        <div class="field"><label>SNMP port</label><input class="inp" name="snmp_port" type="number" min="1" max="65535" value="${d.snmp_port || 161}"></div></div>
+        <div class="field"><label>SNMP port</label><input class="inp" name="snmp_port" type="number" min="1" max="65535" value="${d.snmp_port || 161}"></div>
+        <div class="field"><label>Hồ sơ SNMP</label><select class="sel inp" name="snmp_profile"><option value="">Tự nhận diện (khuyến nghị)</option>${(M.profiles || []).map((p) => `<option value="${esc(p.id)}" ${p.id === d.snmp_profile ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div></div>
       <div class="field"><label>Thuộc nhóm</label><div class="row">${M.S.groups.map((g) => `<span class="field inline"><input type="checkbox" name="grp" value="${g.id}" id="g${g.id}" ${d.groups.includes(g.id) ? 'checked' : ''}><label for="g${g.id}">${esc(g.name)}</label></span>`).join('') || '<span class="muted">Chưa có nhóm</span>'}</div></div>
       ${chk('maintenance', 'Chế độ bảo trì (tắt cảnh báo)', d.maintenance)}
       ${id ? '<div class="field"><button type="button" class="btn danger" id="f-del">Xóa thiết bị</button></div>' : ''}`,
@@ -33,7 +35,7 @@
       const fd = new FormData(f);
       const body = {
         name: fd.get('name'), type: fd.get('type'), address: fd.get('address'), severity: fd.get('severity') || null,
-        location: fd.get('location'), notes: fd.get('notes'), snmp_community: fd.get('snmp_community'), snmp_port: Number(fd.get('snmp_port')),
+        location: fd.get('location'), notes: fd.get('notes'), snmp_community: fd.get('snmp_community'), snmp_port: Number(fd.get('snmp_port')), snmp_profile: fd.get('snmp_profile') || '',
         check_icmp: f.check_icmp.checked, check_agent: f.check_agent.checked, snmp_enabled: f.snmp_enabled.checked,
         maintenance: f.maintenance.checked, groups: fd.getAll('grp').map(Number),
       };

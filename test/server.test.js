@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { open } = require('../server/db');
@@ -6,6 +6,8 @@ const { Monitor } = require('../server/monitor');
 const { createApp } = require('../server/app');
 const auth = require('../server/auth');
 const snmp = require('../server/snmp');
+const walkfile = require('../server/snmp-walkfile');
+const { startReplay, loadFixture } = require('./helpers/snmp-replay');
 
 async function boot(monitorOpts = {}) {
   process.env.ADMIN_PASSWORD = 'initial-pass-1';
@@ -336,45 +338,63 @@ test('housekeeping: purge caps events, disk guard trims history when disk is low
   } finally { m.stop(); db.close(); fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('snmp: pollResources walks HOST-RESOURCES-MIB over UDP', async () => {
-  const dgram = require('node:dgram');
-  const tlv = (tag, b) => Buffer.concat([Buffer.from([tag, b.length]), b]);
-  const int = (n) => tlv(0x02, Buffer.from([(n >> 24) & 0x7f, (n >> 16) & 255, (n >> 8) & 255, n & 255]));
-  const oidB = (o) => {
-    const p = o.split('.').map(Number); const out = [p[0] * 40 + p[1]];
-    for (const n of p.slice(2)) { const c = [n & 127]; for (let v = n >> 7; v > 0; v >>= 7) c.unshift((v & 127) | 128); out.push(...c); }
-    return tlv(0x06, Buffer.from(out));
-  };
-  const cmp = (a, b) => { const x = a.split('.').map(Number); const y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? -1) !== (y[i] ?? -1)) return (x[i] ?? -1) - (y[i] ?? -1); return 0; };
-  const H = '1.3.6.1.2.1.25.';
-  const mib = [
-    [H + '2.3.1.2.1', oidB(H + '2.1.2')], [H + '2.3.1.2.2', oidB(H + '2.1.4')],
-    [H + '2.3.1.4.1', int(1024)], [H + '2.3.1.4.2', int(1024)],
-    [H + '2.3.1.5.1', int(1000)], [H + '2.3.1.5.2', int(200)],
-    [H + '2.3.1.6.1', int(250)], [H + '2.3.1.6.2', int(50)],
-    [H + '3.3.1.2.1', int(10)], [H + '3.3.1.2.2', int(20)],
-  ].sort((a, b) => cmp(a[0], b[0]));
-  const srv = dgram.createSocket('udp4');
-  srv.on('message', (m, rinfo) => {
-    const rd = (o) => { let len = m[o + 1]; let h = 2; if (len & 128) { const n = len & 127; len = 0; for (let i = 0; i < n; i++) len = len * 256 + m[o + 2 + i]; h = 2 + n; } return { s: o + h, e: o + h + len }; };
-    const v = rd(rd(0).s); const c = rd(v.e); const pdu = rd(c.e); const id = rd(pdu.s);
-    const es = rd(id.e); const ei = rd(es.e); const lst = rd(ei.e);
-    const reqId = m.subarray(id.s, id.e).readUIntBE(0, id.e - id.s);
-    const vbs = [];
-    for (let o = lst.s; o < lst.e;) {
-      const vb = rd(o); const ot = rd(vb.s);
-      const b = m.subarray(ot.s, ot.e); const parts = [Math.floor(b[0] / 40), b[0] % 40]; let x = 0;
-      for (let i = 1; i < b.length; i++) { x = x * 128 + (b[i] & 127); if (!(b[i] & 128)) { parts.push(x); x = 0; } }
-      const q = parts.join('.'); const nx = mib.find((e) => cmp(e[0], q) > 0);
-      vbs.push(tlv(0x30, Buffer.concat([oidB(nx ? nx[0] : q), nx ? nx[1] : Buffer.from([0x82, 0])])));
-      o = vb.e;
-    }
-    const body = Buffer.concat([int(reqId), int(0), int(0), tlv(0x30, Buffer.concat(vbs))]);
-    srv.send(tlv(0x30, Buffer.concat([int(1), tlv(0x04, Buffer.from('public')), tlv(0xa2, body)])), rinfo.port, rinfo.address);
-  });
-  await new Promise((r) => srv.bind(0, '127.0.0.1', r));
+test('snmp: device profile end-to-end through the monitor and API (real RouterOS walk)', async () => {
+  const replay = await startReplay('mikrotik-routeros-x86');
+  const t = await boot();
   try {
-    const r = await snmp.pollResources({ host: '127.0.0.1', port: srv.address().port, community: 'public' });
-    assert.deepEqual(r, { cpu: 15, ram: 25, disk: 25 });
-  } finally { srv.close(); }
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'router', type: 'router', address: replay.host, check_icmp: false, snmp_enabled: true, snmp_port: replay.port,
+    });
+    assert.equal(c.status, 201);
+    const poll = async () => {
+      t.monitor.tick(Date.now() + 120000);
+      for (let i = 0; i < 60 && !t.monitor.state.get(c.body.id).snmp.info; i++) await new Promise((r) => setTimeout(r, 50));
+    };
+    await poll();
+    const detail = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.equal(detail.snmp.profile.id, 'mikrotik');
+    assert.equal(detail.snmp.profile.auto, true);
+    assert.equal(detail.cpu, 1); assert.equal(detail.ram, 15.4); assert.equal(detail.disk, 0.3);
+    assert.equal(detail.snmp_community, 'public');
+
+    const profiles = (await t.api('GET', '/api/snmp/profiles')).body.profiles;
+    assert.ok(profiles.some((p) => p.id === 'mikrotik') && profiles.some((p) => p.id === 'generic' && p.fallback));
+    assert.equal((await t.api('PUT', `/api/devices/${c.body.id}`, { snmp_profile: 'nope' })).status, 400);
+
+    // manual override is stored and forces an immediate re-poll with the chosen profile
+    assert.equal((await t.api('PUT', `/api/devices/${c.body.id}`, { snmp_profile: 'generic' })).status, 200);
+    t.monitor.state.get(c.body.id).snmp.info = null;
+    await poll();
+    const after = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.equal(after.snmp_profile, 'generic');
+    assert.equal(after.snmp.profile.id, 'generic');
+    assert.equal(after.snmp.profile.auto, false);
+    assert.equal(after.disk, 0.3);
+
+    // without a session the export is refused
+    const res = await fetch(`${t.base}/api/devices/${c.body.id}/snmp-walk`, { method: 'POST', headers: { 'x-requested-with': 'monitor' } });
+    assert.equal(res.status, 401);
+  } finally { t.close(); replay.close(); }
 });
+
+test('snmp: "Xuất dữ liệu SNMP" returns a .walk file for admins only', async () => {
+  const replay = await startReplay('mikrotik-routeros-x86');
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', { name: 'r2', type: 'router', address: replay.host, check_icmp: false, snmp_enabled: true, snmp_port: replay.port });
+    const cookie = await (async () => {
+      const r = await fetch(`${t.base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'monitor' }, body: JSON.stringify({ username: 'admin', password: 'new-password-1' }) });
+      return r.headers.get('set-cookie').split(';')[0];
+    })();
+    const res = await fetch(`${t.base}/api/devices/${c.body.id}/snmp-walk`, { method: 'POST', headers: { 'x-requested-with': 'monitor', cookie } });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-disposition'), /\.walk"/);
+    const text = await res.text();
+    assert.match(text, /sysObjectID: 1\.3\.6\.1\.4\.1\.14988\.1/);
+    assert.ok(!/public/.test(text.replace(/\n1\.3\.[^\n]*/g, '')), 'community must not appear in header');
+    assert.equal(walkfile.parse(text).rows.length, loadFixture('mikrotik-routeros-x86').rows.length);
+  } finally { t.close(); replay.close(); }
+});
+

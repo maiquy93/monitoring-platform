@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 const pkg = require('../package.json');
 
 // Features the operator can check for; add a name when shipping a capability.
-const FEATURES = ['snmp-host-resources', 'disk-guard'];
+const FEATURES = ['snmp-host-resources', 'snmp-profiles', 'disk-guard'];
 
 function gitShortSha() {
   try {
@@ -30,9 +30,9 @@ function buildFile() {
 // Hash of the real source files: changes whenever any code file changes.
 function codeHash() {
   const h = crypto.createHash('sha1');
-  for (const dir of ['server', 'public']) {
+  for (const dir of ['server', 'server/profiles', 'public']) {
     let names = [];
-    try { names = fs.readdirSync(path.join(root, dir)).filter((n) => /\.(js|css|html)$/.test(n)).sort(); } catch { /* missing dir */ }
+    try { names = fs.readdirSync(path.join(root, dir)).filter((n) => /\.(js|css|html|json)$/.test(n)).sort(); } catch { /* missing dir */ }
     for (const n of names) {
       h.update(`${dir}/${n}\0`);
       try { h.update(fs.readFileSync(path.join(root, dir, n))); } catch { /* unreadable */ }

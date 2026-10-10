@@ -4,7 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { getSettings } = require('./db');
-const snmp = require('./snmp');
 
 const SEV_RANK = { low: 1, medium: 2, high: 3, critical: 4 };
 const ADDR_RE = /^[A-Za-z0-9][A-Za-z0-9.:_-]{0,252}$/;
@@ -43,7 +42,7 @@ class Monitor extends EventEmitter {
       dbFile: null,                // lets the monitor watch the disk holding the database
       concurrency: 32,
       pingFn: defaultPing,
-      snmpFn: snmp.pollDevice,
+      snmpFn: require('./snmp-engine').pollDevice,
       ...opts,
     };
     this.devices = new Map();   // id -> row (+ groups)
@@ -71,6 +70,10 @@ class Monitor extends EventEmitter {
       seen.add(r.id);
       this.devices.set(r.id, { ...r, groups: gm.get(r.id) || [] });
       if (!this.state.has(r.id)) this.state.set(r.id, this._newState(r.id));
+      const st = this.state.get(r.id);
+      const key = [r.address, r.snmp_port, r.snmp_community, r.snmp_profile].join('|');
+      if (st.snmpKey !== undefined && st.snmpKey !== key) { st.snmp.nextAt = 0; st.snmp.fails = 0; } // re-poll right away
+      st.snmpKey = key;
     }
     for (const id of [...this.devices.keys()]) {
       if (!seen.has(id)) { this.devices.delete(id); this.state.delete(id); }
@@ -82,7 +85,7 @@ class Monitor extends EventEmitter {
     return {
       status: 'unknown', reasons: [], since: Date.now(), acked: false,
       icmp: { ok: null, fails: 0, rtt: null, nextAt: 0, busy: false },
-      snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null },
+      snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null },
       agent: { lastAt: last && last.t ? last.t : null, data: null },
       breach: { cpu: 0, ram: 0, disk: 0 },
       lastMetricAt: 0,
@@ -163,10 +166,11 @@ class Monitor extends EventEmitter {
     st.snmp.busy = true;
     st.snmp.nextAt = Date.now() + this.o.snmpIntervalMs;
     try {
-      st.snmp.info = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community });
-      st.snmp.fails = 0; st.snmp.ok = true;
-    } catch {
+      st.snmp.info = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community, profile: d.snmp_profile || '' });
+      st.snmp.fails = 0; st.snmp.ok = true; st.snmp.error = null;
+    } catch (e) {
       st.snmp.fails++;
+      st.snmp.error = { code: e.code || 'error', message: e.message, at: Date.now() };
       if (st.snmp.fails >= this.o.snmpFailLimit) st.snmp.ok = false;
     }
     st.snmp.busy = false;
@@ -350,6 +354,7 @@ class Monitor extends EventEmitter {
       uptime: !stale && a && a.uptime != null ? a.uptime
         : (st.snmp.info && st.snmp.info.uptime != null ? st.snmp.info.uptime : null),
       toner: st.snmp.info && st.snmp.info.toner != null ? st.snmp.info.toner : null,
+      temperature: st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null,
       checks: { icmp: !!(d.check_icmp && d.address), agent: !!d.check_agent, snmp: !!(d.snmp_enabled && d.address) },
       last_agent_at: st.agent.lastAt,
     };
@@ -359,6 +364,8 @@ class Monitor extends EventEmitter {
       v.snmp_enabled = !!d.snmp_enabled; v.snmp_port = d.snmp_port;
       v.severity_override = d.severity || '';
       v.agent = a; v.snmp = st.snmp.info;
+      v.snmp_profile = d.snmp_profile || '';
+      v.snmp_error = st.snmp.error;
     }
     return v;
   }

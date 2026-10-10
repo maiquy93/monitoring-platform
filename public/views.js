@@ -178,6 +178,8 @@
           <div class="panel" style="margin-top:14px"><h2 style="margin:0 0 10px">Sự kiện gần đây</h2><div id="d-events"></div></div>
         </div><div class="panel" id="d-info"></div></div>`;
       $('#d-range').value = this.range;
+      this._infoHtml = null;
+      if (!M.profiles) M.profiles = await M.api('GET', '/api/snmp/profiles').then((r) => r.profiles).catch(() => []);
       $('#d-range').onchange = (e) => { this.range = e.target.value; this.loadCharts(); };
       await this.load();
       this.loadCharts(); this.loadEvents();
@@ -225,6 +227,7 @@
       const stat = (label, v) => `<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px">${v}</div><div class="g-label">${label}</div></div>`;
       gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)), stat('Ping', d.rtt != null ? `${d.rtt} ms` : '—'));
       if (d.toner != null) gs.push(M.gauge('Mực in', d.toner, 'cpu'));
+      if (d.temperature != null) gs.push(stat('Nhiệt độ', `${d.temperature}°C`));
       $('#d-gauges').innerHTML = `<div class="gauges" style="margin:0">${gs.join('')}</div>`;
 
       const names = d.groups.map((id) => (M.S.groups.find((g) => g.id === id) || {}).name).filter(Boolean);
@@ -241,19 +244,72 @@
             <td style="width:70px">${bar('', x.percent ?? 0, 'disk')}</td></tr>`).join('')}</tbody></table>`;
         }
       }
-      if (d.snmp) html += `<h2>SNMP</h2><dl class="kv">${kv('sysName', d.snmp.sysName)}${kv('sysDescr', d.snmp.sysDescr)}</dl>`;
+      if (d.snmp_enabled) html += this.snmpSection(d, kv);
       if (d.agent_token) {
         html += `<h2>Agent token</h2><details><summary class="muted">Hiện token (bí mật)</summary><code style="word-break:break-all">${esc(d.agent_token)}</code>
           <div style="margin-top:6px"><button class="btn sm danger" id="d-regen">Tạo token mới</button></div></details>`;
       }
       const open = $('#d-info details') && $('#d-info details').open;
-      $('#d-info').innerHTML = html;
-      if (open && $('#d-info details')) $('#d-info details').open = true;
+      if (html !== this._infoHtml) { // keep the profile dropdown usable while live updates arrive
+        this._infoHtml = html;
+        $('#d-info').innerHTML = html;
+        if (open && $('#d-info details')) $('#d-info details').open = true;
+        this.bindSnmp(d);
+      }
       const rg = $('#d-regen');
       if (rg) rg.onclick = () => M.confirm('Tạo token mới? Agent đang dùng token cũ sẽ bị từ chối.', async () => {
         await M.api('POST', `/api/devices/${d.id}/regen-token`, {});
         this.load();
       });
+    },
+    snmpSection(d, kv) {
+      const s = d.snmp;
+      const pr = s && s.profile;
+      let h = '<h2>SNMP</h2>';
+      if (d.snmp_error) h += `<div class="reason">• Lần đọc SNMP gần nhất lỗi: ${esc(d.snmp_error.message)}</div>`;
+      if (s) {
+        h += `<dl class="kv">${kv('sysName', s.sysName)}${kv('sysDescr', s.sysDescr)}${kv('sysObjectID', s.sysObjectID)}
+          ${pr ? kv('Hồ sơ đang dùng', `${pr.name} (${pr.auto ? 'tự nhận diện' : 'chọn tay'})`) : ''}</dl>`;
+        if (pr && pr.missing) h += `<div class="reason">• Hồ sơ đã chọn "${esc(pr.requested)}" không còn tồn tại, đang tự nhận diện.</div>`;
+        const rows = Object.entries(s.diag || {}).map(([k, m]) => {
+          const val = (x) => (k === 'uptime' ? M.fmtDur(x) : `${x}${m.unit || ''}`);
+          if (m.ok) {
+            const note = [m.source > 0 ? `nguồn dự phòng #${m.source + 1}` : '', m.unverified ? 'chưa kiểm chứng' : ''].filter(Boolean).join(' · ');
+            return `<tr><td>${esc(m.label)}</td><td><b>${esc(val(m.value))}</b></td><td class="muted">${esc(note)}</td></tr>`;
+          }
+          const tried = (m.tried || []).map((t) => t.oid).join(', ');
+          return `<tr><td>${esc(m.label)}</td><td>—</td><td class="${m.optional ? 'muted' : ''}" ${m.optional ? '' : 'style="color:var(--c-high)"'}>
+            ${m.optional ? 'Không có: ' : 'Không đọc được: '}${esc(m.message)}<br><span class="muted">đã thử OID: ${esc(tried)}</span></td></tr>`;
+        });
+        if (rows.length) h += `<table class="tbl"><thead><tr><th>Chỉ số</th><th>Giá trị</th><th>Ghi chú / lý do</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+      } else if (!d.snmp_error) h += '<div class="muted">Chưa có dữ liệu SNMP.</div>';
+      if (M.S.user.role === 'admin') {
+        const opts = (M.profiles || []).map((p) => `<option value="${esc(p.id)}" ${p.id === d.snmp_profile ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+        h += `<div class="row" style="margin-top:10px"><select class="sel" id="d-prof" title="Hồ sơ SNMP"><option value="">Tự nhận diện</option>${opts}</select>
+          <button class="btn sm" id="d-walk">Xuất dữ liệu SNMP</button></div>
+          <div class="muted" style="font-size:12px;margin-top:4px">Nhận diện sai? Chọn hồ sơ khác. Thiết bị chưa được hỗ trợ? Xuất dữ liệu SNMP và gửi file .walk cho nhà phát triển.</div>`;
+      }
+      return h;
+    },
+    bindSnmp(d) {
+      const sel = $('#d-prof');
+      if (sel) sel.onchange = async () => {
+        try { await M.api('PUT', `/api/devices/${d.id}`, { snmp_profile: sel.value }); M.toast('Đã đổi hồ sơ SNMP, đang đọc lại...'); } catch (e) { M.toast(e.message); }
+      };
+      const btn = $('#d-walk');
+      if (btn) btn.onclick = async () => {
+        btn.disabled = true; btn.textContent = 'Đang đọc thiết bị...';
+        try {
+          const r = await fetch(`/api/devices/${d.id}/snmp-walk`, { method: 'POST', headers: { 'X-Requested-With': 'monitor' }, credentials: 'same-origin' });
+          if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.error || `HTTP ${r.status}`); }
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(await r.blob());
+          a.download = `${d.name.replace(/[^\w.-]+/g, '-')}.walk`;
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+          M.toast('Đã xuất file .walk');
+        } catch (e) { M.toast(e.message); } finally { btn.disabled = false; btn.textContent = 'Xuất dữ liệu SNMP'; }
+      };
     },
     async loadCharts() {
       if (!$('#d-charts')) return;

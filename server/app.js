@@ -7,6 +7,8 @@ const auth = require('./auth');
 const { getSettings, setSetting } = require('./db');
 const { ADDR_RE, SEV_RANK } = require('./monitor');
 const { info: versionInfo } = require('./version');
+const engine = require('./snmp-engine');
+const walkfile = require('./snmp-walkfile');
 
 const TYPES = ['server', 'vm', 'router', 'switch', 'firewall', 'ap', 'printer', 'ups', 'pc', 'other'];
 const THEMES = ['dark', 'light', 'neon'];
@@ -90,6 +92,11 @@ function cleanDevice(b, partial = false) {
     const p = Number(b.snmp_port ?? 161);
     if (!Number.isInteger(p) || p < 1 || p > 65535) throw bad('SNMP port không hợp lệ');
     out.snmp_port = p;
+  }
+  if (!partial || has('snmp_profile')) {
+    const p = String(b.snmp_profile || '');
+    if (p && !engine.profiles().byId.has(p)) throw bad('Hồ sơ SNMP không tồn tại');
+    out.snmp_profile = p;
   }
   if (!partial || has('severity')) {
     const s = b.severity || null;
@@ -214,9 +221,9 @@ function createApp(db, monitor, opts = {}) {
   const insertDevice = (d) => {
     const token = crypto.randomBytes(24).toString('hex');
     const r = db.prepare(
-      `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,severity,
-        location,notes,maintenance,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-      .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port,
+      `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,snmp_profile,severity,
+        location,notes,maintenance,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
         d.severity, d.location, d.notes, d.maintenance, token, Date.now());
     return { id: Number(r.lastInsertRowid), token };
   };
@@ -237,7 +244,7 @@ function createApp(db, monitor, opts = {}) {
     const d = monitor.devices.get(idOf(ctx.p.id));
     if (!d) throw new HttpError(404, 'Không tìm thấy thiết bị');
     const v = monitor.view(d, true);
-    if (RANK[ctx.user.role] >= RANK.admin) v.agent_token = d.agent_token;
+    if (RANK[ctx.user.role] >= RANK.admin) { v.agent_token = d.agent_token; v.snmp_community = d.snmp_community; }
     send(ctx.res, 200, v);
   });
 
@@ -249,8 +256,8 @@ function createApp(db, monitor, opts = {}) {
     const d = cleanDevice({ ...cur, ...b });
     db.prepare(
       `UPDATE devices SET name=?,type=?,address=?,check_icmp=?,check_agent=?,snmp_enabled=?,snmp_community=?,
-        snmp_port=?,severity=?,location=?,notes=?,maintenance=? WHERE id=?`)
-      .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port,
+        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=? WHERE id=?`)
+      .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
         d.severity, d.location, d.notes, d.maintenance, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
@@ -281,6 +288,28 @@ function createApp(db, monitor, opts = {}) {
     db.prepare('UPDATE devices SET agent_token = ? WHERE id = ?').run(token, id);
     monitor.reload();
     send(ctx.res, 200, { agent_token: token });
+  });
+
+  route('GET', '/api/snmp/profiles', 'any', (ctx) => send(ctx.res, 200, { profiles: engine.listProfiles() }));
+
+  // Lets the customer send a real walk of an unsupported device (community is never written to the file).
+  route('POST', '/api/devices/:id/snmp-walk', 'admin', async (ctx) => {
+    const d = monitor.devices.get(idOf(ctx.p.id));
+    if (!d) throw new HttpError(404, 'Không tìm thấy thiết bị');
+    if (!d.address) throw new HttpError(400, 'Thiết bị chưa có địa chỉ IP');
+    let out;
+    try {
+      out = await walkfile.exportWalk({ host: d.address, port: d.snmp_port, community: d.snmp_community });
+    } catch (e) {
+      throw new HttpError(502, `Không đọc được SNMP từ thiết bị: ${e.message}`);
+    }
+    audit(ctx, `Xuất dữ liệu SNMP của "${d.name}"`);
+    const fname = `${d.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'device'}.walk`;
+    ctx.res.writeHead(200, {
+      'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', ...SEC_HEADERS,
+      'Content-Disposition': `attachment; filename="${fname}"`,
+    });
+    ctx.res.end(out.text);
   });
 
   const RANGES = { '1h': 3600e3, '6h': 6 * 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
