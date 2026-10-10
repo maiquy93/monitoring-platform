@@ -116,6 +116,47 @@ test('agent: report keeps device up, 20s silence marks it down; printers use low
   } finally { t.close(); }
 });
 
+test('agent: silence warns when ICMP remains available and recovers on report', async () => {
+  const t = await boot({ agentTimeoutMs: 20000 });
+  try {
+    await loginAdmin(t);
+    t.alive.add('10.0.0.8');
+    const c = await t.api('POST', '/api/devices', {
+      name: 'srv-combined-check', type: 'server', address: '10.0.0.8', check_icmp: true, check_agent: true,
+    });
+    t.monitor.tick();
+    await new Promise((r) => setTimeout(r, 20));
+    const dev = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    const report = {
+      hostname: 'srv-combined-check', cpu: { percent: 12, cores: 4 },
+      memory: { total: 8e9, used: 2e9, percent: 25 },
+      disks: [{ mount: '/', total: 1e11, used: 4e10, percent: 40 }], uptime: 1234,
+    };
+    assert.equal((await t.api('POST', '/api/agent/report', report, {
+      authorization: `Bearer ${dev.agent_token}`, cookie: '',
+    })).status, 200);
+    t.monitor.startedAt -= 60000; // skip startup grace
+    t.monitor.evaluate();
+    assert.equal(t.monitor.snapshot().devices[0].status, 'up');
+
+    t.monitor.evaluate(Date.now() + 21000);
+    let d = t.monitor.snapshot().devices[0];
+    assert.equal(d.status, 'warning');
+    assert.match(d.reasons[0], /Agent không gửi dữ liệu/);
+    const warning = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events.find((e) => e.kind === 'warning');
+    assert.ok(warning);
+
+    assert.equal((await t.api('POST', '/api/agent/report', report, {
+      authorization: `Bearer ${dev.agent_token}`, cookie: '',
+    })).status, 200);
+    t.monitor.evaluate();
+    d = t.monitor.snapshot().devices[0];
+    assert.equal(d.status, 'up');
+    const recovered = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events.find((e) => e.kind === 'up');
+    assert.ok(recovered);
+  } finally { t.close(); }
+});
+
 test('agent auto-enroll with enroll key; invalid address rejected', async () => {
   const t = await boot();
   try {
