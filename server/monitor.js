@@ -1,5 +1,7 @@
 'use strict';
 const { EventEmitter } = require('node:events');
+const fs = require('node:fs');
+const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { getSettings } = require('./db');
 const snmp = require('./snmp');
@@ -36,6 +38,9 @@ class Monitor extends EventEmitter {
       metricEveryMs: 30000,
       breachMs: 15000,
       retentionDays: 7,
+      maxEvents: 100000,
+      minFreeBytes: 500 * 1048576, // below this the history is trimmed early
+      dbFile: null,                // lets the monitor watch the disk holding the database
       concurrency: 32,
       pingFn: defaultPing,
       snmpFn: snmp.pollDevice,
@@ -48,6 +53,8 @@ class Monitor extends EventEmitter {
     this.inflight = 0;
     this.timer = null;
     this.lastPurge = 0;
+    this.lastDiskCheck = 0;
+    this.diskLow = false;
     this.reload();
   }
 
@@ -128,6 +135,7 @@ class Monitor extends EventEmitter {
     }
     this.evaluate(now);
     if (now - this.lastPurge > 3600e3) { this.lastPurge = now; this.purge(); }
+    if (now - this.lastDiskCheck > 300e3) { this.lastDiskCheck = now; this.guardDisk(); }
   }
 
   _dispatch(fn) {
@@ -191,9 +199,8 @@ class Monitor extends EventEmitter {
         status = 'up';
         const agentCheck = checks.find((c) => c.n === 'agent');
         if (agentCheck && agentCheck.ok === false) reasons.push('Agent không gửi dữ liệu (còn ping được)');
-        if (agentFresh && st.agent.data) {
-          const a = st.agent.data;
-          const vals = { cpu: a.cpu, ram: a.ram.percent, disk: a.disks.reduce((m, x) => Math.max(m, x.percent || 0), 0) };
+        const vals = this._resources(st, agentFresh);
+        if (vals) {
           const label = { cpu: 'CPU', ram: 'RAM', disk: 'Ổ đĩa' };
           for (const k of ['cpu', 'ram', 'disk']) {
             // must stay above threshold for 15s so short spikes don't raise alerts
@@ -244,22 +251,78 @@ class Monitor extends EventEmitter {
     this.emit('event', { device_id: d.id, kind, severity, message });
   }
 
+  // Agent data wins; SNMP (HOST-RESOURCES-MIB) is the fallback for routers/switches.
+  _resources(st, agentFresh) {
+    if (agentFresh && st.agent.data) {
+      const a = st.agent.data;
+      return { cpu: a.cpu, ram: a.ram.percent, disk: a.disks.length ? Math.max(...a.disks.map((x) => x.percent || 0)) : null };
+    }
+    const i = st.snmp.ok && st.snmp.info;
+    if (i && (i.cpu != null || i.ram != null || i.disk != null)) {
+      return { cpu: i.cpu ?? null, ram: i.ram ?? null, disk: i.disk ?? null };
+    }
+    return null;
+  }
+
   _maybeStoreMetric(d, st, now, agentFresh) {
     if (now - st.lastMetricAt < this.o.metricEveryMs) return false;
-    const a = agentFresh && st.agent.data ? st.agent.data : null;
+    const res = this._resources(st, agentFresh);
     const rtt = st.icmp.rtt;
-    if (!a && rtt == null) return false;
+    if (!res && rtt == null) return false;
     st.lastMetricAt = now;
     this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt) VALUES(?,?,?,?,?,?)').run(
-      d.id, now, a ? a.cpu : null, a ? a.ram.percent : null,
-      a && a.disks.length ? Math.max(...a.disks.map((x) => x.percent || 0)) : null, rtt);
+      d.id, now, res ? res.cpu : null, res ? res.ram : null, res ? res.disk : null, rtt);
     return true;
   }
 
   purge() {
-    const cutoff = Date.now() - this.o.retentionDays * 86400e3;
-    this.db.prepare('DELETE FROM metrics WHERE ts < ?').run(cutoff);
-    this.db.prepare('DELETE FROM events WHERE ts < ?').run(Date.now() - 90 * 86400e3);
+    const now = Date.now();
+    this.db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - this.o.retentionDays * 86400e3);
+    this.db.prepare('DELETE FROM events WHERE ts < ?').run(now - 90 * 86400e3);
+    // hard cap so a flapping device can never grow the events table without limit
+    this.db.prepare('DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?').run(this.o.maxEvents);
+    this.checkpoint();
+  }
+
+  // Keeps the WAL file from growing and giving space back to the filesystem.
+  checkpoint() {
+    try { this.db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } catch { /* in-memory db or busy */ }
+  }
+
+  // Free space of the volume holding the database (null when unknown).
+  diskSpace() {
+    if (!this.o.dbFile || this.o.dbFile === ':memory:') return null;
+    try {
+      const s = fs.statfsSync(path.dirname(this.o.dbFile));
+      return { free: Number(s.bavail) * Number(s.bsize), total: Number(s.blocks) * Number(s.bsize) };
+    } catch { return null; }
+  }
+
+  // When the disk is nearly full, shrink history early instead of letting SQLite fail with "disk I/O error".
+  guardDisk() {
+    const d = this.diskSpace();
+    this.diskLow = !!d && d.free < this.o.minFreeBytes;
+    if (!this.diskLow) return false;
+    const now = Date.now();
+    this.db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - 86400e3);
+    this.db.prepare('DELETE FROM events WHERE ts < ?').run(now - 14 * 86400e3);
+    this.checkpoint();
+    console.warn(`[monitor] disk almost full (${Math.round(d.free / 1048576)} MB free): trimmed history`);
+    return true;
+  }
+
+  systemInfo() {
+    const size = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
+    const f = this.o.dbFile;
+    const d = this.diskSpace();
+    return {
+      db_bytes: f && f !== ':memory:' ? size(f) : null,
+      wal_bytes: f && f !== ':memory:' ? size(`${f}-wal`) : null,
+      disk_free_bytes: d ? d.free : null,
+      disk_total_bytes: d ? d.total : null,
+      disk_low: !!this.diskLow,
+      retention_days: this.o.retentionDays,
+    };
   }
 
   ack(id) {
@@ -275,14 +338,15 @@ class Monitor extends EventEmitter {
     const st = this.state.get(d.id);
     const a = st.agent.data;
     const stale = st.agent.lastAt != null && Date.now() - st.agent.lastAt > this.o.agentTimeoutMs;
+    const res = this._resources(st, !stale && a != null);
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
       maintenance: !!d.maintenance, severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,
       rtt: st.icmp.rtt,
-      cpu: a && !stale ? a.cpu : null,
-      ram: a && !stale ? a.ram.percent : null,
-      disk: a && !stale && a.disks.length ? Math.max(...a.disks.map((x) => x.percent || 0)) : null,
+      cpu: res ? res.cpu : null,
+      ram: res ? res.ram : null,
+      disk: res ? res.disk : null,
       uptime: !stale && a && a.uptime != null ? a.uptime
         : (st.snmp.info && st.snmp.info.uptime != null ? st.snmp.info.uptime : null),
       toner: st.snmp.info && st.snmp.info.toner != null ? st.snmp.info.toner : null,

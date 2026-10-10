@@ -161,6 +161,8 @@
         <form id="st-enroll" class="row"><input class="inp" name="key" style="flex:1" value="${esc(s.enroll_key || '')}" placeholder="(đang tắt)">
           <button type="button" class="btn" id="st-gen">Tạo ngẫu nhiên</button><button class="btn primary">Lưu</button></form></div>
 
+      <div class="panel" style="margin-top:14px"><h2 style="margin-top:0">Hệ thống</h2>${this.systemPanel(s)}</div>
+
       <div class="panel" style="margin-top:14px"><div class="row"><h2 style="margin:0">Người dùng</h2><span class="spacer"></span><button class="btn primary" id="us-add">+ Thêm</button></div>
         <table class="tbl"><thead><tr><th>Tên đăng nhập</th><th>Vai trò</th><th></th></tr></thead><tbody id="us-body"></tbody></table>
         <p class="muted">Admin: toàn quyền · Operator: xác nhận cảnh báo, chỉnh sơ đồ · Viewer: chỉ xem.</p></div>`;
@@ -181,6 +183,18 @@
         else M.confirm(`Xóa người dùng "${u.username}"?`, async () => { await M.api('DELETE', `/api/users/${u.id}`); this.loadUsers(); });
       };
       this.loadUsers();
+    },
+    systemPanel(s) {
+      const v = s.version || {};
+      const y = s.system || {};
+      const fb = (n) => (n == null ? '—' : M.fmtBytes(n));
+      const low = y.disk_low ? ' <span class="sev-badge critical">Sắp đầy – đang tự dọn lịch sử</span>' : '';
+      return `<dl class="kv">
+        <dt>Phiên bản</dt><dd>v${esc(v.version)} · build ${esc(v.build)} · mã ${esc(v.code)}</dd>
+        <dt>Tính năng</dt><dd>${esc((v.features || []).join(', ') || '—')}</dd>
+        <dt>Khởi động lúc</dt><dd>${v.started_at ? new Date(v.started_at).toLocaleString('vi-VN') : '—'}</dd>
+        <dt>Database</dt><dd>${fb(y.db_bytes)} (WAL ${fb(y.wal_bytes)}) · giữ lịch sử ${esc(y.retention_days)} ngày</dd>
+        <dt>Ổ đĩa chứa database</dt><dd>trống ${fb(y.disk_free_bytes)} / ${fb(y.disk_total_bytes)}${low}</dd></dl>`;
     },
     async loadUsers() {
       this.users = (await M.api('GET', '/api/users')).users;

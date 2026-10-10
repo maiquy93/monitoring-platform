@@ -71,8 +71,8 @@ Environment=PORT=8080
 Environment=DB_FILE=/var/lib/monitoring/monitor.db
 EnvironmentFile=-/etc/monitoring/monitoring.env
 ExecStart=/usr/bin/node server/index.js
-Restart=on-failure
-RestartSec=5
+Restart=always
+RestartSec=30
 NoNewPrivileges=true
 
 [Install]
@@ -90,6 +90,32 @@ sudo systemctl status monitoring.service
 
 Mạng nội bộ dùng HTTP trực tiếp `http://<IP-server>:8080`; không cần HTTPS,
 Nginx, Caddy hay reverse proxy. Không đặt `COOKIE_SECURE` khi chạy HTTP.
+
+### Cập nhật server bằng một lệnh
+
+Trên máy phát triển: `git push`. Trên VM server:
+
+```bash
+sudo bash /opt/monitoring/app/deploy/update.sh
+```
+
+Script lấy bản mới (git), chạy test, áp cấu hình restart/journald, khởi động lại
+dịch vụ, kiểm tra `/api/health` và tự quay về bản cũ nếu lỗi. Biết server đang
+chạy bản nào: chân trang dashboard (`vX.Y.Z · mã xxxxxxxx`), trang **Cài đặt →
+Hệ thống**, hoặc `curl http://127.0.0.1:8080/api/health` (trường `code`).
+
+### Dung lượng ổ đĩa và tự dọn
+
+Server tự xóa metrics quá hạn, giới hạn 100000 sự kiện, checkpoint WAL, và khi ổ
+trống dưới 500 MB sẽ giữ lịch sử ngắn hơn. `deploy/monitoring-restart.conf` và
+`deploy/journald-monitoring.conf` giới hạn tốc độ log và dung lượng journal
+(`update.sh` tự cài). Kiểm tra bằng:
+
+```bash
+df -h /
+sudo bash /opt/monitoring/app/deploy/disk-report.sh          # chỉ báo cáo
+sudo bash /opt/monitoring/app/deploy/disk-report.sh --fix    # dọn journal/apt
+```
 
 ### Docker (tùy chọn)
 
@@ -155,12 +181,19 @@ Mở **Windows PowerShell bằng quyền Administrator**, dán một dòng:
 ```
 
 Agent dùng `Get-CimInstance`, `Get-NetIPAddress` và Scheduled Task chạy lúc
-khởi động bằng tài khoản `SYSTEM`. Log gọn nằm trong Task Scheduler; có thể
-chạy thử runner để xem lỗi:
+khởi động bằng tài khoản `SYSTEM`; task được khởi chạy ngay sau khi cài, không
+giới hạn thời gian chạy và tự restart khi lỗi. Config được nạp bằng
+`[scriptblock]::Create` để tương thích Windows PowerShell 5.1. Kiểm tra:
 
 ```powershell
-Get-ScheduledTask -TaskName "Monitoring Platform Agent"
-Get-Content "$env:ProgramData\Monitoring\agent.ps1"
+Get-ScheduledTask -TaskName "Monitoring Platform Agent" | Get-ScheduledTaskInfo
+```
+
+Chạy thử runner để xem lỗi (dừng task trước để tránh chạy trùng):
+
+```powershell
+Stop-ScheduledTask -TaskName "Monitoring Platform Agent"
+& "$env:ProgramData\Monitoring\agent.ps1"
 ```
 
 Gỡ cài đặt bằng PowerShell Administrator:
@@ -227,6 +260,24 @@ Agent gửi `os: "macOS"` và hỗ trợ cả Intel lẫn Apple Silicon.
 Trên router, switch, firewall hoặc máy in: bật SNMP v2c, tạo community riêng,
 chỉ cho IP server truy cập, quyền read-only và UDP port 161. Không dùng
 community `public`. Sau đó vào **Thiết bị**, nhập IP, bật SNMP và nhập community.
+
+Với SNMP, server đọc thêm CPU, RAM và ổ đĩa từ HOST-RESOURCES-MIB
+(MikroTik RouterOS, Linux net-snmp...). Thiết bị không cần cài agent.
+
+**MikroTik RouterOS:**
+
+```
+/snmp set enabled=yes
+/snmp community set [find default=yes] name=<community> addresses=<IP-server>/32
+```
+
+Sau đó sửa thiết bị trên dashboard, tick **Giám sát SNMP**, nhập đúng community.
+
+Nếu CPU/RAM/Disk vẫn trống, chạy công cụ chẩn đoán (in dữ liệu SNMP thật):
+
+```bash
+node tools/snmp-probe.js <IP-thiết-bị> <community>
+```
 
 ## 5. Chạy demo và test
 

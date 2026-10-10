@@ -57,6 +57,7 @@ input.inp:focus, select:focus, textarea:focus { outline: 2px solid var(--accent)
 @keyframes blink { 50% { background: color-mix(in srgb, var(--lvl) 40%, var(--bg)); } }
 
 main { padding: 18px; max-width: 1900px; margin: 0 auto; }
+.ver { text-align: center; font-size: 12px; padding: 10px 0 16px; opacity: .7; }
 h1 { font-size: 22px; margin: 0 0 14px; }
 h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }

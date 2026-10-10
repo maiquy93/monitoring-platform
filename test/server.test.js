@@ -279,3 +279,102 @@ test('snmp: encode request and decode response', () => {
   assert.equal(out[snmp.OIDS.sysUpTime], 360000);
   assert.throws(() => snmp.decodeResponse(msg.subarray(0, 10), 42));
 });
+
+test('snmp: cpu/ram/disk from SNMP are shown on the device view and stored', async () => {
+  const t = await boot({ snmpFn: async () => ({ sysDescr: 'RouterOS', sysName: 'rt', uptime: 100, cpu: 12, ram: 25, disk: 40 }) });
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', { name: 'mikrotik', type: 'router', address: '10.0.0.5', check_icmp: false, snmp_enabled: true });
+    assert.equal(c.status, 201);
+    t.monitor.tick();
+    await new Promise((r) => setTimeout(r, 30));
+    const v = t.monitor.snapshot().devices[0];
+    assert.equal(v.status, 'up');
+    assert.equal(v.cpu, 12); assert.equal(v.ram, 25); assert.equal(v.disk, 40);
+    t.monitor.tick(Date.now() + 60000);
+    const row = t.db.prepare('SELECT cpu,ram,disk FROM metrics WHERE device_id=?').get(c.body.id);
+    assert.deepEqual({ ...row }, { cpu: 12, ram: 25, disk: 40 });
+  } finally { t.close(); }
+});
+
+test('version: health and settings expose build info', async () => {
+  const t = await boot();
+  try {
+    const h = await t.api('GET', '/api/health');
+    assert.equal(h.status, 200);
+    assert.equal(h.body.ok, true);
+    assert.match(h.body.version, /^\d+\.\d+\.\d+$/);
+    assert.match(h.body.code, /^[0-9a-f]{8}$/);
+    assert.ok(h.body.features.includes('snmp-host-resources'));
+    await loginAdmin(t);
+    const s = (await t.api('GET', '/api/settings')).body;
+    assert.equal(s.version.code, h.body.code);
+    assert.ok('disk_low' in s.system);
+  } finally { t.close(); }
+});
+
+test('housekeeping: purge caps events, disk guard trims history when disk is low', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mon-'));
+  const db = open(path.join(dir, 'm.db'));
+  const m = new Monitor(db, { dbFile: path.join(dir, 'm.db'), maxEvents: 5, minFreeBytes: Number.MAX_SAFE_INTEGER });
+  try {
+    const now = Date.now();
+    for (let i = 0; i < 20; i++) m.db.prepare('INSERT INTO events(ts,device_id,device_name,kind,severity,message) VALUES(?,?,?,?,?,?)').run(now, null, 'd', 'down', 'low', 'x');
+    m.db.prepare("INSERT INTO devices(id,name,agent_token,created_at) VALUES(1,'d','tok',?)").run(now);
+    m.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt) VALUES(1,?,1,1,1,1)').run(now - 3 * 86400e3);
+    m.purge();
+    assert.equal(m.db.prepare('SELECT COUNT(*) c FROM events').get().c, 5);
+    assert.equal(m.db.prepare('SELECT COUNT(*) c FROM metrics').get().c, 1); // still inside 7-day retention
+    assert.equal(m.guardDisk(), true); // "free space" is always below the huge threshold
+    assert.equal(m.db.prepare('SELECT COUNT(*) c FROM metrics').get().c, 0); // older than 1 day removed
+    const info = m.systemInfo();
+    assert.equal(info.disk_low, true);
+    assert.ok(info.db_bytes > 0 && info.disk_free_bytes > 0);
+  } finally { m.stop(); db.close(); fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('snmp: pollResources walks HOST-RESOURCES-MIB over UDP', async () => {
+  const dgram = require('node:dgram');
+  const tlv = (tag, b) => Buffer.concat([Buffer.from([tag, b.length]), b]);
+  const int = (n) => tlv(0x02, Buffer.from([(n >> 24) & 0x7f, (n >> 16) & 255, (n >> 8) & 255, n & 255]));
+  const oidB = (o) => {
+    const p = o.split('.').map(Number); const out = [p[0] * 40 + p[1]];
+    for (const n of p.slice(2)) { const c = [n & 127]; for (let v = n >> 7; v > 0; v >>= 7) c.unshift((v & 127) | 128); out.push(...c); }
+    return tlv(0x06, Buffer.from(out));
+  };
+  const cmp = (a, b) => { const x = a.split('.').map(Number); const y = b.split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? -1) !== (y[i] ?? -1)) return (x[i] ?? -1) - (y[i] ?? -1); return 0; };
+  const H = '1.3.6.1.2.1.25.';
+  const mib = [
+    [H + '2.3.1.2.1', oidB(H + '2.1.2')], [H + '2.3.1.2.2', oidB(H + '2.1.4')],
+    [H + '2.3.1.4.1', int(1024)], [H + '2.3.1.4.2', int(1024)],
+    [H + '2.3.1.5.1', int(1000)], [H + '2.3.1.5.2', int(200)],
+    [H + '2.3.1.6.1', int(250)], [H + '2.3.1.6.2', int(50)],
+    [H + '3.3.1.2.1', int(10)], [H + '3.3.1.2.2', int(20)],
+  ].sort((a, b) => cmp(a[0], b[0]));
+  const srv = dgram.createSocket('udp4');
+  srv.on('message', (m, rinfo) => {
+    const rd = (o) => { let len = m[o + 1]; let h = 2; if (len & 128) { const n = len & 127; len = 0; for (let i = 0; i < n; i++) len = len * 256 + m[o + 2 + i]; h = 2 + n; } return { s: o + h, e: o + h + len }; };
+    const v = rd(rd(0).s); const c = rd(v.e); const pdu = rd(c.e); const id = rd(pdu.s);
+    const es = rd(id.e); const ei = rd(es.e); const lst = rd(ei.e);
+    const reqId = m.subarray(id.s, id.e).readUIntBE(0, id.e - id.s);
+    const vbs = [];
+    for (let o = lst.s; o < lst.e;) {
+      const vb = rd(o); const ot = rd(vb.s);
+      const b = m.subarray(ot.s, ot.e); const parts = [Math.floor(b[0] / 40), b[0] % 40]; let x = 0;
+      for (let i = 1; i < b.length; i++) { x = x * 128 + (b[i] & 127); if (!(b[i] & 128)) { parts.push(x); x = 0; } }
+      const q = parts.join('.'); const nx = mib.find((e) => cmp(e[0], q) > 0);
+      vbs.push(tlv(0x30, Buffer.concat([oidB(nx ? nx[0] : q), nx ? nx[1] : Buffer.from([0x82, 0])])));
+      o = vb.e;
+    }
+    const body = Buffer.concat([int(reqId), int(0), int(0), tlv(0x30, Buffer.concat(vbs))]);
+    srv.send(tlv(0x30, Buffer.concat([int(1), tlv(0x04, Buffer.from('public')), tlv(0xa2, body)])), rinfo.port, rinfo.address);
+  });
+  await new Promise((r) => srv.bind(0, '127.0.0.1', r));
+  try {
+    const r = await snmp.pollResources({ host: '127.0.0.1', port: srv.address().port, community: 'public' });
+    assert.deepEqual(r, { cpu: 15, ram: 25, disk: 25 });
+  } finally { srv.close(); }
+});

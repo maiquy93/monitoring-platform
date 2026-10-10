@@ -14,6 +14,7 @@ const db = open(dbFile);
 auth.ensureAdmin(db);
 
 const monitor = new Monitor(db, {
+  dbFile,
   ...(env.PING_INTERVAL_MS && { pingIntervalMs: Number(env.PING_INTERVAL_MS) }),
   ...(env.AGENT_TIMEOUT_MS && { agentTimeoutMs: Number(env.AGENT_TIMEOUT_MS) }),
   ...(env.RETENTION_DAYS && { retentionDays: Number(env.RETENTION_DAYS) }),

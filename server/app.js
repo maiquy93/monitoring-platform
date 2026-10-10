@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const auth = require('./auth');
 const { getSettings, setSetting } = require('./db');
 const { ADDR_RE, SEV_RANK } = require('./monitor');
+const { info: versionInfo } = require('./version');
 
 const TYPES = ['server', 'vm', 'router', 'switch', 'firewall', 'ap', 'printer', 'ups', 'pc', 'other'];
 const THEMES = ['dark', 'light', 'neon'];
@@ -380,8 +381,8 @@ function createApp(db, monitor, opts = {}) {
     const s = getSettings(db);
     const out = { type_severity: s.type_severity, thresholds: s.thresholds, org_name: s.org_name, default_theme: s.default_theme,
       types: TYPES, timing: { ping_interval_ms: monitor.o.pingIntervalMs, ping_fail_limit: monitor.o.pingFailLimit,
-        agent_timeout_ms: monitor.o.agentTimeoutMs } };
-    if (ctx.user.role === 'admin') out.enroll_key = s.enroll_key;
+        agent_timeout_ms: monitor.o.agentTimeoutMs }, version: versionInfo };
+    if (ctx.user.role === 'admin') { out.enroll_key = s.enroll_key; out.system = monitor.systemInfo(); }
     send(ctx.res, 200, out);
   });
   route('PUT', '/api/settings', 'admin', async (ctx) => {
@@ -466,7 +467,7 @@ function createApp(db, monitor, opts = {}) {
   });
 
   // ---------- agent ----------
-  route('GET', '/api/health', null, (ctx) => send(ctx.res, 200, { ok: true }));
+  route('GET', '/api/health', null, (ctx) => send(ctx.res, 200, { ok: true, version: versionInfo.version, build: versionInfo.build, code: versionInfo.code, features: versionInfo.features }));
   route('POST', '/api/agent/report', null, async (ctx) => {
     const m = /^Bearer\s+(\S+)$/.exec(ctx.req.headers.authorization || '');
     if (!m) throw new HttpError(401, 'Thiếu token');

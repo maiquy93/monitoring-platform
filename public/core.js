@@ -175,6 +175,11 @@ M.logout = async () => {
   M.showLogin();
 };
 
+M.versionText = () => {
+  const v = M.S.settings && M.S.settings.version;
+  return v ? `v${v.version} · build ${v.build} · mã ${v.code}` : '';
+};
+
 // ---------- shell ----------
 const NAV = [['#/', 'Tổng quan'], ['#/groups', 'Nhóm'], ['#/maps', 'Sơ đồ'], ['#/events', 'Sự kiện'], ['#/devices', 'Thiết bị'], ['#/settings', 'Cài đặt', 'admin']];
 
@@ -196,7 +201,8 @@ M.renderShell = () => {
     </div>
   </header>
   <div id="banner"></div>
-  <main id="view"></main>`;
+  <main id="view"></main>
+  <footer class="ver muted" id="ver">${esc(M.versionText())}</footer>`;
   $('#theme-sel').value = document.documentElement.dataset.theme;
   $('#theme-sel').addEventListener('change', async (e) => {
     M.applyTheme(e.target.value);
