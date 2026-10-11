@@ -1,0 +1,81 @@
+{
+  "id": "synology",
+  "name": "Synology NAS (DSM)",
+  "description": "Theo tài liệu chính thức Synology DiskStation MIB Guide (global.download.synology.com/.../Synology_DiskStation_MIB_Guide.pdf): CPU = cpuUtilization (SYNOLOGY-SYSTEM-MIB 1.3.6.1.4.1.6574.1.7.1.0, tổng user+system), RAM = memUtilization (1.3.6.1.4.1.6574.1.7.2.0), nhiệt độ = temperature (1.3.6.1.4.1.6574.1.2.0). Dung lượng đọc SYNOLOGY-RAID-MIB (1.3.6.1.4.1.6574.3.1.1: raidFreeSize .4 / raidTotalSize .5, Counter64) cho volume/storage pool; lấy mức đầy nhất. SYNOLOGY-SYSTEM-MIB và Disk MIB không có chỉ số dùng đĩa (Disk MIB chỉ có model/trạng thái/nhiệt độ từng ổ). Dự phòng cho DSM cũ chưa có cpuUtilization/memUtilization: UCD-SNMP-MIB và HOST-RESOURCES-MIB (Synology tài liệu hóa cả hai). CHƯA kiểm chứng với dữ liệu walk thật (chưa có NAS): chạy `node tools/snmp-probe.js <IP> <community> --name synology-<model>` để lưu walk thật rồi bỏ cờ unverified. Bật SNMP: DSM Control Panel > Terminal & SNMP > SNMP.",
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.6574"] },
+    { "sysDescr": "synology|diskstation" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "get": "1.3.6.1.4.1.6574.1.7.1.0", "unverified": true },
+        { "get": "1.3.6.1.4.1.2021.11.11.0", "invert": true, "unverified": true },
+        { "table": { "columns": { "load": "1.3.6.1.2.1.25.3.3.1.2" }, "value": { "column": "load" }, "agg": "avg" }, "unverified": true }
+      ]
+    },
+    "ram": {
+      "label": "RAM",
+      "unit": "%",
+      "sources": [
+        { "get": "1.3.6.1.4.1.6574.1.7.2.0", "unverified": true },
+        { "percent": { "free": "1.3.6.1.4.1.2021.4.6.0", "total": "1.3.6.1.4.1.2021.4.5.0" }, "unverified": true },
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.2"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "first"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "disk": {
+      "label": "Dung lượng (volume đầy nhất)",
+      "unit": "%",
+      "sources": [
+        {
+          "table": {
+            "columns": { "free": "1.3.6.1.4.1.6574.3.1.1.4", "total": "1.3.6.1.4.1.6574.3.1.1.5" },
+            "value": { "percent": { "free": "free", "total": "total" } },
+            "agg": "max"
+          },
+          "unverified": true
+        },
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.4", "1.3.6.1.2.1.25.2.1.9"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "temperature": {
+      "label": "Nhiệt độ hệ thống",
+      "unit": "°C",
+      "round": 0,
+      "optional": true,
+      "sources": [{ "get": "1.3.6.1.4.1.6574.1.2.0", "unverified": true }]
+    },
+    "toner": null,
+    "dsm_version": {
+      "label": "Phiên bản DSM",
+      "optional": true,
+      "sources": [{ "get": "1.3.6.1.4.1.6574.1.5.3.0", "text": true, "unverified": true }]
+    },
+    "model": {
+      "label": "Model NAS",
+      "optional": true,
+      "sources": [{ "get": "1.3.6.1.4.1.6574.1.5.1.0", "text": true, "unverified": true }]
+    }
+  }
+}

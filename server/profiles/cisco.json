@@ -1,0 +1,38 @@
+{
+  "id": "cisco",
+  "name": "Cisco IOS / IOS-XE (switch, router)",
+  "description": "CPU đọc cpmCPUTotal5minRev (CISCO-PROCESS-MIB, 1.3.6.1.4.1.9.9.109.1.1.1.1.8, trung bình 5 phút, lấy CPU cao nhất); RAM đọc ciscoMemoryPoolUsed/ciscoMemoryPoolFree (CISCO-MEMORY-POOL-MIB, 1.3.6.1.4.1.9.9.48.1.1.1.5/.6) của pool Processor (ciscoMemoryPoolType = 1). Nguồn: MIB công bố của Cisco (github.com/cisco/cisco-mibs: CISCO-PROCESS-MIB.my, CISCO-MEMORY-POOL-MIB.my). CHƯA kiểm chứng với dữ liệu walk thật (chưa có thiết bị Cisco): chạy `node tools/snmp-probe.js <IP> <community> --name cisco-<model>` để lưu walk thật rồi bỏ cờ unverified. Cisco IOS không phơi ổ đĩa qua HOST-RESOURCES nên không có chỉ số disk. Lưu ý: ciscoMemoryPoolUsed/Free là Gauge32 nên có thể sai trên thiết bị RAM > 4 GB. Trên thiết bị cần `snmp-server community <community> RO <ACL>`.",
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.9"] },
+    { "sysDescr": "cisco ios" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU (5 phút, cao nhất)",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "table": { "columns": { "load": "1.3.6.1.4.1.9.9.109.1.1.1.1.8" }, "value": { "column": "load" }, "agg": "max" }, "unverified": true }
+      ]
+    },
+    "ram": {
+      "label": "RAM (pool Processor)",
+      "unit": "%",
+      "sources": [
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.4.1.9.9.48.1.1.1.1", "used": "1.3.6.1.4.1.9.9.48.1.1.1.5", "free": "1.3.6.1.4.1.9.9.48.1.1.1.6" },
+            "where": { "type": [1] },
+            "value": { "percent": { "used": "used", "free": "free" } },
+            "agg": "first"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "disk": null,
+    "toner": null
+  }
+}

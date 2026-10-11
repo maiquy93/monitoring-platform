@@ -310,6 +310,32 @@ end
 ```
 
 
+**Cisco IOS / IOS-XE (switch, router):** chọn **Tự nhận diện** (sysObjectID
+`1.3.6.1.4.1.9` hoặc sysDescr chứa `Cisco IOS`). Hồ sơ `cisco` đọc CPU từ
+`cpmCPUTotal5minRev` (`1.3.6.1.4.1.9.9.109.1.1.1.1.8`, CISCO-PROCESS-MIB, lấy CPU cao nhất)
+và RAM từ `ciscoMemoryPoolUsed`/`ciscoMemoryPoolFree` (`1.3.6.1.4.1.9.9.48.1.1.1.5`/`.6`,
+CISCO-MEMORY-POOL-MIB, pool Processor). Không có chỉ số ổ đĩa. Nguồn: MIB công bố của Cisco
+(`github.com/cisco/cisco-mibs`), **chưa kiểm chứng bằng walk thật**. Gauge32 nên RAM > 4 GB có thể sai. Trên thiết bị:
+
+```
+snmp-server community <community> RO <ACL-cho-IP-server>
+```
+
+**pfSense / OPNsense:** chọn **Tự nhận diện** (sysObjectID `1.3.6.1.4.1.12325` của bsnmpd,
+hoặc sysDescr chứa `pfSense`/`OPNsense` khi dùng net-snmp). Hồ sơ `pfsense` đọc CPU/RAM từ
+UCD-SNMP-MIB (`ssCpuIdle` `…2021.11.11.0`, `memTotalReal` `…2021.4.5.0`, `memAvailReal` `…2021.4.6.0`)
+và ổ đĩa từ HOST-RESOURCES-MIB (`hrStorageTable`). bsnmpd mặc định không có UCD-SNMP-MIB nên
+CPU/RAM tự dùng HOST-RESOURCES dự phòng. **Chưa kiểm chứng bằng walk thật.**
+Bật SNMP ở pfSense: Services > SNMP; OPNsense: Services > Net-SNMP (plugin `os-net-snmp`).
+
+**Synology NAS (DSM):** chọn **Tự nhận diện** (sysObjectID `1.3.6.1.4.1.6574` hoặc sysDescr chứa
+`Synology`/`DiskStation`). Theo *Synology DiskStation MIB Guide*: CPU `cpuUtilization`
+(`1.3.6.1.4.1.6574.1.7.1.0`), RAM `memUtilization` (`…6574.1.7.2.0`), nhiệt độ `…6574.1.2.0`
+(SYNOLOGY-SYSTEM-MIB); dung lượng từ SYNOLOGY-RAID-MIB (`raidFreeSize`/`raidTotalSize`,
+`…6574.3.1.1.4`/`.5`, lấy volume đầy nhất) vì MIB hệ thống/đĩa của Synology không có chỉ số dùng
+đĩa. DSM cũ thiếu các OID này sẽ dùng UCD-SNMP-MIB / HOST-RESOURCES dự phòng.
+**Chưa kiểm chứng bằng walk thật.** Bật SNMP: Control Panel > Terminal & SNMP > SNMP.
+
 Chẩn đoán (walk thiết bị thật, lưu `test/fixtures/<hãng>-<model>.walk`, rồi in
 hồ sơ được chọn và từng chỉ số):
 
@@ -346,7 +372,7 @@ Không sửa code, chỉ thêm file và test:
 
    - Mỗi chỉ số có danh sách `sources` thử lần lượt; nguồn đầu đọc được thì dừng.
    - Nguồn: `get` (một OID), `percent` (`used` hoặc `free`, cùng `total`), `table`
-     (`columns`, `where`, `value.column` hoặc `value.percent`, `agg` = avg/max/min/sum/first).
+     (`columns`, `where`, `value.column` hoặc `value.percent`, `agg` = avg/max/min/sum/first); `value.percent` dùng `total` + `used`/`free`, hoặc cả `used` và `free` khi MIB không có cột tổng).
    - Tuỳ chọn: `scale`, `invert`, `map`, `text`, `unverified`, `optional`; `round`, `unit` ở cấp chỉ số.
    - Chỉ số lõi: `cpu`, `ram`, `disk`, `temperature`, `toner`, `uptime`; tên khác hiện ở mục chỉ số riêng.
    - `extends` kế thừa chỉ số; đặt `"tên": null` để bỏ chỉ số kế thừa.

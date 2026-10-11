@@ -1,0 +1,54 @@
+{
+  "id": "pfsense",
+  "name": "pfSense / OPNsense (FreeBSD)",
+  "description": "CPU/RAM đọc UCD-SNMP-MIB (ssCpuIdle 1.3.6.1.4.1.2021.11.11.0 đảo thành % dùng; memTotalReal 1.3.6.1.4.1.2021.4.5.0 và memAvailReal 1.3.6.1.4.1.2021.4.6.0), ổ đĩa đọc HOST-RESOURCES-MIB (hrStorageTable 1.3.6.1.2.1.25.2.3.1, kiểu hrStorageFixedDisk/hrStorageFlashMemory, lấy ổ đầy nhất). Nguồn: UCD-SNMP-MIB (net-snmp.org) và HOST-RESOURCES-MIB (RFC 2790). Daemon bsnmpd mặc định của pfSense/OPNsense (sysObjectID 1.3.6.1.4.1.12325, Begemot) chỉ có HOST-RESOURCES, không có UCD-SNMP-MIB nên CPU/RAM tự dùng hrProcessorLoad/hrStorageRam dự phòng; cài gói net-snmp (sysDescr chứa pfSense/OPNsense) thì có đủ UCD. CHƯA kiểm chứng với dữ liệu walk thật (chưa có thiết bị): chạy `node tools/snmp-probe.js <IP> <community> --name pfsense-<model>` để lưu walk thật rồi bỏ cờ unverified. Bật SNMP: pfSense Services > SNMP, OPNsense Services > Net-SNMP (hoặc plugin os-net-snmp); cho phép UDP 161 từ IP server.",
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.12325"] },
+    { "sysDescr": "pfsense|opnsense" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "get": "1.3.6.1.4.1.2021.11.11.0", "invert": true, "unverified": true },
+        { "table": { "columns": { "load": "1.3.6.1.2.1.25.3.3.1.2" }, "value": { "column": "load" }, "agg": "avg" }, "unverified": true }
+      ]
+    },
+    "ram": {
+      "label": "RAM",
+      "unit": "%",
+      "sources": [
+        { "percent": { "free": "1.3.6.1.4.1.2021.4.6.0", "total": "1.3.6.1.4.1.2021.4.5.0" }, "unverified": true },
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.2"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "first"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "disk": {
+      "label": "Ổ đĩa (cao nhất)",
+      "unit": "%",
+      "sources": [
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.4", "1.3.6.1.2.1.25.2.1.9"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "toner": null
+  }
+}

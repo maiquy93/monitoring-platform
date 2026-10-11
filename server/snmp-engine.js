@@ -48,7 +48,12 @@ function validateSource(src, where) {
     if (!t.columns || !Object.keys(t.columns).length) throw new Error(`${where}: table.columns trống`);
     for (const [k, v] of Object.entries(t.columns)) oid(v, `table.columns.${k}`);
     if (!t.value || (t.value.column === undefined) === (t.value.percent === undefined)) throw new Error(`${where}: table.value cần column hoặc percent`);
-    const refs = t.value.column !== undefined ? [t.value.column] : [t.value.percent.total, t.value.percent.used ?? t.value.percent.free];
+    const pc = t.value.percent;
+    // percent: "total" + (used hoặc free), hoặc cả "used" và "free" (tổng = used + free, vd. CISCO-MEMORY-POOL-MIB)
+    if (pc && (pc.total !== undefined ? (pc.used === undefined) === (pc.free === undefined) : (pc.used === undefined || pc.free === undefined))) {
+      throw new Error(`${where}: table.value.percent cần total + (used hoặc free), hoặc cả used và free`);
+    }
+    const refs = t.value.column !== undefined ? [t.value.column] : (pc.total !== undefined ? [pc.total, pc.used ?? pc.free] : [pc.used, pc.free]);
     for (const r of refs) if (!t.columns[r]) throw new Error(`${where}: table.value tham chiếu cột "${r}" không có trong columns`);
     for (const k of Object.keys(t.where || {})) if (!t.columns[k]) throw new Error(`${where}: table.where dùng cột "${k}" không có trong columns`);
     if (t.agg && !AGGS.has(t.agg)) throw new Error(`${where}: agg phải là ${[...AGGS].join('/')}`);
@@ -193,6 +198,12 @@ function pct(used, total) {
   if (num(used) === null || num(total) === null || total <= 0 || used < 0) return null;
   return (used / total) * 100;
 }
+// Percent of one table row. `p` names columns: total + (used | free), or used + free (total = used + free).
+function rowPercent(p, get) {
+  if (p.total === undefined) return pct(get(p.used), get(p.used) + get(p.free));
+  const total = get(p.total);
+  return pct(p.used !== undefined ? get(p.used) : total - get(p.free), total);
+}
 const aggregate = (vals, agg) => {
   if (agg === 'max') return Math.max(...vals);
   if (agg === 'min') return Math.min(...vals);
@@ -227,7 +238,7 @@ async function evalSource(src, rd) {
       matched++;
       const x = t.value.column !== undefined
         ? num(col(r, t.value.column))
-        : pct(t.value.percent.used !== undefined ? col(r, t.value.percent.used) : col(r, t.value.percent.total) - col(r, t.value.percent.free), col(r, t.value.percent.total));
+        : rowPercent(t.value.percent, (name) => col(r, name));
       if (x !== null) vals.push(x);
     }
     if (!matched) throw new SnmpFail('no_match');

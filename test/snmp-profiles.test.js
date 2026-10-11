@@ -128,6 +128,187 @@ test('detectProfile: vendor classification (fortigate / mikrotik / generic), lea
   assert.equal(d('', ''), 'generic');
 });
 
+test('detectProfile: cisco / synology / pfsense by enterprise sysObjectID or sysDescr, no false prefix match', () => {
+  const d = (sysObjectID, sysDescr = '') => engine.detectProfile({ sysObjectID, sysDescr }).id;
+  assert.equal(d('1.3.6.1.4.1.9.1.1208'), 'cisco');
+  assert.equal(d('.1.3.6.1.4.1.9.1.1208'), 'cisco');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Cisco IOS Software, C2960 Software'), 'cisco');
+  assert.equal(d('1.3.6.1.4.1.99999.1'), 'generic');   // 1.3.6.1.4.1.9 không được khớp tiền tố chuỗi "…9999"
+  assert.equal(d('1.3.6.1.4.1.6574.1'), 'synology');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Linux DiskStation 4.4.302+ #72806'), 'synology');
+  assert.equal(d('1.3.6.1.4.1.12325.1.1.2.1.1'), 'pfsense');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.8', 'pfSense.home.arpa 2.7.2-RELEASE FreeBSD 14.0'), 'pfsense');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.8', 'OPNsense.localdomain 24.1 FreeBSD 13.2'), 'pfsense');
+});
+
+// ---- Cisco: dữ liệu TỔNG HỢP theo CISCO-PROCESS-MIB / CISCO-MEMORY-POOL-MIB (chưa có walk thật) ----
+const ciscoRows = (descr = 'Cisco IOS Software, C2960X Software') => [
+  ['1.3.6.1.2.1.1.1.0', descr, 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.9.1.1208', 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 720000, 'TIMETICKS'],
+  ['1.3.6.1.4.1.9.9.109.1.1.1.1.8.1', 12, 'GAUGE32'],   // cpmCPUTotal5minRev, CPU 1
+  ['1.3.6.1.4.1.9.9.109.1.1.1.1.8.2', 20, 'GAUGE32'],   // CPU 2 (thành viên stack)
+  ['1.3.6.1.4.1.9.9.48.1.1.1.1.1', 1, 'INTEGER'],       // ciscoMemoryPoolType = processor
+  ['1.3.6.1.4.1.9.9.48.1.1.1.5.1', 300, 'GAUGE32'],     // ciscoMemoryPoolUsed
+  ['1.3.6.1.4.1.9.9.48.1.1.1.6.1', 700, 'GAUGE32'],     // ciscoMemoryPoolFree
+  ['1.3.6.1.4.1.9.9.48.1.1.1.1.2', 2, 'INTEGER'],       // pool I/O: phải bị bỏ qua
+  ['1.3.6.1.4.1.9.9.48.1.1.1.5.2', 900, 'GAUGE32'],
+  ['1.3.6.1.4.1.9.9.48.1.1.1.6.2', 100, 'GAUGE32'],
+];
+
+test('cisco (synthetic MIB data): auto-detected, CPU 5min max over CPUs, RAM from processor pool used/free', async () => {
+  const r = await startReplay(null, { rows: ciscoRows() });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'cisco');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.cpu, 20);
+    assert.equal(out.ram, 30);          // 300 / (300 + 700), pool I/O (90%) không được tính
+    assert.equal(out.uptime, 7200);
+    assert.equal(out.diag.cpu.unverified, true);
+    assert.equal(out.diag.ram.unverified, true);
+    assert.equal(out.disk, undefined);
+    assert.equal(out.diag.disk, undefined);   // Cisco IOS không có disk qua HOST-RESOURCES
+    assert.equal(out.diag.toner, undefined);
+  } finally { r.close(); }
+});
+
+test('cisco: ram reports a reason when the device has no CISCO-MEMORY-POOL-MIB rows', async () => {
+  const rows = ciscoRows().filter(([o]) => !o.startsWith('1.3.6.1.4.1.9.9.48.'));
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'cisco');
+    assert.equal(out.cpu, 20);
+    assert.equal(out.diag.ram.ok, false);
+    assert.equal(out.diag.ram.code, 'no_rows');
+  } finally { r.close(); }
+});
+
+// ---- pfSense / OPNsense: dữ liệu TỔNG HỢP theo UCD-SNMP-MIB + HOST-RESOURCES-MIB (chưa có walk thật) ----
+const HRS = '1.3.6.1.2.1.25.2.3.1.';
+const hrStorageRows = () => [
+  [`${HRS}2.1`, '1.3.6.1.2.1.25.2.1.2', 'OID'], [`${HRS}5.1`, 1000, 'INTEGER'], [`${HRS}6.1`, 250, 'INTEGER'],   // RAM 25%
+  [`${HRS}2.2`, '1.3.6.1.2.1.25.2.1.4', 'OID'], [`${HRS}5.2`, 2000, 'INTEGER'], [`${HRS}6.2`, 500, 'INTEGER'],   // đĩa 25%
+  [`${HRS}2.3`, '1.3.6.1.2.1.25.2.1.4', 'OID'], [`${HRS}5.3`, 1000, 'INTEGER'], [`${HRS}6.3`, 800, 'INTEGER'],   // đĩa 80%
+];
+const pfRows = (objectId, descr) => [
+  ['1.3.6.1.2.1.1.1.0', descr, 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', objectId, 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 100000, 'TIMETICKS'],
+];
+
+test('pfsense/opnsense (synthetic, net-snmp): detected by sysDescr, CPU/RAM from UCD-SNMP-MIB, disk from HOST-RESOURCES', async () => {
+  const rows = [
+    ...pfRows('1.3.6.1.4.1.8072.3.2.8', 'OPNsense.localdomain 24.1 FreeBSD 13.2-RELEASE amd64'),
+    ['1.3.6.1.4.1.2021.11.11.0', 88, 'INTEGER'],     // ssCpuIdle → CPU 12%
+    ['1.3.6.1.4.1.2021.4.5.0', 4000000, 'INTEGER'],  // memTotalReal
+    ['1.3.6.1.4.1.2021.4.6.0', 3000000, 'INTEGER'],  // memAvailReal → RAM 25%
+    ...hrStorageRows(),
+  ];
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'pfsense');
+    assert.equal(out.cpu, 12);
+    assert.equal(out.ram, 25);
+    assert.equal(out.disk, 80);
+    assert.equal(out.uptime, 1000);
+    assert.equal(out.diag.cpu.source, 0);
+    assert.equal(out.diag.disk.unverified, true);
+    assert.equal(out.diag.toner, undefined);
+  } finally { r.close(); }
+});
+
+test('pfsense (synthetic, bsnmpd): detected by Begemot sysObjectID, no UCD → CPU/RAM fall back to HOST-RESOURCES', async () => {
+  const rows = [
+    ...pfRows('1.3.6.1.4.1.12325.1.1.2.1.1', 'FreeBSD fw 14.0-CURRENT'),
+    ['1.3.6.1.2.1.25.3.3.1.2.1', 30, 'INTEGER'], ['1.3.6.1.2.1.25.3.3.1.2.2', 50, 'INTEGER'],   // hrProcessorLoad
+    ...hrStorageRows(),
+  ];
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'pfsense');
+    assert.equal(out.cpu, 40);
+    assert.equal(out.diag.cpu.source, 1);
+    assert.equal(out.diag.cpu.tried.length, 1);
+    assert.equal(out.ram, 25);
+    assert.equal(out.diag.ram.source, 1);
+    assert.equal(out.disk, 80);
+  } finally { r.close(); }
+});
+
+// ---- Synology: dữ liệu TỔNG HỢP theo Synology DiskStation MIB Guide (chưa có walk thật) ----
+const SY = '1.3.6.1.4.1.6574.';
+const synologyRows = (objectId = '1.3.6.1.4.1.8072.3.2.10') => [
+  ['1.3.6.1.2.1.1.1.0', 'Linux DiskStation 4.4.302+ #72806 SMP x86_64', 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', objectId, 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 500000, 'TIMETICKS'],
+  [`${SY}1.2.0`, 38, 'INTEGER'],            // temperature
+  [`${SY}1.5.1.0`, 'DS920+', 'STRING'],     // modelName
+  [`${SY}1.5.3.0`, 'DSM 7.2.1-69057', 'STRING'],   // version
+  [`${SY}1.7.1.0`, 17, 'INTEGER'],          // cpuUtilization
+  [`${SY}1.7.2.0`, 43, 'INTEGER'],          // memUtilization
+  [`${SY}3.1.1.2.1`, 'Storage Pool 1', 'STRING'], [`${SY}3.1.1.4.1`, 2000000000000, 'COUNTER64'], [`${SY}3.1.1.5.1`, 8000000000000, 'COUNTER64'],   // raidFreeSize / raidTotalSize: 75%
+  [`${SY}3.1.1.2.2`, 'Volume 1', 'STRING'],       [`${SY}3.1.1.4.2`, 1000000000000, 'COUNTER64'], [`${SY}3.1.1.5.2`, 8000000000000, 'COUNTER64'],   // 87.5%
+];
+
+test('synology (synthetic MIB data): auto-detected by sysObjectID, cpu/ram/temp from SYNOLOGY-SYSTEM-MIB, disk from SYNOLOGY-RAID-MIB', async () => {
+  const r = await startReplay(null, { rows: synologyRows('1.3.6.1.4.1.6574.1') });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'synology');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.cpu, 17);
+    assert.equal(out.ram, 43);
+    assert.equal(out.disk, 87.5);       // volume đầy nhất
+    assert.equal(out.temperature, 38);
+    assert.equal(out.uptime, 5000);
+    assert.equal(out.diag.cpu.unverified, true);
+    const extra = Object.fromEntries(out.extra.map((e) => [e.key, e.value]));
+    assert.equal(extra.model, 'DS920+');
+    assert.match(extra.dsm_version, /^DSM 7\.2/);
+    assert.equal(out.diag.toner, undefined);
+  } finally { r.close(); }
+});
+
+test('synology: detected by sysDescr, old DSM without SYNOLOGY-SYSTEM-MIB utilisation falls back to UCD-SNMP / HOST-RESOURCES', async () => {
+  const rows = [
+    ...synologyRows().filter(([o]) => !o.startsWith(`${SY}1.7.`) && !o.startsWith(`${SY}3.`)),
+    ['1.3.6.1.4.1.2021.11.11.0', 70, 'INTEGER'],      // ssCpuIdle → CPU 30%
+    ['1.3.6.1.4.1.2021.4.5.0', 2000000, 'INTEGER'],
+    ['1.3.6.1.4.1.2021.4.6.0', 500000, 'INTEGER'],    // RAM 75%
+    ...hrStorageRows(),
+  ];
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'synology');
+    assert.equal(out.cpu, 30);
+    assert.equal(out.diag.cpu.source, 1);
+    assert.equal(out.ram, 75);
+    assert.equal(out.diag.ram.source, 1);
+    assert.equal(out.disk, 80);
+    assert.equal(out.diag.disk.source, 1);
+  } finally { r.close(); }
+});
+
+test('profile validation: table percent accepts used+free without total, rejects incomplete combinations', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prof-'));
+  try {
+    const write = (n, o) => fs.writeFileSync(path.join(dir, `${n}.json`), JSON.stringify(o));
+    write('generic', { id: 'generic', name: 'G', fallback: true, metrics: {} });
+    const prof = (percent) => ({
+      id: 'p', name: 'P', match: { sysObjectID: ['1.3.6.1.4.1.99999'] },
+      metrics: { ram: { sources: [{ table: { columns: { u: '1.3.6.1.4.1.99999.1', f: '1.3.6.1.4.1.99999.2' }, value: { percent } } }] } },
+    });
+    write('p', prof({ used: 'u', free: 'f' }));
+    assert.doesNotThrow(() => engine.loadProfiles(dir));
+    write('p', prof({ used: 'u' }));
+    assert.throws(() => engine.loadProfiles(dir), /p\.json.*percent/);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
 
 // ---- lỗi: lý do phải rõ ---------------------------------------------------
 test('errors: timeout (silent / wrong community) gives a Vietnamese reason', async () => {
