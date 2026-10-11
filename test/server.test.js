@@ -1,8 +1,8 @@
-﻿'use strict';
+'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { open } = require('../server/db');
-const { Monitor } = require('../server/monitor');
+const { Monitor, updateNetSlot } = require('../server/monitor');
 const { createApp } = require('../server/app');
 const auth = require('../server/auth');
 const snmp = require('../server/snmp');
@@ -397,4 +397,126 @@ test('snmp: "Xuất dữ liệu SNMP" returns a .walk file for admins only', asy
     assert.equal(walkfile.parse(text).rows.length, loadFixture('mikrotik-routeros-x86').rows.length);
   } finally { t.close(); replay.close(); }
 });
+
+test('bandwidth: updateNetSlot handles deltas, 32-bit counter rollover and resets', () => {
+  const slot = { base: null, rate: null };
+  const t0 = 1000000;
+  // First sample sets baseline
+  updateNetSlot(slot, { p1: [1000, 2000, 64] }, t0);
+  assert.equal(slot.rate, null);
+  assert.deepEqual(slot.base, { ts: t0, rows: { p1: [1000, 2000, 64] } });
+
+  // Second sample after 10s: rx +10000 (1000 B/s), tx +20000 (2000 B/s)
+  updateNetSlot(slot, { p1: [11000, 22000, 64] }, t0 + 10000);
+  assert.equal(slot.rate.in, 1000);
+  assert.equal(slot.rate.out, 2000);
+
+  // 32-bit rollover: counter near 2^32 wraps to small value
+  const s32 = { base: null, rate: null };
+  updateNetSlot(s32, { eth0: [4294960000, 1000, 32] }, t0);
+  // After 10s: wraps past 2^32 (4294967296) to 5000: delta = 5000 + 4294967296 - 4294960000 = 12296 bytes => 1229.6 B/s
+  updateNetSlot(s32, { eth0: [5000, 21000, 32] }, t0 + 10000);
+  assert.equal(Math.round(s32.rate.in), 1230);
+  assert.equal(s32.rate.out, 2000);
+
+  // Counter reset on 64-bit counter (device rebooted without wrap): drops silently
+  const s64 = { base: null, rate: null };
+  updateNetSlot(s64, { p1: [50000, 50000, 64] }, t0);
+  updateNetSlot(s64, { p1: [1000, 1000, 64] }, t0 + 10000);
+  assert.equal(s64.rate, null);
+});
+
+test('bandwidth: agent network traffic calculates bandwidth, stores in DB and returns in history API', async () => {
+  const t = await boot({ agentTimeoutMs: 20000, agentNetWindowMs: 0 });
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', { name: 'srv-net', type: 'server', check_icmp: false, check_agent: true });
+    const dev = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    const now = Date.now();
+
+    // Report #1 sets baseline
+    await t.api('POST', '/api/agent/report', {
+      hostname: 'srv-net', cpu: { percent: 10, cores: 2 },
+      memory: { total: 4e9, used: 1e9, percent: 25 },
+      disks: [{ mount: '/', total: 5e10, used: 1e10, percent: 20 }],
+      net: { rx_bytes: 1000000, tx_bytes: 500000 },
+      uptime: 500,
+    }, { authorization: `Bearer ${dev.agent_token}`, cookie: '' });
+
+    t.monitor.startedAt -= 60000;
+    t.monitor.evaluate(now);
+    assert.equal(t.monitor.snapshot().devices[0].net_in, null);
+
+    // Report #2: update slot with delta rx = 1000000 B, tx = 500000 B over exactly 10s => in: 100000 B/s, out: 50000 B/s
+    const st = t.monitor.state.get(c.body.id);
+    const t1 = st.agent.net.base.ts + 10000;
+    updateNetSlot(st.agent.net, { agent: [2000000, 1000000, 64] }, t1, 0);
+    st.agent.lastAt = t1;
+    st.lastMetricAt = 0;
+
+    t.monitor.evaluate(t1);
+    const d = t.monitor.snapshot().devices[0];
+    assert.equal(d.net_in, 100000);
+    assert.equal(d.net_out, 50000);
+
+    // Stored metric
+    const row = t.db.prepare('SELECT net_in, net_out FROM metrics WHERE device_id=? ORDER BY ts DESC').get(c.body.id);
+    assert.deepEqual({ ...row }, { net_in: 100000, net_out: 50000 });
+
+    // History API returns points with net_in and net_out
+    const history = await t.api('GET', `/api/devices/${c.body.id}/history?range=1h`);
+    assert.equal(history.status, 200);
+    assert.ok(history.body.points.length > 0);
+    const pt = history.body.points[history.body.points.length - 1];
+    assert.equal(pt.net_in, 100000);
+    assert.equal(pt.net_out, 50000);
+  } finally { t.close(); }
+});
+
+test('bandwidth: SNMP interface traffic calculates rates and stores metrics', async () => {
+  let sample = 1;
+  const t = await boot({
+    snmpFn: async () => ({
+      sysDescr: 'RouterOS', sysName: 'rt', uptime: 100, cpu: 15, ram: 30, disk: 10,
+      if_counters: {
+        rows: {
+          '1': sample === 1 ? [100000, 50000, 64] : [400000, 200000, 64],
+        },
+      },
+    }),
+  });
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'router-net', type: 'router', address: '10.0.0.99', check_icmp: false, snmp_enabled: true,
+    });
+    assert.equal(c.status, 201);
+
+    let now = Date.now();
+    // First SNMP poll: baseline
+    now += 35000;
+    t.monitor.tick(now);
+    for (let i = 0; i < 30 && !t.monitor.state.get(c.body.id).snmp.net.base; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(t.monitor.state.get(c.body.id).snmp.net.base);
+    assert.equal(t.monitor.snapshot().devices[0].net_in, null);
+
+    // Second SNMP poll after 30s: sample 2
+    sample = 2;
+    now += 30000;
+    t.monitor.tick(now);
+    for (let i = 0; i < 30 && !t.monitor.state.get(c.body.id).snmp.net.rate; i++) await new Promise((r) => setTimeout(r, 20));
+
+    // Delta rx = 300,000 / 30s = 10,000 B/s, delta tx = 150,000 / 30s = 5,000 B/s
+    const d = t.monitor.snapshot().devices[0];
+    assert.equal(d.net_in, 10000);
+    assert.equal(d.net_out, 5000);
+
+    // Stored metrics contain net_in and net_out
+    now += 35000;
+    t.monitor.tick(now);
+    const row = t.db.prepare('SELECT net_in, net_out FROM metrics WHERE device_id=? ORDER BY ts DESC').get(c.body.id);
+    assert.deepEqual({ ...row }, { net_in: 10000, net_out: 5000 });
+  } finally { t.close(); }
+});
+
 

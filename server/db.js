@@ -45,7 +45,7 @@ function open(file) {
       PRIMARY KEY(device_id, group_id));
     CREATE TABLE IF NOT EXISTS metrics(
       device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-      ts INTEGER NOT NULL, cpu REAL, ram REAL, disk REAL, rtt REAL);
+      ts INTEGER NOT NULL, cpu REAL, ram REAL, disk REAL, rtt REAL, net_in REAL, net_out REAL);
     CREATE INDEX IF NOT EXISTS idx_metrics ON metrics(device_id, ts);
     CREATE TABLE IF NOT EXISTS events(
       id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, device_id INTEGER, device_name TEXT NOT NULL,
@@ -57,6 +57,10 @@ function open(file) {
   `);
   const cols = db.prepare('PRAGMA table_info(devices)').all().map((c) => c.name);
   if (!cols.includes('snmp_profile')) db.exec("ALTER TABLE devices ADD COLUMN snmp_profile TEXT NOT NULL DEFAULT ''");
+  // bandwidth history (bytes per second): net_in = download/rx, net_out = upload/tx
+  const mcols = db.prepare('PRAGMA table_info(metrics)').all().map((c) => c.name);
+  if (!mcols.includes('net_in')) db.exec('ALTER TABLE metrics ADD COLUMN net_in REAL');
+  if (!mcols.includes('net_out')) db.exec('ALTER TABLE metrics ADD COLUMN net_out REAL');
   return db;
 }
 

@@ -36,8 +36,9 @@ payload() {
     printf "%s{\"mount\":\"%s\",\"total\":%d,\"used\":%d,\"percent\":%s}",(n++?",":""),$6,$2*1024,$3*1024,$5
   }')
   uptime_s=$(awk '{printf "%d",$1}' /proc/uptime)
-  printf '{"hostname":"%s","os":"Linux","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s}' \
-    "$(json_escape "$host")" "$(json_escape "$AGENT_VERSION")" "$(json_escape "$ip")" "$cpercent" "$cores" "$load1" "$total" "$used" "$mempercent" "$disks" "$uptime_s"
+  net=$(awk '{gsub(":", " "); if(NR>2 && $1 != "lo") {rx+=$2; tx+=$10}} END{printf "{\"rx_bytes\":%.0f,\"tx_bytes\":%.0f}", rx, tx}' /proc/net/dev 2>/dev/null || echo '{"rx_bytes":0,"tx_bytes":0}')
+  printf '{"hostname":"%s","os":"Linux","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s,"net":%s}' \
+    "$(json_escape "$host")" "$(json_escape "$AGENT_VERSION")" "$(json_escape "$ip")" "$cpercent" "$cores" "$load1" "$total" "$used" "$mempercent" "$disks" "$uptime_s" "$net"
 }
 mkdir -p "$(dirname "$STATE")" 2>/dev/null || :
 [ -s "$STATE" ] && TOKEN=$(cat "$STATE")

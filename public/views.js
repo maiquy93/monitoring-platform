@@ -6,10 +6,25 @@
   const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
   const STATE_RANK = { down: 0, warning: 1, unknown: 2, up: 3, maint: 4 };
 
-  const sortDevices = (list) => [...list].sort((a, b) =>
+  const defaultSort = (a, b) =>
     STATE_RANK[a.status] - STATE_RANK[b.status] ||
     (a.status === 'down' ? SEV_RANK[b.severity] - SEV_RANK[a.severity] : 0) ||
-    a.name.localeCompare(b.name));
+    a.name.localeCompare(b.name);
+
+  const sortDevices = (list) => {
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem('device_order') || '[]'); } catch {}
+    if (Array.isArray(saved) && saved.length) {
+      const orderMap = new Map(saved.map((id, idx) => [Number(id), idx]));
+      return [...list].sort((a, b) => {
+        const ia = orderMap.has(a.id) ? orderMap.get(a.id) : 999999;
+        const ib = orderMap.has(b.id) ? orderMap.get(b.id) : 999999;
+        if (ia !== ib) return ia - ib;
+        return defaultSort(a, b);
+      });
+    }
+    return [...list].sort(defaultSort);
+  };
 
   // ---------- shared widgets ----------
   const level = (v, key) => (v >= th()[key] ? 'crit' : v >= th()[key] - 10 ? 'hi' : '');
@@ -30,7 +45,7 @@
       if (metrics.length) bars = `<div class="bars">${metrics.map(([label, value, key]) => bar(label, value, key)).join('')}</div>`;
       else if (d.toner != null) bars = `<div class="bars"><div class="bar ${d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : ''}">Mực ${d.toner}%<i><b style="width:${d.toner}%"></b></i></div></div>`;
     }
-    return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}">
+    return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}" data-id="${d.id}" draggable="true">
       <div class="t-top"><span class="t-ico">${M.ICON[d.type] || ''}</span><span class="t-name" title="${esc(d.name)}">${esc(d.name)}</span>
       <span class="t-state">${M.STATE_NAME[d.status]}</span></div><div class="t-sub" title="${esc(sub)}">${esc(sub)}</div>${bars}</a>`;
   };
@@ -61,8 +76,8 @@
       <div class="g-label">${label}${sub ? `<br>${sub}` : ''}</div></div>`;
   };
 
-  M.chart = (pts, series, range, max) => {
-    const W = 600, H = 170, L = 34, R = 8, T = 8, B = 20;
+  M.chart = (pts, series, range, max, fmtY) => {
+    const W = 600, H = 170, L = fmtY ? 54 : 34, R = 8, T = 8, B = 20;
     if (pts.length < 2) return '<div class="muted" style="padding:30px;text-align:center">Chưa đủ dữ liệu lịch sử</div>';
     const x0 = pts[0].ts, x1 = pts[pts.length - 1].ts;
     const yMax = max || Math.max(1, ...series.flatMap((s) => pts.map((p) => p[s.key] ?? 0))) * 1.2;
@@ -78,7 +93,8 @@
       return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
     }).join('');
     const fmt = (t) => new Date(t).toLocaleString('vi-VN', range === '7d' || range === '24h' ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { hour: '2-digit', minute: '2-digit' });
-    const grid = [0, 0.5, 1].map((f) => `<line class="grid-l" x1="${L}" x2="${W - R}" y1="${sy(yMax * f)}" y2="${sy(yMax * f)}"/><text x="${L - 4}" y="${sy(yMax * f) + 3}" text-anchor="end">${Math.round(yMax * f)}</text>`).join('');
+    const formatY = fmtY || ((v) => Math.round(v));
+    const grid = [0, 0.5, 1].map((f) => `<line class="grid-l" x1="${L}" x2="${W - R}" y1="${sy(yMax * f)}" y2="${sy(yMax * f)}"/><text x="${L - 4}" y="${sy(yMax * f) + 3}" text-anchor="end">${formatY(yMax * f)}</text>`).join('');
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${paths}
       <text x="${L}" y="${H - 4}">${fmt(x0)}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">${fmt(x1)}</text></svg>
       <div class="legend">${series.map((s) => `<span style="--lc:${s.color}">${s.label}</span>`).join('')}</div>`;
@@ -95,11 +111,38 @@
 
   // ---------- dashboard ----------
   const F = { q: '', status: '', type: '' };
+  let isDragging = false;
+  let draggedId = null;
+
+  function reorderDevices(srcId, dstId) {
+    const snap = M.S.snap;
+    if (!snap || !snap.devices) return;
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem('device_order') || '[]'); } catch {}
+    const defaultIds = snap.devices.map((d) => d.id);
+    if (!saved.length) saved = sortDevices(snap.devices).map((d) => d.id);
+    else {
+      const set = new Set(defaultIds);
+      saved = saved.filter((id) => set.has(id));
+      for (const id of defaultIds) if (!saved.includes(id)) saved.push(id);
+    }
+    const fromIdx = saved.indexOf(srcId);
+    const toIdx = saved.indexOf(dstId);
+    if (fromIdx !== -1 && toIdx !== -1) {
+      saved.splice(fromIdx, 1);
+      saved.splice(toIdx, 0, srcId);
+      localStorage.setItem('device_order', JSON.stringify(saved));
+      M.views.dashboard.update(M.S.snap);
+    }
+  }
+
   M.views.dashboard = {
     render(el) {
       el.innerHTML = `<div class="kpis" id="kpis"></div>
         <div id="groups-sec"></div>
-        <div class="row" style="margin:22px 0 10px"><h2 style="margin:0">Thiết bị</h2><span class="spacer"></span>
+        <div class="row" style="margin:22px 0 10px"><h2 style="margin:0">Thiết bị</h2>
+          <button class="btn sm" id="btn-reset-order" style="display:none;margin-left:8px" title="Khôi phục thứ tự mặc định">↺ Thứ tự mặc định</button>
+          <span class="spacer"></span>
           <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:200px" value="${esc(F.q)}">
           <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
             <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Hoạt động</option></select>
@@ -109,15 +152,76 @@
       $('#f-q').addEventListener('input', (e) => { F.q = e.target.value; this.update(M.S.snap); });
       $('#f-status').addEventListener('change', (e) => { F.status = e.target.value; this.update(M.S.snap); });
       $('#f-type').addEventListener('change', (e) => { F.type = e.target.value; this.update(M.S.snap); });
+      const resetBtn = $('#btn-reset-order');
+      if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+          localStorage.removeItem('device_order');
+          this.update(M.S.snap);
+          M.toast('Đã khôi phục thứ tự mặc định');
+        });
+      }
+      this.bindDragDrop();
+    },
+    bindDragDrop() {
+      const grid = $('#grid');
+      if (!grid) return;
+      grid.addEventListener('dragstart', (e) => {
+        const tile = e.target.closest('.tile');
+        if (!tile || !tile.dataset.id) return;
+        draggedId = Number(tile.dataset.id);
+        isDragging = true;
+        tile.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(draggedId));
+      });
+      grid.addEventListener('dragend', (e) => {
+        const tile = e.target.closest('.tile');
+        if (tile) tile.classList.remove('dragging');
+        grid.querySelectorAll('.tile.drag-over').forEach((el) => el.classList.remove('drag-over'));
+        draggedId = null;
+        setTimeout(() => { isDragging = false; }, 50);
+      });
+      grid.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const tile = e.target.closest('.tile');
+        if (!tile || !draggedId || Number(tile.dataset.id) === draggedId) return;
+        grid.querySelectorAll('.tile.drag-over').forEach((el) => { if (el !== tile) el.classList.remove('drag-over'); });
+        tile.classList.add('drag-over');
+      });
+      grid.addEventListener('dragleave', (e) => {
+        const tile = e.target.closest('.tile');
+        if (tile && !tile.contains(e.relatedTarget)) {
+          tile.classList.remove('drag-over');
+        }
+      });
+      grid.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const tile = e.target.closest('.tile');
+        grid.querySelectorAll('.tile.drag-over').forEach((el) => el.classList.remove('drag-over'));
+        if (!tile || !draggedId) return;
+        const targetId = Number(tile.dataset.id);
+        if (targetId && targetId !== draggedId) {
+          reorderDevices(draggedId, targetId);
+        }
+      });
+      grid.addEventListener('click', (e) => {
+        if (isDragging) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }, true);
     },
     update(snap) {
-      if (!snap || !$('#kpis')) return;
+      if (!snap || !$('#kpis') || isDragging) return;
       const s = snap.summary;
       const k = (cls, label, v, zero) => `<div class="kpi ${cls} ${zero && !v ? 'zero' : ''}"><div class="label">${label}</div><div class="val">${v}</div></div>`;
       $('#kpis').innerHTML = `<div class="kpi big"><div class="label">Thiết bị đang hoạt động</div><div class="val">${s.alive}<small>/${s.total}</small></div></div>
         ${k('k-down', 'Mất kết nối', s.down, true)}${k('k-warn', 'Cảnh báo', s.warning, true)}${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance)}`;
       $('#groups-sec').innerHTML = M.S.groups.length
         ? `<h2>Nhóm thiết bị</h2><div class="grid">${M.S.groups.map(M.groupTile).join('')}</div>` : '';
+      const resetBtn = $('#btn-reset-order');
+      if (resetBtn) resetBtn.style.display = localStorage.getItem('device_order') ? 'inline-block' : 'none';
       let list = snap.devices;
       if (F.q) list = list.filter((d) => (d.name + d.address + d.location).toLowerCase().includes(F.q.toLowerCase()));
       if (F.type) list = list.filter((d) => d.type === F.type);
@@ -226,6 +330,10 @@
       if (d.disk != null) gs.push(M.gauge('Ổ đĩa (cao nhất)', d.disk, 'disk'));
       const stat = (label, v) => `<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px">${v}</div><div class="g-label">${label}</div></div>`;
       gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)), stat('Ping', d.rtt != null ? `${d.rtt} ms` : '—'));
+      if (d.net_in != null || d.net_out != null) {
+        const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
+        gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
+      }
       if (d.toner != null) gs.push(M.gauge('Mực in', d.toner, 'cpu'));
       if (d.temperature != null) gs.push(stat('Nhiệt độ', `${d.temperature}°C`));
       $('#d-gauges').innerHTML = `<div class="gauges" style="margin:0">${gs.join('')}</div>`;
@@ -319,6 +427,12 @@
       let html = '';
       if (has('cpu')) html += `<h2>CPU / RAM / Ổ đĩa (%)</h2>${M.chart(points, [{ key: 'cpu', color: 'var(--c-low)', label: 'CPU' }, { key: 'ram', color: 'var(--c-medium)', label: 'RAM' }, { key: 'disk', color: 'var(--c-high)', label: 'Disk' }], this.range, 100)}`;
       if (has('rtt')) html += `<h2>Độ trễ ping (ms)</h2>${M.chart(points, [{ key: 'rtt', color: 'var(--c-ok)', label: 'RTT' }], this.range)}`;
+      if (has('net_in') || has('net_out')) {
+        html += `<h2>Tổng băng thông sử dụng</h2>${M.chart(points, [
+          { key: 'net_in', color: 'var(--c-low)', label: 'Tải xuống (In)' },
+          { key: 'net_out', color: 'var(--c-maint)', label: 'Tải lên (Out)' },
+        ], this.range, null, M.fmtRate)}`;
+      }
       $('#d-charts').innerHTML = html || '<div class="muted" style="padding:20px">Chưa có dữ liệu lịch sử</div>';
     },
     async loadEvents() {

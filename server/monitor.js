@@ -24,6 +24,32 @@ function defaultPing(addr) {
 const num = (v, min, max) => (Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : null);
 const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
 
+// ---- bandwidth from cumulative octet counters ------------------------------
+const NET_MAX_BPS = 1.25e11;     // 1 Tbit/s: anything above is a counter glitch, not traffic
+const NET_BASE_MAX_MS = 300e3;   // a baseline older than this is dropped instead of averaged
+
+// slot = { base: {ts, rows} | null, rate: {in, out, at} | null }; rows = { key: [inOctets, outOctets, counterBits] }.
+// Keeps the baseline until `minMs` has passed so a fast reporter is averaged over a longer window.
+function updateNetSlot(slot, rows, now, minMs = 0) {
+  const base = slot.base;
+  if (!base || now - base.ts > NET_BASE_MAX_MS) { slot.base = { ts: now, rows }; return; }
+  const dt = (now - base.ts) / 1000;
+  if (now - base.ts < minMs || dt <= 0) return;
+  let rin = 0, rout = 0, any = false;
+  for (const [k, cur] of Object.entries(rows)) {
+    const prev = base.rows[k];
+    if (!prev) continue;                       // interface appeared since the last sample
+    const wrap = cur[2] === 32 ? 2 ** 32 : 0;  // 32-bit counters roll over; 64-bit decrease = reset
+    let din = cur[0] - prev[0], dout = cur[1] - prev[1];
+    if (din < 0) din = wrap ? din + wrap : NaN;
+    if (dout < 0) dout = wrap ? dout + wrap : NaN;
+    if (!Number.isFinite(din) || !Number.isFinite(dout) || din / dt > NET_MAX_BPS || dout / dt > NET_MAX_BPS) continue;
+    rin += din; rout += dout; any = true;
+  }
+  slot.base = { ts: now, rows };
+  if (any) slot.rate = { in: rin / dt, out: rout / dt, at: now };
+}
+
 class Monitor extends EventEmitter {
   constructor(db, opts = {}) {
     super();
@@ -35,6 +61,8 @@ class Monitor extends EventEmitter {
       snmpIntervalMs: 30000,
       snmpFailLimit: 2,
       metricEveryMs: 30000,
+      netStaleMs: 90000,         // bandwidth sample older than this is not shown or stored
+      agentNetWindowMs: 8000,    // agent traffic is averaged over at least this window
       breachMs: 15000,
       retentionDays: 7,
       maxEvents: 100000,
@@ -72,7 +100,7 @@ class Monitor extends EventEmitter {
       if (!this.state.has(r.id)) this.state.set(r.id, this._newState(r.id));
       const st = this.state.get(r.id);
       const key = [r.address, r.snmp_port, r.snmp_community, r.snmp_profile].join('|');
-      if (st.snmpKey !== undefined && st.snmpKey !== key) { st.snmp.nextAt = 0; st.snmp.fails = 0; } // re-poll right away
+      if (st.snmpKey !== undefined && st.snmpKey !== key) { st.snmp.nextAt = 0; st.snmp.fails = 0; st.snmp.net = { base: null, rate: null }; } // re-poll right away
       st.snmpKey = key;
     }
     for (const id of [...this.devices.keys()]) {
@@ -85,8 +113,8 @@ class Monitor extends EventEmitter {
     return {
       status: 'unknown', reasons: [], since: Date.now(), acked: false,
       icmp: { ok: null, fails: 0, rtt: null, nextAt: 0, busy: false },
-      snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null },
-      agent: { lastAt: last && last.t ? last.t : null, data: null },
+      snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null, net: { base: null, rate: null } },
+      agent: { lastAt: last && last.t ? last.t : null, data: null, net: { base: null, rate: null } },
       breach: { cpu: 0, ram: 0, disk: 0 },
       lastMetricAt: 0,
     };
@@ -106,7 +134,7 @@ class Monitor extends EventEmitter {
   }
 
   // ---- data ingestion -------------------------------------------------
-  ingestAgent(deviceId, p) {
+  ingestAgent(deviceId, p, now = Date.now()) {
     const st = this.state.get(deviceId);
     if (!st) return false;
     const disks = Array.isArray(p.disks) ? p.disks.slice(0, 32).map((d) => ({
@@ -116,14 +144,18 @@ class Monitor extends EventEmitter {
       percent: num(d && d.percent, 0, 100),
     })) : [];
     const mem = p.memory || {};
+    const rx = num(p.net && p.net.rx_bytes, 0, 1e18), tx = num(p.net && p.net.tx_bytes, 0, 1e18);
+    if (rx !== null && tx !== null) updateNetSlot(st.agent.net, { agent: [rx, tx, 64] }, now, this.o.agentNetWindowMs);
     st.agent = {
-      lastAt: Date.now(),
+      net: st.agent.net,
+      lastAt: now,
       data: {
         hostname: str(p.hostname, 128), os: str(p.os, 128), ip: str(p.ip, 64), version: str(p.agent_version, 32),
         cpu: num(p.cpu && p.cpu.percent, 0, 100), cores: num(p.cpu && p.cpu.cores, 0, 4096),
         load1: num(p.cpu && p.cpu.load1, 0, 1e6),
         ram: { total: num(mem.total, 0, 1e18), used: num(mem.used, 0, 1e18), percent: num(mem.percent, 0, 100) },
         disks, uptime: num(p.uptime, 0, 1e10),
+        net: rx !== null && tx !== null ? { rx_bytes: rx, tx_bytes: tx } : null,
       },
     };
     return true;
@@ -133,8 +165,8 @@ class Monitor extends EventEmitter {
   tick(now = Date.now()) {
     for (const [id, d] of this.devices) {
       const st = this.state.get(id);
-      if (d.check_icmp && d.address && !st.icmp.busy && now >= st.icmp.nextAt) this._dispatch(() => this._ping(d, st));
-      if (d.snmp_enabled && d.address && !st.snmp.busy && now >= st.snmp.nextAt) this._dispatch(() => this._snmp(d, st));
+      if (d.check_icmp && d.address && !st.icmp.busy && now >= st.icmp.nextAt) this._dispatch(() => this._ping(d, st, now));
+      if (d.snmp_enabled && d.address && !st.snmp.busy && now >= st.snmp.nextAt) this._dispatch(() => this._snmp(d, st, now));
     }
     this.evaluate(now);
     if (now - this.lastPurge > 3600e3) { this.lastPurge = now; this.purge(); }
@@ -147,9 +179,9 @@ class Monitor extends EventEmitter {
     fn().catch(() => {}).finally(() => { this.inflight--; });
   }
 
-  async _ping(d, st) {
+  async _ping(d, st, now = Date.now()) {
     st.icmp.busy = true;
-    st.icmp.nextAt = Date.now() + this.o.pingIntervalMs;
+    st.icmp.nextAt = now + this.o.pingIntervalMs;
     let r;
     try { r = await this.o.pingFn(d.address); } catch { r = { ok: false }; }
     st.icmp.busy = false;
@@ -159,22 +191,24 @@ class Monitor extends EventEmitter {
       st.icmp.rtt = null;
       if (st.icmp.fails >= this.o.pingFailLimit) st.icmp.ok = false;
     }
-    this.evaluate();
+    this.evaluate(now);
   }
 
-  async _snmp(d, st) {
+  async _snmp(d, st, now = Date.now()) {
     st.snmp.busy = true;
-    st.snmp.nextAt = Date.now() + this.o.snmpIntervalMs;
+    st.snmp.nextAt = now + this.o.snmpIntervalMs;
     try {
-      st.snmp.info = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community, profile: d.snmp_profile || '' });
+      const { if_counters: ifc, ...info } = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community, profile: d.snmp_profile || '' });
+      st.snmp.info = info;
+      if (ifc && ifc.rows) updateNetSlot(st.snmp.net, ifc.rows, now);
       st.snmp.fails = 0; st.snmp.ok = true; st.snmp.error = null;
     } catch (e) {
       st.snmp.fails++;
-      st.snmp.error = { code: e.code || 'error', message: e.message, at: Date.now() };
+      st.snmp.error = { code: e.code || 'error', message: e.message, at: now };
       if (st.snmp.fails >= this.o.snmpFailLimit) st.snmp.ok = false;
     }
     st.snmp.busy = false;
-    this.evaluate();
+    this.evaluate(now);
   }
 
   // ---- evaluation -----------------------------------------------------
@@ -268,14 +302,24 @@ class Monitor extends EventEmitter {
     return null;
   }
 
+  // Current bandwidth in bytes/s ({in, out}) or null. Same precedence as _resources: fresh agent first, then SNMP.
+  _net(st, now, agentFresh) {
+    const fresh = (r) => (r && now - r.at <= this.o.netStaleMs ? r : null);
+    const r = (agentFresh && st.agent && st.agent.net && fresh(st.agent.net.rate))
+      || (st.snmp && st.snmp.ok && st.snmp.net && fresh(st.snmp.net.rate)) || null;
+    return r ? { in: r.in, out: r.out } : null;
+  }
+
   _maybeStoreMetric(d, st, now, agentFresh) {
     if (now - st.lastMetricAt < this.o.metricEveryMs) return false;
     const res = this._resources(st, agentFresh);
+    const net = this._net(st, now, agentFresh);
     const rtt = st.icmp.rtt;
-    if (!res && rtt == null) return false;
+    if (!res && rtt == null && !net) return false;
     st.lastMetricAt = now;
-    this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt) VALUES(?,?,?,?,?,?)').run(
-      d.id, now, res ? res.cpu : null, res ? res.ram : null, res ? res.disk : null, rtt);
+    this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt,net_in,net_out) VALUES(?,?,?,?,?,?,?,?)').run(
+      d.id, now, res ? res.cpu : null, res ? res.ram : null, res ? res.disk : null, rtt,
+      net ? Math.round(net.in) : null, net ? Math.round(net.out) : null);
     return true;
   }
 
@@ -343,11 +387,14 @@ class Monitor extends EventEmitter {
     const a = st.agent.data;
     const stale = st.agent.lastAt != null && Date.now() - st.agent.lastAt > this.o.agentTimeoutMs;
     const res = this._resources(st, !stale && a != null);
+    const net = this._net(st, Date.now(), !stale && a != null);
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
       maintenance: !!d.maintenance, severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,
       rtt: st.icmp.rtt,
+      net_in: net ? Math.round(net.in) : null,
+      net_out: net ? Math.round(net.out) : null,
       cpu: res ? res.cpu : null,
       ram: res ? res.ram : null,
       disk: res ? res.disk : null,
@@ -397,4 +444,4 @@ class Monitor extends EventEmitter {
   }
 }
 
-module.exports = { Monitor, ADDR_RE, SEV_RANK, defaultPing };
+module.exports = { Monitor, ADDR_RE, SEV_RANK, defaultPing, updateNetSlot };

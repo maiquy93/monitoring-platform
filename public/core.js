@@ -32,6 +32,14 @@ M.fmtBytes = (b) => {
   while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
   return `${b.toFixed(i > 1 ? 1 : 0)} ${u[i]}`;
 };
+M.fmtRate = (b) => {
+  if (b == null) return '—';
+  if (!Number.isFinite(b) || b <= 0) return '0 B/s';
+  const u = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  let i = 0;
+  while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+  return `${b.toFixed(i > 0 && b < 10 ? 1 : 0)} ${u[i]}`;
+};
 M.fmtTime = (ts) => new Date(ts).toLocaleString('vi-VN');
 M.pct = (v) => (v == null ? '—' : `${Math.round(v)}%`);
 

@@ -274,6 +274,33 @@ async function evalMetric(key, def, rd) {
   return { key, ok: false, code: last.code, message: last.message, tried };
 }
 
+// ---- interface traffic (IF-MIB) -----------------------------------------------
+// Raw octet counters per interface; the Monitor turns two samples into bytes/s.
+const IF_COLS = {
+  type: '1.3.6.1.2.1.2.2.1.3',
+  in32: '1.3.6.1.2.1.2.2.1.10', out32: '1.3.6.1.2.1.2.2.1.16',
+  hcIn: '1.3.6.1.2.1.31.1.1.1.6', hcOut: '1.3.6.1.2.1.31.1.1.1.10',
+};
+// ifType values that only re-count traffic already seen on a real port (or never leave the box).
+const IF_VIRTUAL_TYPES = new Set([24, 53, 131, 135, 136, 150, 161, 209]); // loopback, propVirtual, tunnel, vlan, lag, bridge...
+
+// -> { rows: { ifIndex: [inOctets, outOctets, counterBits] } } or null when the device has no usable IF-MIB.
+async function readIfCounters(rd) {
+  let table;
+  try { table = await rd.table(Object.values(IF_COLS), 128); } catch { return null; }
+  const all = Object.entries(table).map(([idx, r]) => {
+    const hc = num(r[IF_COLS.hcIn]) !== null && num(r[IF_COLS.hcOut]) !== null;
+    const rx = hc ? r[IF_COLS.hcIn] : num(r[IF_COLS.in32]);
+    const tx = hc ? r[IF_COLS.hcOut] : num(r[IF_COLS.out32]);
+    return { idx, type: num(r[IF_COLS.type]), row: rx !== null && tx !== null ? [rx, tx, hc ? 64 : 32] : null };
+  }).filter((x) => x.row);
+  // prefer physical ports; if everything is "virtual" (some appliances), at least skip loopback
+  let use = all.filter((x) => !IF_VIRTUAL_TYPES.has(x.type));
+  if (!use.length) use = all.filter((x) => x.type !== 24);
+  if (!use.length) return null;
+  return { rows: Object.fromEntries(use.map((x) => [x.idx, x.row])) };
+}
+
 async function pollDevice({ host, port = 161, community = 'public', profile = '' }) {
   const conn = { host, port, community };
   let id;
@@ -310,6 +337,8 @@ async function pollDevice({ host, port = 161, community = 'public', profile = ''
     else if (CORE.includes(r.key)) info[r.key] = r.value;
     else info.extra.push({ key: r.key, label, unit: def.unit || '', value: r.value });
   }
+  const ifc = await readIfCounters(rd);
+  if (ifc) info.if_counters = ifc;
   return info;
 }
 

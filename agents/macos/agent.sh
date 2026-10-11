@@ -15,7 +15,9 @@ payload() {
  used=$((total-(free+inactive)*pagesize)); pct=$(awk -v u="$used" -v t="$total" 'BEGIN{printf "%.1f",100*u/t}')
  disks=$(df -kP | awk 'NR>1 && $1 ~ /^\// {gsub("%","",$5); printf "%s{\"mount\":\"%s\",\"total\":%d,\"used\":%d,\"percent\":%d}",(n++?",":""),$6,$2*1024,$3*1024,$5}')
  uptime_s=$(sysctl -n kern.boottime | awk -F'[ ,}]+' '{print systime()-$4}')
- printf '{"hostname":"%s","os":"macOS","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s}' "$(esc "$host")" "$AGENT_VERSION" "$(esc "$ip")" "$cpu" "$cores" "$load" "$total" "$used" "$pct" "$disks" "$uptime_s"
+ net=$(netstat -ibn 2>/dev/null | awk '/<Link#[0-9]>/ && $1 !~ /^lo/ {rx+=$7; tx+=$10} END{printf "{\"rx_bytes\":%.0f,\"tx_bytes\":%.0f}", rx, tx}')
+ [ -n "$net" ] || net='{"rx_bytes":0,"tx_bytes":0}'
+ printf '{"hostname":"%s","os":"macOS","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s,"net":%s}' "$(esc "$host")" "$AGENT_VERSION" "$(esc "$ip")" "$cpu" "$cores" "$load" "$total" "$used" "$pct" "$disks" "$uptime_s" "$net"
 }
 delay=5
 while :; do response=$(curl -fsS --connect-timeout 5 --max-time 15 -X POST "$SERVER_URL/api/agent/report" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' --data "$(payload)" 2>/dev/null) || response=

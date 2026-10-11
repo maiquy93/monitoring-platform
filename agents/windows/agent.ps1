@@ -20,7 +20,16 @@ function Get-Payload {
   $used = $total - $free; if ($used -lt 0) { $used = 0 }
   $memoryPercent = if ($total -gt 0) { [math]::Round(100 * $used / $total, 1) } else { 0 }
   $cpuPercent = if ($null -eq $cpu) { 0 } else { [math]::Round($cpu,1) }
-  [pscustomobject]@{hostname=$env:COMPUTERNAME;os='Windows';agent_version=$Version;ip=$ip;cpu=[pscustomobject]@{percent=$cpuPercent;cores=$cores;load1=[math]::Round($cpuPercent/100,2)};memory=[pscustomobject]@{total=$total;used=$used;percent=$memoryPercent};disks=$disks;uptime=[int64]((Get-Date)-$os.LastBootUpTime).TotalSeconds}
+  $netStat = @(Get-NetAdapterStatistics 2>$null)
+  if ($netStat.Count -gt 0) {
+    $rx = ($netStat | Measure-Object -Property ReceivedBytes -Sum).Sum
+    $tx = ($netStat | Measure-Object -Property SentBytes -Sum).Sum
+  } else {
+    $perf = @(Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface 2>$null | Where-Object { $_.Name -notlike '*Loopback*' })
+    $rx = ($perf | Measure-Object -Property BytesReceivedPersec -Sum).Sum
+    $tx = ($perf | Measure-Object -Property BytesSentPersec -Sum).Sum
+  }
+  [pscustomobject]@{hostname=$env:COMPUTERNAME;os='Windows';agent_version=$Version;ip=$ip;cpu=[pscustomobject]@{percent=$cpuPercent;cores=$cores;load1=[math]::Round($cpuPercent/100,2)};memory=[pscustomobject]@{total=$total;used=$used;percent=$memoryPercent};disks=$disks;uptime=[int64]((Get-Date)-$os.LastBootUpTime).TotalSeconds;net=[pscustomobject]@{rx_bytes=[int64]($rx ?? 0);tx_bytes=[int64]($tx ?? 0)}}
 }
 $delay=5
 while ($true) {
