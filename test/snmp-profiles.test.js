@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -55,7 +55,11 @@ test('every profile has a real fixture it was verified with (or is explicitly un
   for (const p of engine.listProfiles()) {
     const metrics = engine.profiles().byId.get(p.id).metrics;
     const dir = path.join(__dirname, 'fixtures');
-    assert.ok(p.verified_with.length, `hồ sơ ${p.id} chưa có dữ liệu thật (verified_with) — chưa kiểm chứng`);
+    if (!p.verified_with.length) {
+      // Chưa có walk thật: chỉ chấp nhận khi hồ sơ đánh dấu rõ các nguồn unverified.
+      assert.ok(p.unverified.length, `hồ sơ ${p.id} chưa có dữ liệu thật (verified_with) và cũng không đánh dấu unverified`);
+      continue;
+    }
     for (const name of p.verified_with) {
       assert.ok(fs.existsSync(path.join(dir, `${name}.walk`)), `${p.id}: thiếu test/fixtures/${name}.walk`);
       const r = await startReplay(name);
@@ -68,6 +72,62 @@ test('every profile has a real fixture it was verified with (or is explicitly un
     }
   }
 });
+
+// ---- Fortigate: dữ liệu TỔNG HỢP theo FORTINET-FORTIGATE-MIB (chưa có walk thật) ----
+const FG = '1.3.6.1.4.1.12356.101.4.1.';
+const fgRows = (objectId = '1.3.6.1.4.1.12356.101.1.1000.1', descr = 'FortiGate-VM64') => [
+  ['1.3.6.1.2.1.1.1.0', descr, 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', objectId, 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 360000, 'TIMETICKS'],
+  [`${FG}1.0`, 'v7.4.3,build2573,240425 (GA.M)', 'STRING'],
+  [`${FG}3.0`, 7, 'GAUGE32'],
+  [`${FG}4.0`, 41, 'GAUGE32'],
+  [`${FG}5.0`, 2097152, 'GAUGE32'],
+  [`${FG}6.0`, 1024, 'GAUGE32'],
+  [`${FG}7.0`, 4096, 'GAUGE32'],
+  [`${FG}8.0`, 123, 'GAUGE32'],
+];
+
+test('fortigate (synthetic MIB data): auto-detected by sysObjectID, cpu/ram/disk read from fgSystemInfo', async () => {
+  const r = await startReplay(null, { rows: fgRows() });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'fortigate');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.cpu, 7);
+    assert.equal(out.ram, 41);
+    assert.equal(out.disk, 25);
+    assert.equal(out.uptime, 3600);
+    assert.equal(out.diag.cpu.unverified, true);
+    const extra = Object.fromEntries(out.extra.map((e) => [e.key, e.value]));
+    assert.match(extra.fortios_version, /^v7\.4\.3/);
+    assert.equal(extra.sessions, 123);
+    assert.equal(out.diag.toner, undefined);
+  } finally { r.close(); }
+});
+
+test('fortigate: auto-detected by sysDescr alone, and without disk the optional disk metric just fails', async () => {
+  const rows = fgRows('1.3.6.1.4.1.8072.3.2.10', 'FortiGate-60F v7.2.0').filter(([o]) => o !== `${FG}6.0` && o !== `${FG}7.0`);
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'fortigate');
+    assert.equal(out.cpu, 7);
+    assert.equal(out.diag.disk.ok, false);
+    assert.equal(out.diag.disk.optional, true);
+  } finally { r.close(); }
+});
+
+test('detectProfile: vendor classification (fortigate / mikrotik / generic), leading dot tolerated', () => {
+  const d = (sysObjectID, sysDescr = '') => engine.detectProfile({ sysObjectID, sysDescr }).id;
+  assert.equal(d('1.3.6.1.4.1.12356.101.1.43'), 'fortigate');
+  assert.equal(d('.1.3.6.1.4.1.12356.101.1.43'), 'fortigate');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'FortiOS 7.4'), 'fortigate');
+  assert.equal(d('1.3.6.1.4.1.14988.1'), 'mikrotik');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Linux box 6.1'), 'generic');
+  assert.equal(d('', ''), 'generic');
+});
+
 
 // ---- lỗi: lý do phải rõ ---------------------------------------------------
 test('errors: timeout (silent / wrong community) gives a Vietnamese reason', async () => {

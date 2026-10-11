@@ -27,6 +27,10 @@ class SnmpFail extends Error {
   }
 }
 
+// "match" is one clause {sysObjectID?, sysDescr?} (both must hit) or an array of such
+// clauses (any one is enough), e.g. sysObjectID of the vendor OR a sysDescr regex.
+const matchClauses = (p) => (Array.isArray(p.match) ? p.match : [p.match]);
+
 // ---- profile loading ------------------------------------------------------
 function validateSource(src, where) {
   const kinds = ['get', 'percent', 'table'].filter((k) => src[k] !== undefined);
@@ -59,8 +63,11 @@ function validateProfile(p, file) {
   if (typeof p.name !== 'string' || !p.name) fail('thiếu "name"');
   if (!p.fallback && !p.match) fail('cần "match" (hoặc "fallback": true cho hồ sơ chung)');
   if (p.match) {
-    for (const o of p.match.sysObjectID || []) if (!/^\d+(\.\d+)+$/.test(o)) fail(`match.sysObjectID "${o}" không hợp lệ`);
-    if (p.match.sysDescr !== undefined) { try { new RegExp(p.match.sysDescr, 'i'); } catch { fail('match.sysDescr không phải regex hợp lệ'); } }
+    for (const c of matchClauses(p)) {
+      if (!c || typeof c !== 'object' || (c.sysObjectID === undefined && c.sysDescr === undefined)) fail('match cần sysObjectID và/hoặc sysDescr');
+      for (const o of c.sysObjectID || []) if (!/^\d+(\.\d+)+$/.test(o)) fail(`match.sysObjectID "${o}" không hợp lệ`);
+      if (c.sysDescr !== undefined) { try { new RegExp(c.sysDescr, 'i'); } catch { fail('match.sysDescr không phải regex hợp lệ'); } }
+    }
   }
   for (const [key, m] of Object.entries(p.metrics || {})) {
     if (m === null) continue; // removes an inherited metric
@@ -107,21 +114,30 @@ function listProfiles() {
 }
 
 // ---- detection --------------------------------------------------------------
+// Score of one clause (null = no match). sysObjectID (longest-prefix) outranks sysDescr.
+function scoreClause(c, ident) {
+  let score = 0;
+  const oids = c.sysObjectID;
+  if (oids && oids.length) {
+    const hit = oids.filter((o) => ident.sysObjectID === o || ident.sysObjectID.startsWith(`${o}.`));
+    if (!hit.length) return null;
+    score += 100 + Math.max(...hit.map((o) => o.split('.').length));
+  }
+  if (c.sysDescr !== undefined) {
+    if (!new RegExp(c.sysDescr, 'i').test(ident.sysDescr || '')) return null;
+    score += 10;
+  }
+  return score;
+}
+
 function detectProfile(ident, reg = profiles()) {
+  ident = { ...ident, sysObjectID: String(ident.sysObjectID || '').replace(/^\./, ''), sysDescr: ident.sysDescr || '' };
   let best = null;
   for (const p of reg.list) {
     if (p.fallback || !p.match) continue;
-    let score = p.priority || 0;
-    const oids = p.match.sysObjectID;
-    if (oids && oids.length) {
-      const hit = oids.filter((o) => ident.sysObjectID === o || ident.sysObjectID.startsWith(`${o}.`));
-      if (!hit.length) continue;
-      score += 100 + Math.max(...hit.map((o) => o.split('.').length));
-    }
-    if (p.match.sysDescr !== undefined) {
-      if (!new RegExp(p.match.sysDescr, 'i').test(ident.sysDescr || '')) continue;
-      score += 10;
-    }
+    const scores = matchClauses(p).map((c) => scoreClause(c, ident)).filter((s) => s !== null);
+    if (!scores.length) continue;
+    const score = (p.priority || 0) + Math.max(...scores);
     if (!best || score > best.score) best = { p, score };
   }
   return best ? best.p : reg.list.find((p) => p.fallback);

@@ -1,0 +1,66 @@
+{
+  "id": "fortigate",
+  "name": "Fortinet FortiGate (FortiOS)",
+  "description": "FortiOS không phơi HOST-RESOURCES-MIB cho CPU/RAM/ổ đĩa nên dùng FORTINET-FORTIGATE-MIB (fgSystemInfo 1.3.6.1.4.1.12356.101.4.1). CHƯA kiểm chứng với dữ liệu walk thật (chưa walk được thiết bị): OID lấy từ MIB công bố của Fortinet. Chạy `node tools/snmp-probe.js <IP> <community> --name fortinet-fortigate-vm` để lưu walk thật rồi bỏ cờ unverified. Trên FortiGate cần bật SNMP agent, tạo SNMP community cho IP server và cho phép `snmp` trong allowaccess của interface.",
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.12356"] },
+    { "sysDescr": "forti(gate|os)" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "get": "1.3.6.1.4.1.12356.101.4.1.3.0", "unverified": true },
+        { "table": { "columns": { "load": "1.3.6.1.4.1.12356.101.4.4.2.1.2" }, "value": { "column": "load" }, "agg": "avg" }, "unverified": true },
+        { "table": { "columns": { "load": "1.3.6.1.2.1.25.3.3.1.2" }, "value": { "column": "load" }, "agg": "avg" } }
+      ]
+    },
+    "ram": {
+      "label": "RAM",
+      "unit": "%",
+      "sources": [
+        { "get": "1.3.6.1.4.1.12356.101.4.1.4.0", "unverified": true },
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.2"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "first"
+          }
+        }
+      ]
+    },
+    "disk": {
+      "label": "Ổ đĩa",
+      "unit": "%",
+      "optional": true,
+      "sources": [
+        { "percent": { "used": "1.3.6.1.4.1.12356.101.4.1.6.0", "total": "1.3.6.1.4.1.12356.101.4.1.7.0" }, "unverified": true },
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.4", "1.3.6.1.2.1.25.2.1.9"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "max"
+          }
+        }
+      ]
+    },
+    "toner": null,
+    "fortios_version": {
+      "label": "Phiên bản FortiOS",
+      "optional": true,
+      "sources": [{ "get": "1.3.6.1.4.1.12356.101.4.1.1.0", "text": true, "unverified": true }]
+    },
+    "sessions": {
+      "label": "Số phiên (session)",
+      "optional": true,
+      "round": 0,
+      "sources": [{ "get": "1.3.6.1.4.1.12356.101.4.1.8.0", "unverified": true }]
+    }
+  }
+}

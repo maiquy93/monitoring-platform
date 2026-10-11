@@ -2,7 +2,7 @@
   "id": "mikrotik",
   "name": "MikroTik RouterOS",
   "description": "RouterOS dùng HOST-RESOURCES-MIB cho CPU/RAM/ổ đĩa. Đã kiểm chứng với RouterOS x86 7.23.8 (VMware). Phần cảm biến phần cứng (nhiệt độ, điện áp...) CHƯA thêm vì router x86 này không có dữ liệu health trong walk; cần walk từ router phần cứng (hAP, CCR, RB...).",
-  "match": { "sysObjectID": ["1.3.6.1.4.1.14988"] },
+  "match": [{ "sysObjectID": ["1.3.6.1.4.1.14988"] }, { "sysDescr": "routeros|mikrotik" }],
   "verified_with": ["mikrotik-routeros-x86"],
   "metrics": {
     "uptime": {

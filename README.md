@@ -281,6 +281,35 @@ file `.walk` để gửi cho người phát triển khi gặp thiết bị chưa
 
 Sau đó sửa thiết bị trên dashboard, tick **Giám sát SNMP**, nhập đúng community.
 
+**Fortinet FortiGate (FortiOS):** chọn **Tự nhận diện** là đủ (sysObjectID
+`1.3.6.1.4.1.12356` hoặc sysDescr chứa `FortiGate`/`FortiOS`). FortiOS không
+dùng HOST-RESOURCES nên hồ sơ `fortigate` đọc FORTINET-FORTIGATE-MIB:
+CPU `…12356.101.4.1.3.0`, RAM `…4.1.4.0`, ổ đĩa `…4.1.6.0`/`…4.1.7.0` (MB), phiên bản
+`…4.1.1.0`, số session `…4.1.8.0`. Các OID này lấy từ MIB công bố của Fortinet,
+**chưa kiểm chứng bằng walk thật** (giao diện ghi "chưa kiểm chứng"). Trên FortiGate:
+
+```
+config system snmp sysinfo
+  set status enable
+end
+config system snmp community
+  edit 1
+    set name <community>
+    config hosts
+      edit 1
+        set ip <IP-server> 255.255.255.255
+      next
+    end
+  next
+end
+config system interface
+  edit <interface-nối-tới-server>
+    append allowaccess snmp
+  next
+end
+```
+
+
 Chẩn đoán (walk thiết bị thật, lưu `test/fixtures/<hãng>-<model>.walk`, rồi in
 hồ sơ được chọn và từng chỉ số):
 
