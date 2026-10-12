@@ -81,10 +81,32 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
   border: 1px solid color-mix(in srgb, var(--s) 55%, var(--border)); border-left: 6px solid var(--s); border-radius: var(--radius);
   padding: 12px 14px; cursor: pointer; position: relative; box-shadow: 0 0 10px color-mix(in srgb, var(--s) 18%, transparent); transition: transform .1s; }
 .tile:hover { transform: translateY(-2px); }
-#grid .tile { cursor: grab; user-select: none; transition: transform .2s ease, box-shadow .2s ease, opacity .2s ease, border-color .2s ease; }
+#grid .tile { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
 #grid .tile:active { cursor: grabbing; }
-#grid .tile.dragging { opacity: .45; transform: scale(.96); cursor: grabbing; }
-#grid .tile.drag-over { border-color: var(--accent); box-shadow: 0 0 18px var(--accent); transform: translateY(-4px) scale(1.02); }
+#grid.is-dragging { cursor: grabbing !important; }
+#grid.is-dragging .tile { cursor: grabbing !important; pointer-events: none; }
+#grid.is-dragging .tile:hover { transform: none !important; }
+#grid .tile.tile-placeholder {
+  border: 2px dashed var(--accent) !important;
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel)) !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent) !important;
+  opacity: .75 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: none !important;
+}
+#grid .tile.tile-placeholder > * { visibility: hidden !important; }
+.tile.tile-drag-clone {
+  position: fixed !important;
+  margin: 0 !important;
+  z-index: 10000 !important;
+  pointer-events: none !important;
+  cursor: grabbing !important;
+  box-shadow: 0 20px 42px rgba(0, 0, 0, .55), 0 0 26px color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  border-color: var(--accent) !important;
+  opacity: .95 !important;
+  will-change: transform;
+}
 .tile .t-top { display: flex; align-items: center; gap: 8px; }
 .tile .t-name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .tile .t-ico { font-size: 20px; }

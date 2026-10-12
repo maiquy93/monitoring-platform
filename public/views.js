@@ -45,7 +45,7 @@
       if (metrics.length) bars = `<div class="bars">${metrics.map(([label, value, key]) => bar(label, value, key)).join('')}</div>`;
       else if (d.toner != null) bars = `<div class="bars"><div class="bar ${d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : ''}">Mực ${d.toner}%<i><b style="width:${d.toner}%"></b></i></div></div>`;
     }
-    return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}" data-id="${d.id}" draggable="true">
+    return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}" data-id="${d.id}" draggable="false">
       <div class="t-top"><span class="t-ico">${M.ICON[d.type] || ''}</span><span class="t-name" title="${esc(d.name)}">${esc(d.name)}</span>
       <span class="t-state">${M.STATE_NAME[d.status]}</span></div><div class="t-sub" title="${esc(sub)}">${esc(sub)}</div>${bars}</a>`;
   };
@@ -114,6 +114,31 @@
   let isDragging = false;
   let draggedId = null;
 
+  function saveDeviceOrder(visibleIds) {
+    const snap = M.S.snap;
+    if (!snap || !snap.devices) return;
+    const allIds = snap.devices.map((d) => d.id);
+    let saved = [];
+    try { saved = JSON.parse(localStorage.getItem('device_order') || '[]'); } catch {}
+    if (!saved.length) saved = sortDevices(snap.devices).map((d) => d.id);
+    else {
+      const set = new Set(allIds);
+      saved = saved.filter((id) => set.has(id));
+      for (const id of allIds) if (!saved.includes(id)) saved.push(id);
+    }
+    const visSet = new Set(visibleIds);
+    const slots = [];
+    for (let i = 0; i < saved.length; i++) {
+      if (visSet.has(saved[i])) slots.push(i);
+    }
+    for (let i = 0; i < slots.length && i < visibleIds.length; i++) {
+      saved[slots[i]] = visibleIds[i];
+    }
+    localStorage.setItem('device_order', JSON.stringify(saved));
+    const resetBtn = $('#btn-reset-order');
+    if (resetBtn) resetBtn.style.display = 'inline-block';
+  }
+
   function reorderDevices(srcId, dstId) {
     const snap = M.S.snap;
     if (!snap || !snap.devices) return;
@@ -162,51 +187,334 @@
       }
       this.bindDragDrop();
     },
+    destroy() {
+      if (this.cleanupDrag) this.cleanupDrag();
+    },
     bindDragDrop() {
       const grid = $('#grid');
       if (!grid) return;
-      grid.addEventListener('dragstart', (e) => {
+
+      let session = null;
+      let suppressClickUntil = 0;
+      let scrollSpeed = 0;
+      let scrollRaf = null;
+
+      const stopAutoScroll = () => {
+        scrollSpeed = 0;
+        if (scrollRaf) {
+          cancelAnimationFrame(scrollRaf);
+          scrollRaf = null;
+        }
+      };
+
+      const updateAutoScroll = (clientY) => {
+        const edge = 70;
+        const maxSpeed = 12;
+        if (clientY < edge) {
+          scrollSpeed = -Math.round((1 - Math.max(0, clientY) / edge) * maxSpeed);
+        } else if (clientY > window.innerHeight - edge) {
+          scrollSpeed = Math.round((1 - Math.max(0, window.innerHeight - clientY) / edge) * maxSpeed);
+        } else {
+          scrollSpeed = 0;
+        }
+        if (scrollSpeed !== 0 && !scrollRaf) {
+          const loop = () => {
+            if (scrollSpeed !== 0 && isDragging) {
+              window.scrollBy(0, scrollSpeed);
+              scrollRaf = requestAnimationFrame(loop);
+            } else {
+              scrollRaf = null;
+            }
+          };
+          scrollRaf = requestAnimationFrame(loop);
+        }
+      };
+
+      const detachWindowListeners = () => {
+        window.removeEventListener('pointermove', onPointerMove);
+        window.removeEventListener('pointerup', onPointerUp);
+        window.removeEventListener('pointercancel', cancelDrag);
+        window.removeEventListener('keydown', onKeyDown);
+      };
+
+      const cancelDrag = () => {
+        if (!session) return;
+        stopAutoScroll();
+        detachWindowListeners();
+        if (session.holdTimer) {
+          clearTimeout(session.holdTimer);
+          session.holdTimer = null;
+        }
+        if (session.started) {
+          if (session.clone) session.clone.remove();
+          if (session.tile) {
+            session.tile.classList.remove('tile-placeholder');
+            session.tile.style.transform = '';
+            session.tile.style.transition = '';
+          }
+          grid.classList.remove('is-dragging');
+          grid.style.touchAction = '';
+          if (session.initialIds && session.initialIds.length) {
+            const tileMap = new Map();
+            grid.querySelectorAll('.tile').forEach((t) => {
+              tileMap.set(Number(t.dataset.id), t);
+              t.style.transform = '';
+              t.style.transition = '';
+            });
+            for (const id of session.initialIds) {
+              const el = tileMap.get(id);
+              if (el) grid.appendChild(el);
+            }
+          }
+          suppressClickUntil = Date.now() + 200;
+          setTimeout(() => { isDragging = false; draggedId = null; }, 50);
+        }
+        session = null;
+      };
+
+      this.cleanupDrag = cancelDrag;
+
+      const startDragging = (s, clientX, clientY) => {
+        if (s.started) return;
+        const tile = s.tile;
+        if (!tile || !tile.dataset.id) return;
+        const allTiles = Array.from(grid.querySelectorAll('.tile'));
+        if (allTiles.length <= 1) return;
+
+        s.started = true;
+        isDragging = true;
+        draggedId = Number(tile.dataset.id);
+        s.initialIds = allTiles.map((t) => Number(t.dataset.id));
+
+        const rect = tile.getBoundingClientRect();
+        s.grabOffsetX = clientX - rect.left;
+        s.grabOffsetY = clientY - rect.top;
+
+        const clone = tile.cloneNode(true);
+        clone.classList.add('tile-drag-clone');
+        clone.style.width = `${rect.width}px`;
+        clone.style.height = `${rect.height}px`;
+        clone.style.left = '0px';
+        clone.style.top = '0px';
+        clone.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0) scale(1.05)`;
+        document.body.appendChild(clone);
+        s.clone = clone;
+
+        tile.classList.add('tile-placeholder');
+        grid.classList.add('is-dragging');
+        grid.style.touchAction = 'none';
+
+        if (navigator.vibrate) {
+          try { navigator.vibrate(30); } catch {}
+        }
+      };
+
+      const onPointerMove = (e) => {
+        if (!session || e.pointerId !== session.pointerId) return;
+
+        const dx = e.clientX - session.startX;
+        const dy = e.clientY - session.startY;
+        const dist = Math.hypot(dx, dy);
+
+        if (!session.started) {
+          if (session.pointerType === 'mouse') {
+            if (dist > 4) {
+              startDragging(session, e.clientX, e.clientY);
+            }
+          } else {
+            if (dist > 8 && session.holdTimer) {
+              clearTimeout(session.holdTimer);
+              session.holdTimer = null;
+              detachWindowListeners();
+              session = null;
+              return;
+            }
+          }
+          return;
+        }
+
+        e.preventDefault();
+        const curX = e.clientX - session.grabOffsetX;
+        const curY = e.clientY - session.grabOffsetY;
+        session.clone.style.transform = `translate3d(${curX}px, ${curY}px, 0) scale(1.05)`;
+
+        updateAutoScroll(e.clientY);
+
+        const px = e.clientX;
+        const py = e.clientY;
+        const otherTiles = Array.from(grid.querySelectorAll('.tile:not(.tile-placeholder)'));
+        let targetTile = null;
+
+        for (const t of otherTiles) {
+          const r = t.getBoundingClientRect();
+          if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) {
+            targetTile = t;
+            break;
+          }
+        }
+
+        if (!targetTile && otherTiles.length > 0) {
+          let closestDist = Infinity;
+          for (const t of otherTiles) {
+            const r = t.getBoundingClientRect();
+            const cx = r.left + r.width / 2;
+            const cy = r.top + r.height / 2;
+            const d = Math.hypot(px - cx, py - cy);
+            if (d < closestDist && d < Math.max(r.width, r.height) * 0.95) {
+              closestDist = d;
+              targetTile = t;
+            }
+          }
+        }
+
+        if (targetTile && targetTile !== session.tile) {
+          const allTiles = Array.from(grid.children).filter((el) => el.classList.contains('tile'));
+          const pIdx = allTiles.indexOf(session.tile);
+          const tIdx = allTiles.indexOf(targetTile);
+          if (pIdx !== -1 && tIdx !== -1 && pIdx !== tIdx) {
+            const prevRects = new Map();
+            for (const t of allTiles) {
+              if (t !== session.tile) {
+                prevRects.set(t, t.getBoundingClientRect());
+              }
+            }
+
+            if (pIdx < tIdx) {
+              grid.insertBefore(session.tile, targetTile.nextSibling);
+            } else {
+              grid.insertBefore(session.tile, targetTile);
+            }
+
+            for (const [t, oldRect] of prevRects.entries()) {
+              const newRect = t.getBoundingClientRect();
+              const diffX = oldRect.left - newRect.left;
+              const diffY = oldRect.top - newRect.top;
+              if (diffX !== 0 || diffY !== 0) {
+                t.style.transition = 'none';
+                t.style.transform = `translate(${diffX}px, ${diffY}px)`;
+              }
+            }
+
+            grid.offsetHeight; // reflow
+
+            requestAnimationFrame(() => {
+              for (const [t, oldRect] of prevRects.entries()) {
+                const newRect = t.getBoundingClientRect();
+                if (oldRect.left !== newRect.left || oldRect.top !== newRect.top) {
+                  t.style.transition = 'transform 0.24s cubic-bezier(0.2, 0, 0, 1)';
+                  t.style.transform = '';
+                }
+              }
+            });
+          }
+        }
+      };
+
+      const onPointerUp = (e) => {
+        if (!session || e.pointerId !== session.pointerId) return;
+
+        stopAutoScroll();
+        detachWindowListeners();
+
+        if (session.holdTimer) {
+          clearTimeout(session.holdTimer);
+          session.holdTimer = null;
+        }
+
+        if (!session.started) {
+          session = null;
+          return;
+        }
+
+        e.preventDefault();
+        const clone = session.clone;
+        const tile = session.tile;
+        const destRect = tile.getBoundingClientRect();
+
+        grid.classList.remove('is-dragging');
+        grid.style.touchAction = '';
+        suppressClickUntil = Date.now() + 250;
+
+        clone.style.transition = 'transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease, box-shadow 0.2s ease';
+        clone.style.transform = `translate3d(${destRect.left}px, ${destRect.top}px, 0) scale(1)`;
+        clone.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+        clone.style.opacity = '1';
+
+        const finalize = () => {
+          if (clone.parentNode) clone.remove();
+          tile.classList.remove('tile-placeholder');
+          grid.querySelectorAll('.tile').forEach((t) => {
+            t.style.transform = '';
+            t.style.transition = '';
+          });
+          const newOrder = Array.from(grid.querySelectorAll('.tile'))
+            .map((t) => Number(t.dataset.id))
+            .filter(Boolean);
+          saveDeviceOrder(newOrder);
+          setTimeout(() => {
+            isDragging = false;
+            draggedId = null;
+          }, 50);
+        };
+
+        let handled = false;
+        clone.addEventListener('transitionend', () => {
+          if (handled) return;
+          handled = true;
+          finalize();
+        }, { once: true });
+        setTimeout(() => {
+          if (handled) return;
+          handled = true;
+          finalize();
+        }, 220);
+
+        session = null;
+      };
+
+      const onKeyDown = (e) => {
+        if (e.key === 'Escape' && isDragging) {
+          cancelDrag();
+        }
+      };
+
+      grid.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return;
         const tile = e.target.closest('.tile');
         if (!tile || !tile.dataset.id) return;
-        draggedId = Number(tile.dataset.id);
-        isDragging = true;
-        tile.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', String(draggedId));
-      });
-      grid.addEventListener('dragend', (e) => {
-        const tile = e.target.closest('.tile');
-        if (tile) tile.classList.remove('dragging');
-        grid.querySelectorAll('.tile.drag-over').forEach((el) => el.classList.remove('drag-over'));
-        draggedId = null;
-        setTimeout(() => { isDragging = false; }, 50);
-      });
-      grid.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        const tile = e.target.closest('.tile');
-        if (!tile || !draggedId || Number(tile.dataset.id) === draggedId) return;
-        grid.querySelectorAll('.tile.drag-over').forEach((el) => { if (el !== tile) el.classList.remove('drag-over'); });
-        tile.classList.add('drag-over');
-      });
-      grid.addEventListener('dragleave', (e) => {
-        const tile = e.target.closest('.tile');
-        if (tile && !tile.contains(e.relatedTarget)) {
-          tile.classList.remove('drag-over');
+        if (grid.querySelectorAll('.tile').length <= 1) return;
+
+        session = {
+          tile,
+          pointerId: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          pointerType: e.pointerType,
+          started: false,
+          holdTimer: null,
+          clone: null,
+        };
+
+        window.addEventListener('pointermove', onPointerMove, { passive: false });
+        window.addEventListener('pointerup', onPointerUp, { passive: false });
+        window.addEventListener('pointercancel', cancelDrag);
+        window.addEventListener('keydown', onKeyDown);
+
+        if (e.pointerType === 'touch') {
+          session.holdTimer = setTimeout(() => {
+            if (session && !session.started) {
+              startDragging(session, e.clientX, e.clientY);
+            }
+          }, 220);
         }
       });
-      grid.addEventListener('drop', (e) => {
+
+      grid.addEventListener('dragstart', (e) => {
         e.preventDefault();
-        const tile = e.target.closest('.tile');
-        grid.querySelectorAll('.tile.drag-over').forEach((el) => el.classList.remove('drag-over'));
-        if (!tile || !draggedId) return;
-        const targetId = Number(tile.dataset.id);
-        if (targetId && targetId !== draggedId) {
-          reorderDevices(draggedId, targetId);
-        }
       });
+
       grid.addEventListener('click', (e) => {
-        if (isDragging) {
+        if (isDragging || Date.now() < suppressClickUntil) {
           e.preventDefault();
           e.stopPropagation();
         }
