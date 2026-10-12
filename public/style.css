@@ -89,7 +89,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 #grid .tile.tile-placeholder {
   border: 2px dashed var(--accent) !important;
   background: color-mix(in srgb, var(--accent) 12%, var(--panel)) !important;
-  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 30%, transparent) !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 26%, transparent) !important;
   opacity: .75 !important;
   pointer-events: none !important;
   transform: none !important;
@@ -104,8 +104,22 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
   cursor: grabbing !important;
   box-shadow: 0 20px 42px rgba(0, 0, 0, .55), 0 0 26px color-mix(in srgb, var(--accent) 55%, transparent) !important;
   border-color: var(--accent) !important;
-  opacity: .95 !important;
+  opacity: .96 !important;
   will-change: transform;
+}
+:root[data-theme="light"] .tile.tile-drag-clone {
+  background: var(--panel) !important;
+  border: 1px solid var(--accent) !important;
+  border-left: 6px solid var(--s) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, .22), 0 2px 10px rgba(0, 0, 0, .12) !important;
+}
+:root[data-theme="light"] #grid .tile.tile-placeholder {
+  background: color-mix(in srgb, var(--accent) 9%, #ffffff) !important;
+  border: 2px dashed var(--accent) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 22%, transparent) !important;
+}
+:root[data-theme="neon"] .tile.tile-drag-clone {
+  box-shadow: 0 20px 48px rgba(0, 0, 0, .8), 0 0 28px var(--accent) !important;
 }
 .tile .t-top { display: flex; align-items: center; gap: 8px; }
 .tile .t-name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
@@ -214,4 +228,82 @@ body.tv .banner { font-size: 24px; }
   .kpis { grid-template-columns: 1fr 1fr; } .kpi.big { grid-column: 1 / -1; }
   .cols { grid-template-columns: 1fr; } .field-grid { grid-template-columns: 1fr; }
   header.top { flex-wrap: wrap; }
+}
+
+/* ---------- Dual Screen Mode ---------- */
+.dual-layout {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 18px;
+  align-items: start;
+}
+.dual-pane {
+  min-width: 0;
+}
+.dual-pane-sub {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--glow);
+  position: sticky;
+  top: 70px;
+  max-height: calc(100vh - 90px);
+  display: flex;
+  flex-direction: column;
+}
+.dual-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--panel2);
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.dual-title {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .5px;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.dual-tabs {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.dual-pane-body {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 480px;
+}
+.dual-pane-body .map-box svg {
+  height: 520px;
+  min-height: 400px;
+}
+body.tv .dual-layout {
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+body.tv .dual-pane-sub {
+  top: 55px;
+  max-height: calc(100vh - 75px);
+}
+.secondary-screen-view {
+  padding: 4px 14px;
+}
+.secondary-screen-view .map-box svg {
+  height: calc(100vh - 120px);
+}
+@media (max-width: 1100px) {
+  .dual-layout {
+    grid-template-columns: 1fr;
+  }
+  .dual-pane-sub {
+    position: static;
+    max-height: none;
+  }
 }

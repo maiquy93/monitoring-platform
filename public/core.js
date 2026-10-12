@@ -1,9 +1,18 @@
 'use strict';
 // Core: state, API, shell, realtime, routing, helpers. Views register themselves on M.views.
 const M = window.M = {
-  S: { user: null, settings: null, snap: null, groups: [], maps: [], sound: localStorage.getItem('sound') === '1', tv: false, rotate: false, lastSnapAt: 0 },
+  S: { user: null, settings: null, snap: null, groups: [], maps: [], sound: localStorage.getItem('sound') === '1', tv: false, rotate: false, dual: localStorage.getItem('dual_screen') === '1', lastSnapAt: 0 },
   views: {},
 };
+let dualChannel = null;
+try {
+  dualChannel = new window.BroadcastChannel('monitoring_sync');
+  dualChannel.onmessage = (e) => {
+    if (!e.data) return;
+    if (e.data.type === 'theme' && e.data.theme) M.applyTheme(e.data.theme, false);
+    else if (e.data.type === 'dual' && typeof e.data.dual === 'boolean') M.toggleDual(e.data.dual, false);
+  };
+} catch {}
 const $ = (s, el = document) => el.querySelector(s);
 M.$ = $;
 
@@ -88,12 +97,15 @@ M.toast = (msg) => {
   setTimeout(() => el.remove(), 4000);
 };
 
-M.applyTheme = (t) => {
+M.applyTheme = (t, broadcast = true) => {
   if (!['dark', 'light', 'neon'].includes(t)) t = 'neon';
   document.documentElement.dataset.theme = t;
   localStorage.setItem('theme', t);
   const sel = $('#theme-sel');
   if (sel) sel.value = t;
+  if (broadcast && dualChannel) {
+    try { dualChannel.postMessage({ type: 'theme', theme: t }); } catch {}
+  }
 };
 
 // Modal with a form. onSubmit(formEl) may throw an Error to show a message and keep the dialog open.
@@ -201,6 +213,7 @@ M.renderShell = () => {
     <div class="tools">
       <button class="icon-btn ${M.S.sound ? 'on' : ''}" id="btn-sound" title="Âm thanh cảnh báo">🔔</button>
       <button class="icon-btn" id="btn-rotate" title="Tự động luân phiên màn hình (chế độ TV)">🔁</button>
+      <button class="icon-btn ${M.S.dual ? 'on' : ''}" id="btn-dual" title="Chế độ màn hình đôi (Phím D): Chia 2 màn hình hoặc mở cửa sổ phụ">🖥️🖥️</button>
       <button class="icon-btn" id="btn-tv" title="Chế độ màn hình lớn (phím F)">📺</button>
       <select class="sel hide-tv" id="theme-sel" title="Giao diện">
         <option value="neon">Neon</option><option value="dark">Tối</option><option value="light">Sáng</option></select>
@@ -222,6 +235,7 @@ M.renderShell = () => {
     e.currentTarget.classList.toggle('on', M.S.sound);
     M.beep();
   });
+  $('#btn-dual').addEventListener('click', () => M.toggleDual());
   $('#btn-tv').addEventListener('click', () => M.toggleTv());
   $('#btn-rotate').addEventListener('click', (e) => {
     M.S.rotate = !M.S.rotate;
@@ -231,6 +245,20 @@ M.renderShell = () => {
   });
   $('#btn-user').addEventListener('click', () => M.changePassword(false));
   $('#btn-logout').addEventListener('click', M.logout);
+};
+
+M.toggleDual = (force, broadcast = true) => {
+  M.S.dual = force !== undefined ? force : !M.S.dual;
+  document.body.classList.toggle('dual-screen', M.S.dual);
+  $('#btn-dual') && $('#btn-dual').classList.toggle('on', M.S.dual);
+  localStorage.setItem('dual_screen', M.S.dual ? '1' : '0');
+  M.toast(M.S.dual ? 'Bật chế độ màn hình đôi (Phím D)' : 'Tắt chế độ màn hình đôi');
+  if (broadcast && dualChannel) {
+    try { dualChannel.postMessage({ type: 'dual', dual: M.S.dual }); } catch {}
+  }
+  if ((location.hash || '#/') === '#/') {
+    M.route();
+  }
 };
 
 M.toggleTv = (force) => {
@@ -246,6 +274,7 @@ document.addEventListener('fullscreenchange', () => {
 document.addEventListener('keydown', (e) => {
   if (!M.S.user || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   if (e.key === 'f' || e.key === 'F') M.toggleTv();
+  if (e.key === 'd' || e.key === 'D') M.toggleDual();
 });
 
 M.updateChrome = () => {
@@ -312,7 +341,7 @@ M.connect = () => {
 
 // ---------- router ----------
 const ROUTES = [
-  [/^#\/?$/, 'dashboard'], [/^#\/groups$/, 'groups'], [/^#\/group\/(\d+)$/, 'group'], [/^#\/device\/(\d+)$/, 'device'],
+  [/^#\/?$/, 'dashboard'], [/^#\/secondary$/, 'secondary'], [/^#\/groups$/, 'groups'], [/^#\/group\/(\d+)$/, 'group'], [/^#\/device\/(\d+)$/, 'device'],
   [/^#\/maps$/, 'maps'], [/^#\/map\/(\d+)$/, 'map'], [/^#\/events$/, 'events'], [/^#\/devices$/, 'devices'], [/^#\/settings$/, 'settings'],
 ];
 
@@ -354,6 +383,7 @@ M.boot = async () => {
   M.S.settings = await M.api('GET', '/api/settings');
   M.applyTheme(M.S.user.theme || localStorage.getItem('theme') || M.S.settings.default_theme);
   await Promise.all([M.loadGroups(), M.loadMaps()]);
+  if (M.S.dual) document.body.classList.add('dual-screen');
   M.renderShell();
   M.applyTheme(document.documentElement.dataset.theme);
   M.connect();

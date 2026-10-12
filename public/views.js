@@ -161,18 +161,78 @@
     }
   }
 
+  let dualTab = localStorage.getItem('dual_tab') || 'map';
+  let currentDualMapId = null;
+  let cachedDualMap = null;
+
   M.views.dashboard = {
     render(el) {
-      el.innerHTML = `<div class="kpis" id="kpis"></div>
-        <div id="groups-sec"></div>
-        <div class="row" style="margin:22px 0 10px"><h2 style="margin:0">Thiết bị</h2>
-          <button class="btn sm" id="btn-reset-order" style="display:none;margin-left:8px" title="Khôi phục thứ tự mặc định">↺ Thứ tự mặc định</button>
-          <span class="spacer"></span>
-          <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:200px" value="${esc(F.q)}">
-          <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
-            <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Hoạt động</option></select>
-          <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
-        <div class="grid" id="grid"></div>`;
+      if (M.S.dual) {
+        el.innerHTML = `
+          <div class="dual-layout">
+            <div class="dual-pane dual-pane-main">
+              <div class="kpis" id="kpis"></div>
+              <div id="groups-sec"></div>
+              <div class="row" style="margin:20px 0 10px"><h2 style="margin:0">Thiết bị</h2>
+                <button class="btn sm" id="btn-reset-order" style="display:none;margin-left:8px" title="Khôi phục thứ tự mặc định">↺ Thứ tự mặc định</button>
+                <span class="spacer"></span>
+                <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:160px" value="${esc(F.q)}">
+                <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
+                  <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Hoạt động</option></select>
+                <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+              </div>
+              <div class="grid" id="grid"></div>
+            </div>
+            <div class="dual-pane dual-pane-sub">
+              <div class="dual-pane-head">
+                <span class="dual-title">🖥️ Màn hình 2</span>
+                <div class="dual-tabs">
+                  <button class="btn sm ${dualTab === 'map' ? 'primary' : ''}" id="dual-tab-map">🗺️ Topology</button>
+                  <button class="btn sm ${dualTab === 'groups' ? 'primary' : ''}" id="dual-tab-groups">🗂️ Nhóm</button>
+                  <button class="btn sm ${dualTab === 'problems' ? 'primary' : ''}" id="dual-tab-problems">⚠️ Cảnh báo</button>
+                </div>
+                <span class="spacer"></span>
+                <button class="btn sm" id="btn-dual-popout" title="Mở cửa sổ tách biệt cho màn hình phụ thứ hai">🗗 Cửa sổ riêng</button>
+                <button class="btn sm" id="btn-dual-close" title="Tắt chế độ màn hình đôi">✕</button>
+              </div>
+              <div class="dual-pane-body" id="dual-pane-body"></div>
+            </div>
+          </div>`;
+
+        const tabMap = $('#dual-tab-map');
+        const tabGroups = $('#dual-tab-groups');
+        const tabProblems = $('#dual-tab-problems');
+        const switchDualTab = (t) => {
+          dualTab = t;
+          localStorage.setItem('dual_tab', t);
+          tabMap?.classList.toggle('primary', t === 'map');
+          tabGroups?.classList.toggle('primary', t === 'groups');
+          tabProblems?.classList.toggle('primary', t === 'problems');
+          this.updateDualPane(M.S.snap);
+        };
+        if (tabMap) tabMap.onclick = () => switchDualTab('map');
+        if (tabGroups) tabGroups.onclick = () => switchDualTab('groups');
+        if (tabProblems) tabProblems.onclick = () => switchDualTab('problems');
+
+        const popoutBtn = $('#btn-dual-popout');
+        if (popoutBtn) popoutBtn.onclick = () => {
+          window.open(location.origin + '/#/secondary', 'monitoring_secondary_screen', 'width=1366,height=800,menubar=no,toolbar=no');
+        };
+        const closeBtn = $('#btn-dual-close');
+        if (closeBtn) closeBtn.onclick = () => M.toggleDual(false);
+      } else {
+        el.innerHTML = `<div class="kpis" id="kpis"></div>
+          <div id="groups-sec"></div>
+          <div class="row" style="margin:22px 0 10px"><h2 style="margin:0">Thiết bị</h2>
+            <button class="btn sm" id="btn-reset-order" style="display:none;margin-left:8px" title="Khôi phục thứ tự mặc định">↺ Thứ tự mặc định</button>
+            <span class="spacer"></span>
+            <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:200px" value="${esc(F.q)}">
+            <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
+              <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Hoạt động</option></select>
+            <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
+          <div class="grid" id="grid"></div>`;
+      }
+
       $('#f-status').value = F.status; $('#f-type').value = F.type;
       $('#f-q').addEventListener('input', (e) => { F.q = e.target.value; this.update(M.S.snap); });
       $('#f-status').addEventListener('change', (e) => { F.status = e.target.value; this.update(M.S.snap); });
@@ -198,6 +258,7 @@
       let suppressClickUntil = 0;
       let scrollSpeed = 0;
       let scrollRaf = null;
+      let lastSwapTime = 0;
 
       const stopAutoScroll = () => {
         scrollSpeed = 0;
@@ -208,8 +269,8 @@
       };
 
       const updateAutoScroll = (clientY) => {
-        const edge = 70;
-        const maxSpeed = 12;
+        const edge = 75;
+        const maxSpeed = 14;
         if (clientY < edge) {
           scrollSpeed = -Math.round((1 - Math.max(0, clientY) / edge) * maxSpeed);
         } else if (clientY > window.innerHeight - edge) {
@@ -289,6 +350,8 @@
         const rect = tile.getBoundingClientRect();
         s.grabOffsetX = clientX - rect.left;
         s.grabOffsetY = clientY - rect.top;
+        s.tileWidth = rect.width;
+        s.tileHeight = rect.height;
 
         const clone = tile.cloneNode(true);
         clone.classList.add('tile-drag-clone');
@@ -296,7 +359,7 @@
         clone.style.height = `${rect.height}px`;
         clone.style.left = '0px';
         clone.style.top = '0px';
-        clone.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0) scale(1.05)`;
+        clone.style.transform = `translate3d(${rect.left}px, ${rect.top}px, 0) scale(1.04)`;
         document.body.appendChild(clone);
         s.clone = clone;
 
@@ -336,46 +399,50 @@
         e.preventDefault();
         const curX = e.clientX - session.grabOffsetX;
         const curY = e.clientY - session.grabOffsetY;
-        session.clone.style.transform = `translate3d(${curX}px, ${curY}px, 0) scale(1.05)`;
+        session.clone.style.transform = `translate3d(${curX}px, ${curY}px, 0) scale(1.04)`;
 
         updateAutoScroll(e.clientY);
 
-        const px = e.clientX;
-        const py = e.clientY;
-        const otherTiles = Array.from(grid.querySelectorAll('.tile:not(.tile-placeholder)'));
+        const cx = curX + session.tileWidth / 2;
+        const cy = curY + session.tileHeight / 2;
+        const allTiles = Array.from(grid.querySelectorAll('.tile'));
         let targetTile = null;
 
-        for (const t of otherTiles) {
+        for (const t of allTiles) {
+          if (t === session.tile) continue;
           const r = t.getBoundingClientRect();
-          if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) {
+          if (cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
             targetTile = t;
             break;
           }
         }
 
-        if (!targetTile && otherTiles.length > 0) {
+        if (!targetTile && allTiles.length > 1) {
           let closestDist = Infinity;
-          for (const t of otherTiles) {
+          for (const t of allTiles) {
+            if (t === session.tile) continue;
             const r = t.getBoundingClientRect();
-            const cx = r.left + r.width / 2;
-            const cy = r.top + r.height / 2;
-            const d = Math.hypot(px - cx, py - cy);
-            if (d < closestDist && d < Math.max(r.width, r.height) * 0.95) {
+            const tcx = r.left + r.width / 2;
+            const tcy = r.top + r.height / 2;
+            const d = Math.hypot(cx - tcx, cy - tcy);
+            if (d < closestDist && d < Math.max(r.width, r.height) * 0.85) {
               closestDist = d;
               targetTile = t;
             }
           }
         }
 
-        if (targetTile && targetTile !== session.tile) {
-          const allTiles = Array.from(grid.children).filter((el) => el.classList.contains('tile'));
-          const pIdx = allTiles.indexOf(session.tile);
-          const tIdx = allTiles.indexOf(targetTile);
+        const now = Date.now();
+        if (targetTile && targetTile !== session.tile && (now - lastSwapTime > 75)) {
+          const currentTiles = Array.from(grid.children).filter((el) => el.classList.contains('tile'));
+          const pIdx = currentTiles.indexOf(session.tile);
+          const tIdx = currentTiles.indexOf(targetTile);
           if (pIdx !== -1 && tIdx !== -1 && pIdx !== tIdx) {
-            const prevRects = new Map();
-            for (const t of allTiles) {
+            lastSwapTime = now;
+            const firstRects = new Map();
+            for (const t of currentTiles) {
               if (t !== session.tile) {
-                prevRects.set(t, t.getBoundingClientRect());
+                firstRects.set(t, t.getBoundingClientRect());
               }
             }
 
@@ -385,7 +452,7 @@
               grid.insertBefore(session.tile, targetTile);
             }
 
-            for (const [t, oldRect] of prevRects.entries()) {
+            for (const [t, oldRect] of firstRects.entries()) {
               const newRect = t.getBoundingClientRect();
               const diffX = oldRect.left - newRect.left;
               const diffY = oldRect.top - newRect.top;
@@ -395,15 +462,12 @@
               }
             }
 
-            grid.offsetHeight; // reflow
+            grid.offsetHeight;
 
             requestAnimationFrame(() => {
-              for (const [t, oldRect] of prevRects.entries()) {
-                const newRect = t.getBoundingClientRect();
-                if (oldRect.left !== newRect.left || oldRect.top !== newRect.top) {
-                  t.style.transition = 'transform 0.24s cubic-bezier(0.2, 0, 0, 1)';
-                  t.style.transform = '';
-                }
+              for (const [t] of firstRects) {
+                t.style.transition = 'transform 0.25s cubic-bezier(0.2, 0, 0, 1)';
+                t.style.transform = '';
               }
             });
           }
@@ -505,7 +569,7 @@
             if (session && !session.started) {
               startDragging(session, e.clientX, e.clientY);
             }
-          }, 220);
+          }, 180);
         }
       });
 
@@ -537,6 +601,146 @@
       else if (F.status) list = list.filter((d) => d.status === F.status);
       $('#grid').innerHTML = list.length ? sortDevices(list).map(M.tile).join('')
         : `<div class="muted">${snap.devices.length ? 'Không có thiết bị phù hợp' : 'Chưa có thiết bị nào. Vào mục "Thiết bị" để thêm.'}</div>`;
+
+      if (M.S.dual) {
+        this.updateDualPane(snap);
+      }
+    },
+    updateDualPane(snap) {
+      const body = $('#dual-pane-body');
+      if (!body || !snap) return;
+      if (dualTab === 'map') {
+        if (M.S.maps && M.S.maps.length > 0) {
+          const mapId = currentDualMapId || M.S.maps[0].id;
+          let selectHtml = '';
+          if (M.S.maps.length > 1) {
+            selectHtml = `<div style="margin-bottom:8px"><select class="sel" id="dual-map-sel">${M.S.maps.map((m) => `<option value="${m.id}" ${m.id === mapId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></div>`;
+          }
+          if (!$('#dual-map-box')) {
+            body.innerHTML = `${selectHtml}<div class="map-box" id="dual-map-box" style="overflow:hidden"><svg id="dual-map-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet"></svg></div>`;
+          }
+          const mapSel = $('#dual-map-sel');
+          if (mapSel) {
+            mapSel.onchange = async (e) => {
+              currentDualMapId = Number(e.target.value);
+              cachedDualMap = await M.api('GET', `/api/maps/${currentDualMapId}`);
+              M.renderMapSvg($('#dual-map-svg'), cachedDualMap);
+            };
+          }
+          if (!cachedDualMap || cachedDualMap.id !== mapId) {
+            M.api('GET', `/api/maps/${mapId}`).then((mData) => {
+              cachedDualMap = mData;
+              M.renderMapSvg($('#dual-map-svg'), cachedDualMap);
+            }).catch(() => {});
+          } else {
+            M.renderMapSvg($('#dual-map-svg'), cachedDualMap);
+          }
+        } else {
+          body.innerHTML = `<div class="panel" style="text-align:center;padding:36px 16px">
+            <div style="font-size:36px;margin-bottom:8px">🗺️</div>
+            <h3 style="margin:0 0 8px">Chưa có sơ đồ mạng Topology</h3>
+            <p class="muted" style="margin:0 0 14px">Tạo sơ đồ mạng để theo dõi trực quan liên kết giữa các thiết bị trên màn hình thứ hai.</p>
+            ${M.S.user.role !== 'viewer' ? '<a class="btn primary" href="#/maps">+ Tạo sơ đồ Topology</a>' : ''}
+          </div>`;
+        }
+      } else if (dualTab === 'groups') {
+        body.innerHTML = M.S.groups.length
+          ? `<div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(200px, 1fr))">${M.S.groups.map(M.groupTile).join('')}</div>`
+          : '<div class="muted">Chưa có nhóm thiết bị nào.</div>';
+      } else if (dualTab === 'problems') {
+        const probs = snap.devices.filter((d) => d.status === 'down' || d.status === 'warning');
+        if (!probs.length) {
+          body.innerHTML = `<div class="panel" style="text-align:center;padding:36px 16px;border-color:var(--c-ok)">
+            <div style="font-size:40px;margin-bottom:8px">✅</div>
+            <h3 style="color:var(--c-ok);margin:0 0 6px">Hệ thống đang hoạt động ổn định</h3>
+            <p class="muted" style="margin:0">Tất cả thiết bị đều đang trực tuyến, không có cảnh báo.</p>
+          </div>`;
+        } else {
+          body.innerHTML = `<div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(220px, 1fr))">${sortDevices(probs).map(M.tile).join('')}</div>`;
+        }
+      }
+    },
+  };
+
+  // ---------- secondary screen (detached popout window) ----------
+  M.views.secondary = {
+    async render(el) {
+      await Promise.all([M.loadGroups(), M.loadMaps()]);
+      let secTab = localStorage.getItem('secondary_tab') || 'map';
+      el.innerHTML = `
+        <div class="secondary-screen-view">
+          <div class="row" style="margin-bottom:14px;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div class="brand" style="font-size:20px">◉ MÀN HÌNH PHỤ (SECONDARY)</div>
+            <span class="chip" id="sec-chip">–/–</span>
+            <div class="dual-tabs">
+              <button class="btn sm ${secTab === 'map' ? 'primary' : ''}" id="sec-tab-map">🗺️ Sơ đồ Topology</button>
+              <button class="btn sm ${secTab === 'groups' ? 'primary' : ''}" id="sec-tab-groups">🗂️ Nhóm thiết bị</button>
+              <button class="btn sm ${secTab === 'problems' ? 'primary' : ''}" id="sec-tab-problems">⚠️ Cảnh báo</button>
+              <button class="btn sm ${secTab === 'wallboard' ? 'primary' : ''}" id="sec-tab-wallboard">📊 Wallboard</button>
+            </div>
+            <span class="spacer"></span>
+            <button class="icon-btn" id="sec-btn-fullscreen" title="Phóng to toàn màn hình (phím F)">📺 Toàn màn hình</button>
+            <select class="sel" id="sec-theme-sel" title="Giao diện">
+              <option value="neon">Neon</option><option value="dark">Tối</option><option value="light">Sáng</option>
+            </select>
+          </div>
+          <div id="sec-body"></div>
+        </div>`;
+
+      $('#sec-theme-sel').value = document.documentElement.dataset.theme;
+      $('#sec-theme-sel').onchange = (e) => M.applyTheme(e.target.value);
+      $('#sec-btn-fullscreen').onclick = () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().catch(() => {});
+        else document.exitFullscreen?.();
+      };
+
+      const switchTab = (t) => {
+        secTab = t;
+        localStorage.setItem('secondary_tab', t);
+        $('#sec-tab-map')?.classList.toggle('primary', t === 'map');
+        $('#sec-tab-groups')?.classList.toggle('primary', t === 'groups');
+        $('#sec-tab-problems')?.classList.toggle('primary', t === 'problems');
+        $('#sec-tab-wallboard')?.classList.toggle('primary', t === 'wallboard');
+        this.update(M.S.snap);
+      };
+      $('#sec-tab-map').onclick = () => switchTab('map');
+      $('#sec-tab-groups').onclick = () => switchTab('groups');
+      $('#sec-tab-problems').onclick = () => switchTab('problems');
+      $('#sec-tab-wallboard').onclick = () => switchTab('wallboard');
+      this.update(M.S.snap);
+    },
+    update(snap) {
+      if (!snap || !$('#sec-body')) return;
+      const s = snap.summary;
+      const chip = $('#sec-chip');
+      if (chip) chip.textContent = `${s.alive}/${s.total} hoạt động`;
+      const body = $('#sec-body');
+      const tab = localStorage.getItem('secondary_tab') || 'map';
+      if (tab === 'map') {
+        if (M.S.maps && M.S.maps.length) {
+          body.innerHTML = `<div class="map-box" style="height:calc(100vh - 120px)"><svg id="sec-map-svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" style="height:100%"></svg></div>`;
+          M.api('GET', `/api/maps/${M.S.maps[0].id}`).then((m) => {
+            M.renderMapSvg($('#sec-map-svg'), m);
+          }).catch(() => {});
+        } else {
+          body.innerHTML = '<div class="panel muted" style="padding:40px;text-align:center">Chưa có sơ đồ Topology nào.</div>';
+        }
+      } else if (tab === 'groups') {
+        body.innerHTML = `<div class="grid">${M.S.groups.map(M.groupTile).join('')}</div>`;
+      } else if (tab === 'problems') {
+        const probs = snap.devices.filter((d) => d.status === 'down' || d.status === 'warning');
+        body.innerHTML = probs.length
+          ? `<div class="grid">${sortDevices(probs).map(M.tile).join('')}</div>`
+          : '<div class="panel" style="text-align:center;padding:40px;border-color:var(--c-ok);color:var(--c-ok)"><h3>✅ Tất cả thiết bị đang hoạt động ổn định</h3></div>';
+      } else if (tab === 'wallboard') {
+        const k = (cls, label, v, zero) => `<div class="kpi ${cls} ${zero && !v ? 'zero' : ''}"><div class="label">${label}</div><div class="val">${v}</div></div>`;
+        body.innerHTML = `
+          <div class="kpis">
+            <div class="kpi big"><div class="label">Thiết bị đang hoạt động</div><div class="val">${s.alive}<small>/${s.total}</small></div></div>
+            ${k('k-down', 'Mất kết nối', s.down, true)}${k('k-warn', 'Cảnh báo', s.warning, true)}${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance)}
+          </div>
+          <div class="grid" style="margin-top:20px">${sortDevices(snap.devices).map(M.tile).join('')}</div>`;
+      }
     },
   };
 

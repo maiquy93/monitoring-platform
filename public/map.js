@@ -197,4 +197,31 @@
       });
     },
   };
+
+  M.renderMapSvg = (svg, m) => {
+    if (!svg || !m) return;
+    const nodes = new Map(m.nodes.map((n) => [n.id, n]));
+    const infos = new Map(m.nodes.map((n) => [n.id, M.views.map.info(n)]));
+    const score = (r) => (SEV_RANK[r] ? 10 + SEV_RANK[r] : r === 'up' ? 1 : 0);
+    const links = (m.links || []).map((l) => {
+      const a = nodes.get(l.from), b = nodes.get(l.to);
+      if (!a || !b) return '';
+      const ia = infos.get(a.id), ib = infos.get(b.id);
+      const r = score(ia ? ia.rank : 'unknown') >= score(ib ? ib.rank : 'unknown') ? (ia ? ia.rank : 'unknown') : (ib ? ib.rank : 'unknown');
+      const bad = SEV_RANK[r];
+      return `<line class="m-link ${bad ? 'down' : ''}" style="stroke:${COL[r] || 'var(--c-ok)'}" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}"/>`;
+    }).join('');
+    const trunc = (s, n) => (s && s.length > n ? `${s.slice(0, n - 1)}…` : s || '');
+    const nodeSvg = (m.nodes || []).map((n) => {
+      const i = infos.get(n.id) || { name: '', sub: '', cls: '', icon: '' };
+      if (n.kind === 'label') {
+        return `<g class="m-node m-label" data-id="${n.id}" transform="translate(${n.x - NW / 2},${n.y - 22})">
+          <rect width="${NW}" height="44" rx="8"/><text x="${NW / 2}" y="28" text-anchor="middle" font-size="16" font-weight="700">${esc(trunc(i.name, 22))}</text></g>`;
+      }
+      return `<g class="m-node ${i.cls}" data-id="${n.id}" data-href="${i.href || ''}" style="cursor:pointer" transform="translate(${n.x - NW / 2},${n.y - NH / 2})">
+        <rect width="${NW}" height="${NH}" rx="10"/><text x="12" y="27" font-size="22">${i.icon}</text>
+        <text x="42" y="26" font-size="16" font-weight="700">${esc(trunc(i.name, 17))}</text><text class="m-sub" x="42" y="46">${esc(i.sub)}</text></g>`;
+    }).join('');
+    svg.innerHTML = links + nodeSvg;
+  };
 })();
