@@ -30,6 +30,16 @@ New-NetFirewallRule -DisplayName "Monitoring Platform 8080" `
 
 ### Linux
 
+**Cách 1 — Triển khai tự động bằng một lệnh:**
+
+```bash
+sudo bash deploy/setup-os.sh
+```
+
+Script sẽ tự động cài các gói phụ thuộc (kể cả Node.js >= 22.5 nếu chưa có), tạo user `monitoring`, sao chép source vào `/opt/monitoring/app`, tạo cấu hình `/etc/monitoring/monitoring.env`, thiết lập systemd service `monitoring.service` tự khởi động khi boot OS và kiểm tra `/api/health`.
+
+**Cách 2 — Cài đặt thủ công từng bước:**
+
 ```bash
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl iputils-ping
