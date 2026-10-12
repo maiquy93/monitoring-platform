@@ -319,7 +319,7 @@ function createApp(db, monitor, opts = {}) {
     const step = Math.max(30e3, Math.floor(span / 240 / 1000) * 1000);
     const rows = db.prepare(
       `SELECT (ts / ?) * ? AS ts, AVG(cpu) cpu, AVG(ram) ram, MAX(disk) disk, AVG(rtt) rtt,
-              AVG(net_in) net_in, AVG(net_out) net_out
+              AVG(net_in) net_in, AVG(net_out) net_out, AVG(temp) temp
        FROM metrics WHERE device_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY ts`)
       .all(step, step, id, Date.now() - span, step);
     send(ctx.res, 200, { points: rows });
@@ -431,6 +431,16 @@ function createApp(db, monitor, opts = {}) {
         const v = Number(b.thresholds[k]);
         if (!Number.isFinite(v) || v < 1 || v > 100) throw bad('Ngưỡng phải từ 1 đến 100');
         t[k] = v;
+      }
+      if (b.thresholds.temp !== undefined) {
+        const v = Number(b.thresholds.temp);
+        if (!Number.isFinite(v) || v < 1 || v > 150) throw bad('Ngưỡng nhiệt độ phải từ 1 đến 150°C');
+        t.temp = v;
+      }
+      if (b.thresholds.dos_packet_rate !== undefined) {
+        const v = Number(b.thresholds.dos_packet_rate);
+        if (!Number.isFinite(v) || v < 10) throw bad('Ngưỡng tốc độ gói tin không hợp lệ');
+        t.dos_packet_rate = v;
       }
       setSetting(db, 'thresholds', t);
     }

@@ -10,7 +10,7 @@ const DEFAULT_TYPE_SEVERITY = {
 
 const DEFAULT_SETTINGS = {
   type_severity: DEFAULT_TYPE_SEVERITY,
-  thresholds: { cpu: 90, ram: 90, disk: 90 },
+  thresholds: { cpu: 90, ram: 90, disk: 90, temp: 85, dos_packet_rate: 10000 },
   enroll_key: '',
   org_name: 'Monitoring',
   default_theme: 'neon',
@@ -45,7 +45,7 @@ function open(file) {
       PRIMARY KEY(device_id, group_id));
     CREATE TABLE IF NOT EXISTS metrics(
       device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-      ts INTEGER NOT NULL, cpu REAL, ram REAL, disk REAL, rtt REAL, net_in REAL, net_out REAL);
+      ts INTEGER NOT NULL, cpu REAL, ram REAL, disk REAL, rtt REAL, net_in REAL, net_out REAL, temp REAL);
     CREATE INDEX IF NOT EXISTS idx_metrics ON metrics(device_id, ts);
     CREATE TABLE IF NOT EXISTS events(
       id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, device_id INTEGER, device_name TEXT NOT NULL,
@@ -61,6 +61,7 @@ function open(file) {
   const mcols = db.prepare('PRAGMA table_info(metrics)').all().map((c) => c.name);
   if (!mcols.includes('net_in')) db.exec('ALTER TABLE metrics ADD COLUMN net_in REAL');
   if (!mcols.includes('net_out')) db.exec('ALTER TABLE metrics ADD COLUMN net_out REAL');
+  if (!mcols.includes('temp')) db.exec('ALTER TABLE metrics ADD COLUMN temp REAL');
   return db;
 }
 

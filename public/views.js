@@ -42,12 +42,39 @@
     if (d.status === 'up' || d.status === 'warning') {
       const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram'], ['Disk', d.disk, 'disk']]
         .filter(([, value]) => value != null);
-      if (metrics.length) bars = `<div class="bars">${metrics.map(([label, value, key]) => bar(label, value, key)).join('')}</div>`;
+      const metricBars = metrics.map(([label, value, key]) => bar(label, value, key));
+      if (d.temperature != null) {
+        const tTh = (th() && th().temp) || 85;
+        const tLv = d.temperature >= tTh ? 'crit' : d.temperature >= tTh - 10 ? 'hi' : '';
+        metricBars.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
+      }
+      if (metricBars.length) bars = `<div class="bars">${metricBars.join('')}</div>`;
       else if (d.toner != null) bars = `<div class="bars"><div class="bar ${d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : ''}">Mực ${d.toner}%<i><b style="width:${d.toner}%"></b></i></div></div>`;
+    }
+    let alertBadges = '';
+    const al = d.alerts;
+    if (al) {
+      const items = [];
+      if (al.dos || d.dos_alert) {
+        items.push(`<span class="t-badge-alert alert-dos" title="Nghi ngờ tấn công Flood/DoS${d.pkt_rate ? ` (${d.pkt_rate} gói/s)` : ''}">🛡️ DoS</span>`);
+      }
+      if (al.power || (d.power && d.power.on_battery)) {
+        const pct = d.power && d.power.battery_percent != null ? ` ${d.power.battery_percent}%` : '';
+        items.push(`<span class="t-badge-alert alert-power" title="Mất điện lưới - Đang dùng pin UPS${pct}">🔋 Mất điện${pct}</span>`);
+      }
+      if (al.smart || (d.smart && d.smart.ok === false)) {
+        items.push(`<span class="t-badge-alert alert-smart" title="Cảnh báo đĩa cứng SMART lỗi / Bad Sector${d.smart && d.smart.details ? `: ${esc(d.smart.details)}` : ''}">💾 Lỗi đĩa</span>`);
+      }
+      if (al.thermal || (d.temperature != null && d.temperature >= ((th() && th().temp) || 85))) {
+        items.push(`<span class="t-badge-alert alert-thermal" title="Báo động nhiệt độ CPU quá cao (Thermal Throttling)">🔥 ${Math.round(d.temperature)}°C</span>`);
+      }
+      if (items.length) {
+        alertBadges = `<div class="t-alert-row">${items.join('')}</div>`;
+      }
     }
     return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}" data-id="${d.id}" draggable="false">
       <div class="t-top"><span class="t-ico">${M.ICON[d.type] || ''}</span><span class="t-name" title="${esc(d.name)}">${esc(d.name)}</span>
-      <span class="t-state">${M.STATE_NAME[d.status]}</span></div><div class="t-sub" title="${esc(sub)}">${esc(sub)}</div>${bars}</a>`;
+      <span class="t-state">${M.STATE_NAME[d.status]}</span></div>${alertBadges}<div class="t-sub" title="${esc(sub)}">${esc(sub)}</div>${bars}</a>`;
   };
 
   const groupDevices = (g) => devs().filter((d) => d.groups.includes(g.id));
@@ -103,7 +130,7 @@
   M.eventsTable = (events, showDevice) => {
     if (!events.length) return '<div class="muted">Chưa có sự kiện</div>';
     const badge = (e) => (e.kind === 'audit' ? 'ok' : e.severity);
-    const label = { down: 'Mất kết nối', up: 'Phục hồi', warning: 'Cảnh báo', audit: 'Hệ thống' };
+    const label = { down: 'Mất kết nối', up: 'Phục hồi', warning: 'Cảnh báo', audit: 'Hệ thống', dos: 'Tấn công DoS', smart: 'Lỗi đĩa cứng', thermal: 'Quá nhiệt', power: 'Mất điện lưới' };
     return `<table class="tbl"><thead><tr><th>Thời gian</th>${showDevice ? '<th>Thiết bị</th>' : ''}<th>Loại</th><th>Nội dung</th></tr></thead><tbody>
       ${events.map((e) => `<tr><td>${M.fmtTime(e.ts)}</td>${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
       <td><span class="sev-badge ${badge(e)}">${label[e.kind] || e.kind}</span></td><td>${esc(e.message)}</td></tr>`).join('')}</tbody></table>`;
@@ -847,7 +874,25 @@
         gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
       }
       if (d.toner != null) gs.push(M.gauge('Mực in', d.toner, 'cpu'));
-      if (d.temperature != null) gs.push(stat('Nhiệt độ', `${d.temperature}°C`));
+      if (d.temperature != null) {
+        const tTh = (th() && th().temp) || 85;
+        const tCol = d.temperature >= tTh ? 'var(--c-critical)' : d.temperature >= tTh - 10 ? 'var(--c-medium)' : 'var(--c-ok)';
+        gs.push(`<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px;color:${tCol}">${Math.round(d.temperature)}°C</div><div class="g-label">Nhiệt độ CPU</div></div>`);
+      }
+      if (d.power) {
+        const pState = d.power.on_battery ? 'Đang chạy PIN' : 'Điện lưới AC';
+        const pCol = d.power.on_battery ? 'var(--c-critical)' : 'var(--c-ok)';
+        const pSub = d.power.battery_percent != null ? `Pin: ${d.power.battery_percent}%` : '';
+        gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${pCol}">${d.power.on_battery ? '🔋 ' : '⚡ '}${pState}</div><div class="g-label">Nguồn / UPS${pSub ? `<br>${pSub}` : ''}</div></div>`);
+      }
+      if (d.smart) {
+        const sOk = d.smart.ok !== false;
+        const sCol = sOk ? 'var(--c-ok)' : 'var(--c-critical)';
+        gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${sCol}">${sOk ? '✅ Bình thường' : '❌ Lỗi SMART'}</div><div class="g-label">Trạng thái đĩa cứng</div></div>`);
+      }
+      if (d.dos_alert || (d.alerts && d.alerts.dos)) {
+        gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:var(--c-critical)">🛡️ Cảnh báo DoS</div><div class="g-label">${d.pkt_rate ? `${d.pkt_rate} gói/s` : 'Lưu lượng bất thường'}</div></div>`);
+      }
       $('#d-gauges').innerHTML = `<div class="gauges" style="margin:0">${gs.join('')}</div>`;
 
       const names = d.groups.map((id) => (M.S.groups.find((g) => g.id === id) || {}).name).filter(Boolean);
@@ -945,6 +990,9 @@
           { key: 'net_out', color: 'var(--c-maint)', label: 'Tải lên (Out)' },
         ], this.range, null, M.fmtRate)}`;
       }
+      if (has('temp')) {
+        html += `<h2>Nhiệt độ CPU (°C)</h2>${M.chart(points, [{ key: 'temp', color: 'var(--c-high)', label: 'Nhiệt độ (°C)' }], this.range, 120, (v) => `${Math.round(v)}°`)}`;
+      }
       $('#d-charts').innerHTML = html || '<div class="muted" style="padding:20px">Chưa có dữ liệu lịch sử</div>';
     },
     async loadEvents() {
@@ -958,7 +1006,7 @@
   M.views.events = {
     async render(el) {
       el.innerHTML = `<div class="row"><h1>Nhật ký sự kiện</h1><span class="spacer"></span>
-        <select class="sel" id="ev-kind"><option value="">Tất cả</option><option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Phục hồi</option><option value="audit">Hệ thống</option></select></div>
+        <select class="sel" id="ev-kind"><option value="">Tất cả</option><option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="dos">Tấn công DoS</option><option value="power">Mất điện lưới</option><option value="smart">Lỗi đĩa cứng</option><option value="thermal">Quá nhiệt</option><option value="up">Phục hồi</option><option value="audit">Hệ thống</option></select></div>
         <div class="panel" id="ev-body"></div>`;
       $('#ev-kind').onchange = () => this.load();
       await this.load();

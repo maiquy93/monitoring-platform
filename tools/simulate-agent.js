@@ -25,6 +25,9 @@ async function tick() {
     disks: [{ mount: '/', total: 5e11, used: 2e11, percent: 40 }, { mount: '/data', total: 2e12, used: 1.4e12, percent: +(args.disk || 70) }],
     uptime: Math.floor((Date.now() - t0) / 1000),
     net: { rx_bytes: simRx, tx_bytes: simTx },
+    temperature: args.temp !== undefined ? Number(args.temp) : +(45 + 10 * Math.sin(Date.now() / 30000)).toFixed(1),
+    smart: args['smart-failing'] ? { ok: false, status: 'failing', details: 'Predicted drive failure' } : { ok: true, status: 'passed' },
+    power: args['on-battery'] ? { on_battery: true, battery_percent: 45, status: 'discharging' } : { on_battery: false, battery_percent: 100, status: 'ac' },
   };
   try {
     const r = await fetch(`${server}/api/agent/report`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: JSON.stringify(body) });

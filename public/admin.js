@@ -153,8 +153,11 @@
         <button class="btn primary">Lưu mức cảnh báo</button></form></div>
 
       <div class="panel" style="margin-top:14px"><h2 style="margin-top:0">Ngưỡng tài nguyên & phát hiện mất kết nối</h2>
-        <form id="st-th" class="field-grid">${['cpu', 'ram', 'disk'].map((k) => `<div class="field"><label>Cảnh báo ${k.toUpperCase()} từ (%) – kéo dài trên 15 giây</label><input class="inp" type="number" min="1" max="100" name="${k}" value="${s.thresholds[k]}"></div>`).join('')}
-        <div><button class="btn primary">Lưu ngưỡng</button></div></form>
+        <form id="st-th" class="field-grid">
+          ${['cpu', 'ram', 'disk'].map((k) => `<div class="field"><label>Cảnh báo ${k.toUpperCase()} từ (%) – kéo dài trên 15 giây</label><input class="inp" type="number" min="1" max="100" name="${k}" value="${s.thresholds[k] || 90}"></div>`).join('')}
+          <div class="field"><label>Báo động quá nhiệt CPU (°C)</label><input class="inp" type="number" min="30" max="120" name="temp" value="${s.thresholds.temp || 85}"></div>
+          <div class="field"><label>Cảnh báo DoS / Flood (gói tin/giây)</label><input class="inp" type="number" min="100" max="1000000" name="dos_packet_rate" value="${s.thresholds.dos_packet_rate || 10000}"></div>
+          <div><button class="btn primary">Lưu ngưỡng</button></div></form>
         <p class="muted">Mất kết nối: ICMP ping không phản hồi ${t.ping_fail_limit} lần liên tiếp (chu kỳ ${t.ping_interval_ms / 1000}s, phát hiện sau khoảng ${Math.round(t.ping_interval_ms * t.ping_fail_limit / 1000)}–${Math.round((t.ping_interval_ms * t.ping_fail_limit + 1000) / 1000)}s) hoặc agent không gửi dữ liệu quá ${t.agent_timeout_ms / 1000}s.
         Thiết bị có nhiều kiểu kiểm tra chỉ bị coi là mất kết nối khi tất cả đều thất bại. Các giá trị này cấu hình qua biến môi trường (xem README).</p></div>
 

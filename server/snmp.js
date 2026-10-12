@@ -7,6 +7,8 @@ const OIDS = {
   sysObjectID: '1.3.6.1.2.1.1.2.0',
   sysUpTime: '1.3.6.1.2.1.1.3.0',
   sysName: '1.3.6.1.2.1.1.5.0',
+  tcpInSegs: '1.3.6.1.2.1.6.10.0',
+  udpInDatagrams: '1.3.6.1.2.1.7.1.0',
 };
 
 function encLen(n) {

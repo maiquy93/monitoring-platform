@@ -25,6 +25,77 @@ cpu_data() {
   load1=$(awk '{print $1}' /proc/loadavg)
   printf '%s %s %s\n' "$percent" "$cores" "$load1"
 }
+smart_data() {
+  failing=0; msg=
+  if command -v smartctl >/dev/null 2>&1; then
+    for dev in $(ls /dev/sd[a-z] /dev/nvme[0-9]n1 /dev/vd[a-z] 2>/dev/null); do
+      out=$(smartctl -H "$dev" 2>/dev/null || true)
+      if echo "$out" | grep -Ei 'FAILED|FAILING|ATTRIBUTE.*FAILED' >/dev/null 2>&1; then
+        failing=1; msg="$dev failing"
+        break
+      fi
+    done
+  fi
+  if [ "$failing" -eq 1 ]; then
+    printf '{"ok":false,"status":"failing","details":"%s"}' "$(json_escape "$msg")"
+  else
+    printf '{"ok":true,"status":"passed"}'
+  fi
+}
+thermal_data() {
+  temp=
+  for z in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp1_input; do
+    if [ -r "$z" ]; then
+      read -r raw < "$z" 2>/dev/null || raw=
+      if [ -n "$raw" ] && [ "$raw" -gt 0 ] 2>/dev/null; then
+        if [ "$raw" -gt 1000 ]; then
+          temp=$(awk -v r="$raw" 'BEGIN{printf "%.1f", r/1000}')
+        else
+          temp="$raw"
+        fi
+        break
+      fi
+    fi
+  done
+  if [ -n "$temp" ]; then printf '%s' "$temp"; else printf 'null'; fi
+}
+power_data() {
+  on_bat=0; bat_pct=; status="ac"
+  for bat in /sys/class/power_supply/BAT* /sys/class/power_supply/ups*; do
+    if [ -d "$bat" ]; then
+      [ -r "$bat/status" ] && read -r bstat < "$bat/status" 2>/dev/null || bstat=
+      [ -r "$bat/capacity" ] && read -r bcap < "$bat/capacity" 2>/dev/null || bcap=
+      if [ -n "$bcap" ]; then bat_pct="$bcap"; fi
+      case "$bstat" in
+        [Dd]ischarging*) on_bat=1; status="discharging" ;;
+        *) status="ac" ;;
+      esac
+      break
+    fi
+  done
+  if [ "$on_bat" -eq 0 ] && command -v upower >/dev/null 2>&1; then
+    udev=$(upower -e 2>/dev/null | awk '/battery|ups/{print $1; exit}')
+    if [ -n "$udev" ]; then
+      uinfo=$(upower -i "$udev" 2>/dev/null || true)
+      if echo "$uinfo" | grep -Ei 'state:[[:space:]]*discharging' >/dev/null 2>&1; then
+        on_bat=1; status="discharging"
+      fi
+      upct=$(echo "$uinfo" | awk '/percentage:[[:space:]]*[0-9]+/{gsub("%","",$2); print $2; exit}')
+      if [ -n "$upct" ]; then bat_pct="$upct"; fi
+    fi
+  fi
+  if [ "$on_bat" -eq 1 ]; then
+    if [ -n "$bat_pct" ]; then
+      printf '{"on_battery":true,"battery_percent":%s,"status":"%s"}' "$bat_pct" "$status"
+    else
+      printf '{"on_battery":true,"battery_percent":null,"status":"%s"}' "$status"
+    fi
+  elif [ -n "$bat_pct" ]; then
+    printf '{"on_battery":false,"battery_percent":%s,"status":"%s"}' "$bat_pct" "$status"
+  else
+    printf '{"on_battery":false,"battery_percent":null,"status":"ac"}'
+  fi
+}
 payload() {
   host=$(hostname 2>/dev/null || echo unknown); ip=$(local_ip); [ -n "$ip" ] || ip=$(hostname -I 2>/dev/null | awk '{print $1}'); [ -n "$ip" ] || ip=
   set -- $(cpu_data); cpercent=$1; cores=$2; load1=$3
@@ -37,8 +108,11 @@ payload() {
   }')
   uptime_s=$(awk '{printf "%d",$1}' /proc/uptime)
   net=$(awk '{gsub(":", " "); if(NR>2 && $1 != "lo") {rx+=$2; tx+=$10}} END{printf "{\"rx_bytes\":%.0f,\"tx_bytes\":%.0f}", rx, tx}' /proc/net/dev 2>/dev/null || echo '{"rx_bytes":0,"tx_bytes":0}')
-  printf '{"hostname":"%s","os":"Linux","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s,"net":%s}' \
-    "$(json_escape "$host")" "$(json_escape "$AGENT_VERSION")" "$(json_escape "$ip")" "$cpercent" "$cores" "$load1" "$total" "$used" "$mempercent" "$disks" "$uptime_s" "$net"
+  temp=$(thermal_data)
+  smart=$(smart_data)
+  power=$(power_data)
+  printf '{"hostname":"%s","os":"Linux","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s,"net":%s,"temperature":%s,"smart":%s,"power":%s}' \
+    "$(json_escape "$host")" "$(json_escape "$AGENT_VERSION")" "$(json_escape "$ip")" "$cpercent" "$cores" "$load1" "$total" "$used" "$mempercent" "$disks" "$uptime_s" "$net" "$temp" "$smart" "$power"
 }
 mkdir -p "$(dirname "$STATE")" 2>/dev/null || :
 [ -s "$STATE" ] && TOKEN=$(cat "$STATE")

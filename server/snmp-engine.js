@@ -301,6 +301,19 @@ async function readIfCounters(rd) {
   return { rows: Object.fromEntries(use.map((x) => [x.idx, x.row])) };
 }
 
+// ---- packet counters for Flood/DoS detection (TCP-MIB & UDP-MIB) ------------
+const TCP_IN_SEGS = '1.3.6.1.2.1.6.10.0';
+const UDP_IN_DATAGRAMS = '1.3.6.1.2.1.7.1.0';
+
+// -> { tcp: number|null, udp: number|null } or null when unsupported.
+async function readPktCounters(rd) {
+  let tcp = null, udp = null;
+  try { tcp = num(await rd.get(TCP_IN_SEGS)); } catch { /* optional TCP-MIB */ }
+  try { udp = num(await rd.get(UDP_IN_DATAGRAMS)); } catch { /* optional UDP-MIB */ }
+  if (tcp === null && udp === null) return null;
+  return { tcp, udp };
+}
+
 async function pollDevice({ host, port = 161, community = 'public', profile = '' }) {
   const conn = { host, port, community };
   let id;
@@ -339,6 +352,8 @@ async function pollDevice({ host, port = 161, community = 'public', profile = ''
   }
   const ifc = await readIfCounters(rd);
   if (ifc) info.if_counters = ifc;
+  const pkt = await readPktCounters(rd);
+  if (pkt) info.pkt_counters = pkt;
   return info;
 }
 

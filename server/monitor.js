@@ -50,6 +50,29 @@ function updateNetSlot(slot, rows, now, minMs = 0) {
   if (any) slot.rate = { in: rin / dt, out: rout / dt, at: now };
 }
 
+// ---- packet rate (TCP + UDP) for Flood/DoS detection -----------------------
+// slot = { base: {ts, pkt} | null, rate: {rate, at} | null }; pkt = { tcp, udp }
+function updatePktSlot(slot, pkt, now) {
+  const base = slot.base;
+  if (!base || now - base.ts > NET_BASE_MAX_MS) { slot.base = { ts: now, pkt }; return; }
+  const dt = (now - base.ts) / 1000;
+  if (dt <= 0) return;
+  const wrap = 2 ** 32;
+  let totalPkts = 0, any = false;
+  for (const k of ['tcp', 'udp']) {
+    if (pkt[k] != null && base.pkt[k] != null) {
+      let d = pkt[k] - base.pkt[k];
+      if (d < 0) d += wrap;
+      if (Number.isFinite(d) && d >= 0) {
+        totalPkts += d;
+        any = true;
+      }
+    }
+  }
+  slot.base = { ts: now, pkt };
+  if (any) slot.rate = { rate: totalPkts / dt, at: now };
+}
+
 class Monitor extends EventEmitter {
   constructor(db, opts = {}) {
     super();
@@ -100,7 +123,10 @@ class Monitor extends EventEmitter {
       if (!this.state.has(r.id)) this.state.set(r.id, this._newState(r.id));
       const st = this.state.get(r.id);
       const key = [r.address, r.snmp_port, r.snmp_community, r.snmp_profile].join('|');
-      if (st.snmpKey !== undefined && st.snmpKey !== key) { st.snmp.nextAt = 0; st.snmp.fails = 0; st.snmp.net = { base: null, rate: null }; } // re-poll right away
+      if (st.snmpKey !== undefined && st.snmpKey !== key) {
+        st.snmp.nextAt = 0; st.snmp.fails = 0; st.snmp.net = { base: null, rate: null };
+        st.snmp.pkt = { base: null, rate: null };
+      } // re-poll right away
       st.snmpKey = key;
     }
     for (const id of [...this.devices.keys()]) {
@@ -113,9 +139,10 @@ class Monitor extends EventEmitter {
     return {
       status: 'unknown', reasons: [], since: Date.now(), acked: false,
       icmp: { ok: null, fails: 0, rtt: null, nextAt: 0, busy: false },
-      snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null, net: { base: null, rate: null } },
+      snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null, net: { base: null, rate: null }, pkt: { base: null, rate: null } },
       agent: { lastAt: last && last.t ? last.t : null, data: null, net: { base: null, rate: null } },
       breach: { cpu: 0, ram: 0, disk: 0 },
+      alerts: { dos: false, smart: false, thermal: false, ups: false },
       lastMetricAt: 0,
     };
   }
@@ -146,6 +173,17 @@ class Monitor extends EventEmitter {
     const mem = p.memory || {};
     const rx = num(p.net && p.net.rx_bytes, 0, 1e18), tx = num(p.net && p.net.tx_bytes, 0, 1e18);
     if (rx !== null && tx !== null) updateNetSlot(st.agent.net, { agent: [rx, tx, 64] }, now, this.o.agentNetWindowMs);
+    const temp = num(p.temperature ?? (p.cpu && p.cpu.temp), -50, 200);
+    const smart = p.smart && typeof p.smart === 'object' ? {
+      ok: p.smart.ok !== false && !p.smart.failing,
+      status: str(p.smart.status, 32),
+      details: str(p.smart.details || p.smart.message, 128),
+    } : null;
+    const power = p.power && typeof p.power === 'object' ? {
+      on_battery: !!p.power.on_battery,
+      battery_percent: num(p.power.battery_percent, 0, 100),
+      status: str(p.power.status, 32),
+    } : null;
     st.agent = {
       net: st.agent.net,
       lastAt: now,
@@ -156,6 +194,9 @@ class Monitor extends EventEmitter {
         ram: { total: num(mem.total, 0, 1e18), used: num(mem.used, 0, 1e18), percent: num(mem.percent, 0, 100) },
         disks, uptime: num(p.uptime, 0, 1e10),
         net: rx !== null && tx !== null ? { rx_bytes: rx, tx_bytes: tx } : null,
+        temperature: temp,
+        smart,
+        power,
       },
     };
     return true;
@@ -198,9 +239,10 @@ class Monitor extends EventEmitter {
     st.snmp.busy = true;
     st.snmp.nextAt = now + this.o.snmpIntervalMs;
     try {
-      const { if_counters: ifc, ...info } = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community, profile: d.snmp_profile || '' });
+      const { if_counters: ifc, pkt_counters: pkt, ...info } = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community, profile: d.snmp_profile || '' });
       st.snmp.info = info;
       if (ifc && ifc.rows) updateNetSlot(st.snmp.net, ifc.rows, now);
+      if (pkt) updatePktSlot(st.snmp.pkt, pkt, now);
       st.snmp.fails = 0; st.snmp.ok = true; st.snmp.error = null;
     } catch (e) {
       st.snmp.fails++;
@@ -218,6 +260,7 @@ class Monitor extends EventEmitter {
     const th = this.settings.thresholds;
     for (const [id, d] of this.devices) {
       const st = this.state.get(id);
+      if (!st.alerts) st.alerts = { dos: false, smart: false, thermal: false, ups: false };
       const reasons = [];
       let status;
 
@@ -250,6 +293,65 @@ class Monitor extends EventEmitter {
         }
         const toner = st.snmp.info && st.snmp.info.toner;
         if (toner != null && toner <= 10) reasons.push(`Mực còn ${toner}%`);
+
+        // 1. SNMP Flood / DoS detection
+        const pktFresh = st.snmp && st.snmp.pkt && st.snmp.pkt.rate && (now - st.snmp.pkt.rate.at <= this.o.netStaleMs);
+        const pktRate = pktFresh ? st.snmp.pkt.rate.rate : null;
+        st.snmp.pktRate = pktRate;
+        const dosTh = th.dos_packet_rate || 10000;
+        if (pktRate != null && pktRate >= dosTh) {
+          reasons.push(`Nghi ngờ tấn công Flood/DoS (${Math.round(pktRate)} gói/s > ${dosTh} gói/s)`);
+          if (!st.alerts.dos) {
+            st.alerts.dos = true;
+            this._event(d, 'dos', 'critical', `${d.name}: Nghi ngờ tấn công Flood/DoS (${Math.round(pktRate)} gói/s)`);
+          }
+        } else if (st.alerts.dos) {
+          st.alerts.dos = false;
+          this._event(d, 'dos', 'ok', `${d.name}: Tốc độ gói tin đã trở lại bình thường${pktRate != null ? ` (${Math.round(pktRate)} gói/s)` : ''}`);
+        }
+
+        // 2. SMART / Bad Sector detection
+        if (agentFresh && st.agent.data && st.agent.data.smart && st.agent.data.smart.ok === false) {
+          const detail = st.agent.data.smart.details ? `: ${st.agent.data.smart.details}` : '';
+          reasons.push(`Đĩa cứng báo lỗi SMART / Bad Sector${detail}`);
+          if (!st.alerts.smart) {
+            st.alerts.smart = true;
+            this._event(d, 'smart', 'critical', `${d.name}: Cảnh báo đĩa cứng (SMART lỗi/Bad Sector)${detail}`);
+          }
+        } else if (st.alerts.smart) {
+          st.alerts.smart = false;
+          this._event(d, 'smart', 'ok', `${d.name}: Trạng thái đĩa cứng SMART đã trở lại bình thường`);
+        }
+
+        // 3. Thermal Throttling detection
+        const curTemp = (agentFresh && st.agent.data && st.agent.data.temperature != null)
+          ? st.agent.data.temperature
+          : (st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null);
+        const tempTh = th.temp || 85;
+        if (curTemp != null && curTemp >= tempTh) {
+          reasons.push(`Nhiệt độ CPU quá cao: ${Math.round(curTemp)}°C (ngưỡng ${tempTh}°C)`);
+          if (!st.alerts.thermal) {
+            st.alerts.thermal = true;
+            this._event(d, 'thermal', 'critical', `${d.name}: Báo động nhiệt độ CPU quá cao: ${Math.round(curTemp)}°C (Thermal Throttling)`);
+          }
+        } else if (st.alerts.thermal && curTemp != null && curTemp < tempTh - 3) {
+          st.alerts.thermal = false;
+          this._event(d, 'thermal', 'ok', `${d.name}: Nhiệt độ CPU đã trở lại mức an toàn (${Math.round(curTemp)}°C)`);
+        }
+
+        // 4. Power / UPS status
+        if (agentFresh && st.agent.data && st.agent.data.power && st.agent.data.power.on_battery) {
+          const batInfo = st.agent.data.power.battery_percent != null ? ` (pin còn ${st.agent.data.power.battery_percent}%)` : '';
+          reasons.push(`Mất điện lưới (On Battery)${batInfo}`);
+          if (!st.alerts.ups) {
+            st.alerts.ups = true;
+            this._event(d, 'power', 'critical', `${d.name}: Cảnh báo khẩn cấp: Mất điện lưới, đang chạy pin UPS${batInfo}`);
+          }
+        } else if (st.alerts.ups) {
+          st.alerts.ups = false;
+          this._event(d, 'power', 'ok', `${d.name}: Đã có điện lưới trở lại (nguồn AC ổn định)`);
+        }
+
         if (reasons.length) status = 'warning';
       } else if (checks.every((c) => c.ok === false)) {
         status = 'down';
@@ -273,8 +375,9 @@ class Monitor extends EventEmitter {
     const prev = st.status;
     const sev = this.severityOf(d);
     const dur = Math.round((now - st.since) / 1000);
+    const hasCritAlert = st.alerts && (st.alerts.dos || st.alerts.smart || st.alerts.thermal || st.alerts.ups);
     if (next === 'down') this._event(d, 'down', sev, `${d.name} mất kết nối: ${st.reasons.join(', ')}`);
-    else if (next === 'warning') this._event(d, 'warning', sev === 'low' ? 'low' : 'medium', `${d.name}: ${st.reasons.join('; ')}`);
+    else if (next === 'warning') this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), `${d.name}: ${st.reasons.join('; ')}`);
     else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
       this._event(d, 'up', 'ok', `${d.name} hoạt động trở lại sau ${dur}s`);
     }
@@ -315,11 +418,15 @@ class Monitor extends EventEmitter {
     const res = this._resources(st, agentFresh);
     const net = this._net(st, now, agentFresh);
     const rtt = st.icmp.rtt;
-    if (!res && rtt == null && !net) return false;
+    const temp = (agentFresh && st.agent.data && st.agent.data.temperature != null)
+      ? st.agent.data.temperature
+      : (st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null);
+    if (!res && rtt == null && !net && temp == null) return false;
     st.lastMetricAt = now;
-    this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt,net_in,net_out) VALUES(?,?,?,?,?,?,?,?)').run(
+    this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt,net_in,net_out,temp) VALUES(?,?,?,?,?,?,?,?,?)').run(
       d.id, now, res ? res.cpu : null, res ? res.ram : null, res ? res.disk : null, rtt,
-      net ? Math.round(net.in) : null, net ? Math.round(net.out) : null);
+      net ? Math.round(net.in) : null, net ? Math.round(net.out) : null,
+      temp != null ? Math.round(temp * 10) / 10 : null);
     return true;
   }
 
@@ -401,7 +508,17 @@ class Monitor extends EventEmitter {
       uptime: !stale && a && a.uptime != null ? a.uptime
         : (st.snmp.info && st.snmp.info.uptime != null ? st.snmp.info.uptime : null),
       toner: st.snmp.info && st.snmp.info.toner != null ? st.snmp.info.toner : null,
-      temperature: st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null,
+      temperature: (!stale && a && a.temperature != null) ? a.temperature
+        : (st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null),
+      smart: (!stale && a) ? a.smart : null,
+      power: (!stale && a) ? a.power : null,
+      dos_alert: !stale && !!(st.alerts && st.alerts.dos),
+      alerts: {
+        dos: !stale && !!(st.alerts && st.alerts.dos),
+        smart: (!stale && a) ? !!(st.alerts && st.alerts.smart) : false,
+        thermal: !!(st.alerts && st.alerts.thermal),
+        power: (!stale && a) ? !!(st.alerts && st.alerts.ups) : false,
+      },
       checks: { icmp: !!(d.check_icmp && d.address), agent: !!d.check_agent, snmp: !!(d.snmp_enabled && d.address) },
       last_agent_at: st.agent.lastAt,
     };
@@ -413,6 +530,7 @@ class Monitor extends EventEmitter {
       v.agent = a; v.snmp = st.snmp.info;
       v.snmp_profile = d.snmp_profile || '';
       v.snmp_error = st.snmp.error;
+      v.pkt_rate = st.snmp.pkt && st.snmp.pkt.rate ? Math.round(st.snmp.pkt.rate.rate) : null;
     }
     return v;
   }
@@ -434,7 +552,8 @@ class Monitor extends EventEmitter {
       if (d.status === 'warning') s.warning++;
       if (d.status === 'unknown') s.unknown++;
       if (d.status === 'down' || d.status === 'warning') {
-        const sev = d.status === 'down' ? d.severity : (d.severity === 'low' ? 'low' : 'medium');
+        const hasCrit = d.alerts && (d.alerts.dos || d.alerts.smart || d.alerts.thermal || d.alerts.power);
+        const sev = d.status === 'down' ? d.severity : (hasCrit ? 'critical' : (d.severity === 'low' ? 'low' : 'medium'));
         worst = Math.max(worst, SEV_RANK[sev]);
         if (!d.acked) s.unacked++;
       }
@@ -444,4 +563,4 @@ class Monitor extends EventEmitter {
   }
 }
 
-module.exports = { Monitor, ADDR_RE, SEV_RANK, defaultPing, updateNetSlot };
+module.exports = { Monitor, ADDR_RE, SEV_RANK, defaultPing, updateNetSlot, updatePktSlot };

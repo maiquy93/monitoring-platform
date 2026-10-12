@@ -519,4 +519,171 @@ test('bandwidth: SNMP interface traffic calculates rates and stores metrics', as
   } finally { t.close(); }
 });
 
+test('dos: SNMP TCP/UDP packet rate spike triggers critical Flood/DoS event and recovers', async () => {
+  let sample = 1;
+  const t = await boot({
+    snmpFn: async () => ({
+      sysDescr: 'RouterOS', sysName: 'rt-sec', uptime: 500, cpu: 10, ram: 20, disk: 5,
+      pkt_counters: {
+        tcp: sample === 1 ? 100000 : 700000,
+        udp: sample === 1 ? 50000 : 250000,
+      },
+    }),
+  });
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'router-dos', type: 'router', address: '10.0.0.101', check_icmp: false, snmp_enabled: true,
+    });
+    assert.equal(c.status, 201);
+
+    let now = Date.now();
+    // Sample 1: Baseline
+    now += 35000;
+    t.monitor.tick(now);
+    for (let i = 0; i < 30 && !t.monitor.state.get(c.body.id).snmp.pkt.base; i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(t.monitor.state.get(c.body.id).snmp.pkt.base);
+
+    // Sample 2 after 30s:
+    // Delta TCP = 600,000, UDP = 200,000 => total 800,000 / 30s = 26,666.7 pkts/s (> threshold 10,000 pkts/s)
+    sample = 2;
+    now += 30000;
+    t.monitor.tick(now);
+    for (let i = 0; i < 30 && !t.monitor.state.get(c.body.id).alerts.dos; i++) await new Promise((r) => setTimeout(r, 20));
+
+    const snap = t.monitor.snapshot();
+    const d = snap.devices.find((x) => x.id === c.body.id);
+    assert.equal(d.dos_alert, true);
+    assert.equal(d.alerts.dos, true);
+    assert.ok(d.reasons.some((r) => r.includes('Flood/DoS')));
+    assert.equal(d.status, 'warning');
+    assert.equal(snap.summary.level, 'critical'); // Bumped to critical due to active emergency alert
+
+    // Event was logged with critical severity
+    const events = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events;
+    const dosEv = events.find((e) => e.kind === 'dos');
+    assert.ok(dosEv);
+    assert.equal(dosEv.severity, 'critical');
+    assert.match(dosEv.message, /Flood\/DoS/);
+
+    // Sample 3 after 30s: normal packet rate (delta = 300 packets / 30s = 10 pkts/s)
+    sample = 3;
+    const st = t.monitor.state.get(c.body.id);
+    now += 30000;
+    st.snmp.pkt.base = { ts: now - 30000, pkt: { tcp: 700000, udp: 250000 } };
+    t.monitor.o.snmpFn = async () => ({
+      sysDescr: 'RouterOS', sysName: 'rt-sec', uptime: 530, cpu: 10, ram: 20, disk: 5,
+      pkt_counters: { tcp: 700200, udp: 250100 },
+    });
+    t.monitor.tick(now);
+    for (let i = 0; i < 30 && t.monitor.state.get(c.body.id).alerts.dos; i++) await new Promise((r) => setTimeout(r, 20));
+
+    const snap2 = t.monitor.snapshot();
+    const d2 = snap2.devices.find((x) => x.id === c.body.id);
+    assert.equal(d2.dos_alert, false);
+    assert.equal(d2.alerts.dos, false);
+
+    const recEv = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events.find((e) => e.kind === 'dos' && e.severity === 'ok');
+    assert.ok(recEv);
+  } finally { t.close(); }
+});
+
+test('agent deep monitoring: SMART failure, Thermal Throttling, and UPS on battery trigger critical events', async () => {
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'srv-deep', type: 'server', check_icmp: false, check_agent: true,
+    });
+    assert.equal(c.status, 201);
+    const devId = c.body.id;
+    const token = (await t.api('GET', `/api/devices/${devId}`)).body.agent_token;
+
+    // Report 1: Normal report with temperature = 50°C, smart passed, power AC
+    const r1 = await fetch(`${t.base}/api/agent/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        hostname: 'srv-deep', os: 'Linux', agent_version: '1.1.0',
+        cpu: { percent: 35, cores: 8, load1: 0.5 },
+        memory: { total: 16e9, used: 8e9, percent: 50 },
+        disks: [{ mount: '/', total: 500e9, used: 200e9, percent: 40 }],
+        uptime: 1000,
+        temperature: 50.0,
+        smart: { ok: true, status: 'passed' },
+        power: { on_battery: false, battery_percent: 100, status: 'ac' },
+      }),
+    });
+    assert.equal(r1.status, 200);
+    t.monitor.startedAt -= 60000;
+    t.monitor.evaluate();
+
+    let d = t.monitor.snapshot().devices[0];
+    assert.equal(d.temperature, 50.0);
+    assert.equal(d.smart.ok, true);
+    assert.equal(d.power.on_battery, false);
+    assert.equal(d.status, 'up');
+
+    // Report 2: Bad Sector / SMART failure + Thermal Throttling (89°C > 85°C) + On Battery (UPS power loss)
+    const r2 = await fetch(`${t.base}/api/agent/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        hostname: 'srv-deep', os: 'Linux', agent_version: '1.1.0',
+        cpu: { percent: 40, cores: 8, load1: 0.6 },
+        memory: { total: 16e9, used: 8e9, percent: 50 },
+        disks: [{ mount: '/', total: 500e9, used: 200e9, percent: 40 }],
+        uptime: 1005,
+        temperature: 89.0,
+        smart: { ok: false, status: 'failing', details: '/dev/sda: Bad Sectors detected' },
+        power: { on_battery: true, battery_percent: 65, status: 'discharging' },
+      }),
+    });
+    assert.equal(r2.status, 200);
+    t.monitor.evaluate();
+
+    d = t.monitor.snapshot().devices[0];
+    assert.equal(d.temperature, 89.0);
+    assert.equal(d.alerts.smart, true);
+    assert.equal(d.alerts.thermal, true);
+    assert.equal(d.alerts.power, true);
+    assert.equal(d.status, 'warning');
+    assert.equal(t.monitor.snapshot().summary.level, 'critical');
+
+    // Verify critical events logged
+    const events = (await t.api('GET', `/api/events?device=${devId}`)).body.events;
+    assert.ok(events.some((e) => e.kind === 'smart' && e.severity === 'critical'));
+    assert.ok(events.some((e) => e.kind === 'thermal' && e.severity === 'critical'));
+    assert.ok(events.some((e) => e.kind === 'power' && e.severity === 'critical'));
+
+    // Verify temp is recorded into metrics history
+    const stDev = t.monitor.state.get(devId);
+    stDev.lastMetricAt = 0;
+    t.monitor._maybeStoreMetric(t.monitor.devices.get(devId), stDev, Date.now() + 35000, true);
+    const hist = await t.api('GET', `/api/devices/${devId}/history?range=1h`);
+    assert.equal(hist.status, 200);
+    const lastPt = hist.body.points[hist.body.points.length - 1];
+    assert.equal(lastPt.temp, 89.0);
+
+    // Report 3: Legacy agent payload backward compatibility (no temperature, smart, or power)
+    const r3 = await fetch(`${t.base}/api/agent/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        hostname: 'srv-deep', os: 'Linux', agent_version: '0.9.0',
+        cpu: { percent: 20, cores: 4, load1: 0.1 },
+        memory: { total: 8e9, used: 2e9, percent: 25 },
+        disks: [{ mount: '/', total: 100e9, used: 20e9, percent: 20 }],
+        uptime: 2000,
+      }),
+    });
+    assert.equal(r3.status, 200);
+    t.monitor.evaluate();
+    d = t.monitor.snapshot().devices[0];
+    assert.equal(d.temperature, null);
+    assert.equal(d.smart, null);
+    assert.equal(d.power, null);
+  } finally { t.close(); }
+});
+
 

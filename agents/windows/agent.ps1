@@ -29,7 +29,29 @@ function Get-Payload {
     $rx = ($perf | Measure-Object -Property BytesReceivedPersec -Sum).Sum
     $tx = ($perf | Measure-Object -Property BytesSentPersec -Sum).Sum
   }
-  [pscustomobject]@{hostname=$env:COMPUTERNAME;os='Windows';agent_version=$Version;ip=$ip;cpu=[pscustomobject]@{percent=$cpuPercent;cores=$cores;load1=[math]::Round($cpuPercent/100,2)};memory=[pscustomobject]@{total=$total;used=$used;percent=$memoryPercent};disks=$disks;uptime=[int64]((Get-Date)-$os.LastBootUpTime).TotalSeconds;net=[pscustomobject]@{rx_bytes=[int64]($rx ?? 0);tx_bytes=[int64]($tx ?? 0)}}
+  $temp = $null
+  try {
+    $tz = Get-CimInstance -Namespace "root/wmi" -ClassName "MSAcpi_ThermalZoneTemperature" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($tz -and $tz.CurrentTemperature -gt 2732) {
+      $temp = [math]::Round(($tz.CurrentTemperature - 2732) / 10.0, 1)
+    }
+  } catch {}
+  $smart = [pscustomobject]@{ok=$true;status='passed';details=''}
+  try {
+    $badDisks = @(Get-CimInstance Win32_DiskDrive -ErrorAction SilentlyContinue | Where-Object { $_.Status -and $_.Status -ne 'OK' })
+    if ($badDisks.Count -gt 0) {
+      $smart = [pscustomobject]@{ok=$false;status='failing';details="Disks failing: $($badDisks.DeviceID -join ', ')"}
+    }
+  } catch {}
+  $power = $null
+  try {
+    $bat = Get-CimInstance Win32_Battery -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($bat) {
+      $onBat = ($bat.BatteryStatus -eq 1)
+      $power = [pscustomobject]@{on_battery=$onBat;battery_percent=[int]$bat.EstimatedChargeRemaining;status=(if ($onBat) {'discharging'} else {'ac'})}
+    }
+  } catch {}
+  [pscustomobject]@{hostname=$env:COMPUTERNAME;os='Windows';agent_version=$Version;ip=$ip;cpu=[pscustomobject]@{percent=$cpuPercent;cores=$cores;load1=[math]::Round($cpuPercent/100,2)};memory=[pscustomobject]@{total=$total;used=$used;percent=$memoryPercent};disks=$disks;uptime=[int64]((Get-Date)-$os.LastBootUpTime).TotalSeconds;net=[pscustomobject]@{rx_bytes=[int64]($rx ?? 0);tx_bytes=[int64]($tx ?? 0)};temperature=$temp;smart=$smart;power=$power}
 }
 $delay=5
 while ($true) {
