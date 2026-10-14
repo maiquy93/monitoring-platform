@@ -142,7 +142,7 @@ class Monitor extends EventEmitter {
       snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null, net: { base: null, rate: null }, pkt: { base: null, rate: null } },
       agent: { lastAt: last && last.t ? last.t : null, data: null, net: { base: null, rate: null } },
       breach: { cpu: 0, ram: 0, disk: 0 },
-      alerts: { dos: false, smart: false, thermal: false, ups: false },
+      alerts: { dos: false, smart: false, thermal: false, ups: false, printer: false },
       lastMetricAt: 0,
     };
   }
@@ -260,7 +260,7 @@ class Monitor extends EventEmitter {
     const th = this.settings.thresholds;
     for (const [id, d] of this.devices) {
       const st = this.state.get(id);
-      if (!st.alerts) st.alerts = { dos: false, smart: false, thermal: false, ups: false };
+      if (!st.alerts) st.alerts = { dos: false, smart: false, thermal: false, ups: false, printer: false };
       const reasons = [];
       let status;
 
@@ -293,6 +293,21 @@ class Monitor extends EventEmitter {
         }
         const toner = st.snmp.info && st.snmp.info.toner;
         if (toner != null && toner <= 10) reasons.push(`Mực còn ${toner}%`);
+        const drum = st.snmp.info && st.snmp.info.drum;
+        if (drum != null && drum <= 10) reasons.push(`Độ bền drum còn ${drum}% (cần thay drum)`);
+        else if (drum != null && drum <= 20) reasons.push(`Độ bền drum sắp hết: ${drum}%`);
+
+        const prn = st.snmp.info && st.snmp.info.printer;
+        if (prn && prn.errors && prn.errors.length) {
+          for (const err of prn.errors) reasons.push(err);
+          if (!st.alerts.printer) {
+            st.alerts.printer = true;
+            this._event(d, 'warning', 'medium', `${d.name}: Sự cố máy in - ${prn.errors.join('; ')}`);
+          }
+        } else if (st.alerts.printer) {
+          st.alerts.printer = false;
+          this._event(d, 'up', 'ok', `${d.name}: Máy in đã hoạt động bình thường`);
+        }
 
         // 1. SNMP Flood / DoS detection
         const pktFresh = st.snmp && st.snmp.pkt && st.snmp.pkt.rate && (now - st.snmp.pkt.rate.at <= this.o.netStaleMs);
@@ -421,12 +436,16 @@ class Monitor extends EventEmitter {
     const temp = (agentFresh && st.agent.data && st.agent.data.temperature != null)
       ? st.agent.data.temperature
       : (st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null);
-    if (!res && rtt == null && !net && temp == null) return false;
+    const toner = st.snmp.ok && st.snmp.info && st.snmp.info.toner != null ? st.snmp.info.toner : null;
+    const drum = st.snmp.ok && st.snmp.info && st.snmp.info.drum != null ? st.snmp.info.drum : null;
+    if (!res && rtt == null && !net && temp == null && toner == null && drum == null) return false;
     st.lastMetricAt = now;
-    this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt,net_in,net_out,temp) VALUES(?,?,?,?,?,?,?,?,?)').run(
+    this.db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,rtt,net_in,net_out,temp,toner,drum) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(
       d.id, now, res ? res.cpu : null, res ? res.ram : null, res ? res.disk : null, rtt,
       net ? Math.round(net.in) : null, net ? Math.round(net.out) : null,
-      temp != null ? Math.round(temp * 10) / 10 : null);
+      temp != null ? Math.round(temp * 10) / 10 : null,
+      toner != null ? Math.round(toner * 10) / 10 : null,
+      drum != null ? Math.round(drum * 10) / 10 : null);
     return true;
   }
 
@@ -508,6 +527,10 @@ class Monitor extends EventEmitter {
       uptime: !stale && a && a.uptime != null ? a.uptime
         : (st.snmp.info && st.snmp.info.uptime != null ? st.snmp.info.uptime : null),
       toner: st.snmp.info && st.snmp.info.toner != null ? st.snmp.info.toner : null,
+      drum: st.snmp.info && st.snmp.info.drum != null ? st.snmp.info.drum : null,
+      page_count: st.snmp.info && st.snmp.info.page_count != null ? st.snmp.info.page_count : null,
+      printer_status: st.snmp.info && st.snmp.info.printer ? (st.snmp.info.printer.display || st.snmp.info.printer.status_text) : null,
+      printer_errors: st.snmp.info && st.snmp.info.printer ? st.snmp.info.printer.errors : [],
       temperature: (!stale && a && a.temperature != null) ? a.temperature
         : (st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null),
       smart: (!stale && a) ? a.smart : null,
@@ -518,6 +541,7 @@ class Monitor extends EventEmitter {
         smart: (!stale && a) ? !!(st.alerts && st.alerts.smart) : false,
         thermal: !!(st.alerts && st.alerts.thermal),
         power: (!stale && a) ? !!(st.alerts && st.alerts.ups) : false,
+        printer: !!(st.alerts && st.alerts.printer),
       },
       checks: { icmp: !!(d.check_icmp && d.address), agent: !!d.check_agent, snmp: !!(d.snmp_enabled && d.address) },
       last_agent_at: st.agent.lastAt,
@@ -528,6 +552,7 @@ class Monitor extends EventEmitter {
       v.snmp_enabled = !!d.snmp_enabled; v.snmp_port = d.snmp_port;
       v.severity_override = d.severity || '';
       v.agent = a; v.snmp = st.snmp.info;
+      v.printer = st.snmp.info ? st.snmp.info.printer : null;
       v.snmp_profile = d.snmp_profile || '';
       v.snmp_error = st.snmp.error;
       v.pkt_rate = st.snmp.pkt && st.snmp.pkt.rate ? Math.round(st.snmp.pkt.rate.rate) : null;

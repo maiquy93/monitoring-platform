@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node server/index.js",
     "test": "node --test test/*.test.js",
-    "simulate": "node tools/simulate-agent.js"
+    "simulate": "node tools/simulate-agent.js",
+    "simulate:printer": "node tools/simulate-printer.js"
   }
 }

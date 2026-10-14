@@ -62,6 +62,8 @@ function open(file) {
   if (!mcols.includes('net_in')) db.exec('ALTER TABLE metrics ADD COLUMN net_in REAL');
   if (!mcols.includes('net_out')) db.exec('ALTER TABLE metrics ADD COLUMN net_out REAL');
   if (!mcols.includes('temp')) db.exec('ALTER TABLE metrics ADD COLUMN temp REAL');
+  if (!mcols.includes('toner')) db.exec('ALTER TABLE metrics ADD COLUMN toner REAL');
+  if (!mcols.includes('drum')) db.exec('ALTER TABLE metrics ADD COLUMN drum REAL');
   return db;
 }
 

@@ -299,6 +299,110 @@ test('snmp: cpu/ram/disk from SNMP are shown on the device view and stored', asy
   } finally { t.close(); }
 });
 
+test('snmp printer: toner/drum/page_count/status are shown on overview tile and device detail, and stored in metrics history', async () => {
+  const printerInfo = {
+    sysDescr: 'HP LaserJet Pro M404dn',
+    sysName: 'HP-Printer-01',
+    uptime: 3600,
+    toner: 65,
+    drum: 82,
+    page_count: 15420,
+    printer: {
+      status_code: 3,
+      status_text: 'Sẵn sàng (Ready/Idle)',
+      display: 'Ready',
+      model: 'HP LaserJet Pro M404dn',
+      serial: 'VNC3K04921',
+      page_count: 15420,
+      errors: [],
+      supplies: [
+        { name: 'HP Black Toner CF276A', kind: 'toner', percent: 65, status: '65%' },
+        { name: 'HP Imaging Drum Unit', kind: 'drum', percent: 82, status: '82%' }
+      ],
+      trays: [
+        { name: 'Tray 1', status: 'Còn giấy', max: 250, level: 180 }
+      ]
+    }
+  };
+  const t = await boot({ snmpFn: async () => printerInfo });
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'hp-printer', type: 'printer', address: '10.0.0.88', check_icmp: false, snmp_enabled: true
+    });
+    assert.equal(c.status, 201);
+    t.monitor.tick();
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Kiểm tra thông tin hiển thị trên thẻ tổng quan (overview tile)
+    const v = t.monitor.snapshot().devices[0];
+    assert.equal(v.status, 'up');
+    assert.equal(v.type, 'printer');
+    assert.equal(v.toner, 65);
+    assert.equal(v.drum, 82);
+    assert.equal(v.page_count, 15420);
+    assert.equal(v.printer_status, 'Ready');
+
+    // Kiểm tra trang chi tiết (device detail API)
+    const detail = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.ok(detail.printer);
+    assert.equal(detail.printer.model, 'HP LaserJet Pro M404dn');
+    assert.equal(detail.printer.serial, 'VNC3K04921');
+    assert.equal(detail.printer.supplies.length, 2);
+    assert.equal(detail.printer.trays.length, 1);
+
+    // Lưu vào bảng metrics
+    t.monitor.tick(Date.now() + 60000);
+    const row = t.db.prepare('SELECT toner, drum FROM metrics WHERE device_id=?').get(c.body.id);
+    assert.deepEqual({ ...row }, { toner: 65, drum: 82 });
+
+    // API history trả về toner và drum
+    const hist = (await t.api('GET', `/api/devices/${c.body.id}/history`)).body;
+    assert.ok(hist.points.length > 0);
+    assert.equal(hist.points[0].toner, 65);
+    assert.equal(hist.points[0].drum, 82);
+  } finally { t.close(); }
+});
+
+test('snmp printer: low drum life or low toner or paper jam triggers warning status and event', async () => {
+  const printerState = {
+    sysDescr: 'Brother HL-L2366DW',
+    sysName: 'Brother-HR',
+    uptime: 1000,
+    toner: 8, // <= 10%
+    drum: 9,  // <= 10%
+    page_count: 9500,
+    printer: {
+      status_code: 1,
+      status_text: 'Cảnh báo',
+      display: 'Paper Jam',
+      errors: ['Kẹt giấy (Paper jam)'],
+      supplies: [],
+      trays: []
+    }
+  };
+  const t = await boot({ snmpFn: async () => printerState });
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'brother-printer', type: 'printer', address: '10.0.0.89', check_icmp: false, snmp_enabled: true
+    });
+    assert.equal(c.status, 201);
+    t.monitor.tick();
+    await new Promise((r) => setTimeout(r, 30));
+
+    const v = t.monitor.snapshot().devices[0];
+    assert.equal(v.status, 'warning');
+    assert.ok(v.reasons.some((r) => /mực còn 8%/i.test(r)));
+    assert.ok(v.reasons.some((r) => /độ bền drum còn 9%/i.test(r)));
+    assert.ok(v.reasons.some((r) => /kẹt giấy/i.test(r)));
+
+    const events = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events;
+    assert.ok(events.length > 0);
+    assert.ok(events.some((e) => /sự cố máy in/i.test(e.message)));
+  } finally { t.close(); }
+});
+
 test('version: health and settings expose build info', async () => {
   const t = await boot();
   try {

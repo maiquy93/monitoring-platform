@@ -319,7 +319,8 @@ function createApp(db, monitor, opts = {}) {
     const step = Math.max(30e3, Math.floor(span / 240 / 1000) * 1000);
     const rows = db.prepare(
       `SELECT (ts / ?) * ? AS ts, AVG(cpu) cpu, AVG(ram) ram, MAX(disk) disk, AVG(rtt) rtt,
-              AVG(net_in) net_in, AVG(net_out) net_out, AVG(temp) temp
+              AVG(net_in) net_in, AVG(net_out) net_out, AVG(temp) temp,
+              AVG(toner) toner, AVG(drum) drum
        FROM metrics WHERE device_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY ts`)
       .all(step, step, id, Date.now() - span, step);
     send(ctx.res, 200, { points: rows });

@@ -8,7 +8,7 @@ const snmp = require('./snmp');
 
 const PROFILES_DIR = path.join(__dirname, 'profiles');
 // Metrics the dashboard understands natively; any other metric is shown as an extra row.
-const CORE = ['cpu', 'ram', 'disk', 'temperature', 'toner'];
+const CORE = ['cpu', 'ram', 'disk', 'temperature', 'toner', 'drum', 'page_count'];
 const AGGS = new Set(['avg', 'max', 'min', 'sum', 'first']);
 
 const MESSAGES = {
@@ -56,6 +56,7 @@ function validateSource(src, where) {
     const refs = t.value.column !== undefined ? [t.value.column] : (pc.total !== undefined ? [pc.total, pc.used ?? pc.free] : [pc.used, pc.free]);
     for (const r of refs) if (!t.columns[r]) throw new Error(`${where}: table.value tham chiếu cột "${r}" không có trong columns`);
     for (const k of Object.keys(t.where || {})) if (!t.columns[k]) throw new Error(`${where}: table.where dùng cột "${k}" không có trong columns`);
+    for (const k of Object.keys(t.where_match || {})) if (!t.columns[k]) throw new Error(`${where}: table.where_match dùng cột "${k}" không có trong columns`);
     if (t.agg && !AGGS.has(t.agg)) throw new Error(`${where}: agg phải là ${[...AGGS].join('/')}`);
   }
 }
@@ -235,6 +236,7 @@ async function evalSource(src, rd) {
     let matched = 0;
     for (const r of Object.values(rows)) {
       if (t.where && !Object.entries(t.where).every(([k, allowed]) => allowed.map(String).includes(String(col(r, k))))) continue;
+      if (t.where_match && !Object.entries(t.where_match).every(([k, pat]) => new RegExp(pat, 'i').test(String(col(r, k) || '')))) continue;
       matched++;
       const x = t.value.column !== undefined
         ? num(col(r, t.value.column))
@@ -314,6 +316,192 @@ async function readPktCounters(rd) {
   return { tcp, udp };
 }
 
+// ---- printer status, supplies and counters (Printer-MIB & HOST-RESOURCES) ----
+const PRT_STATUS_NAMES = {
+  1: 'Khác',
+  2: 'Không rõ',
+  3: 'Sẵn sàng (Ready/Idle)',
+  4: 'Đang in (Printing)',
+  5: 'Đang khởi động/sấy (Warmup)',
+};
+
+const PRINTER_ERROR_BITS = [
+  'Sắp hết giấy (Low paper)',
+  'Hết giấy (No paper)',
+  'Sắp hết mực (Low toner)',
+  'Hết mực (No toner)',
+  'Nắp máy đang mở (Door open)',
+  'Kẹt giấy (Paper jam)',
+  'Ngoại tuyến (Offline)',
+  'Cần bảo trì kỹ thuật (Service requested)',
+  'Thiếu khay nạp giấy (Input tray missing)',
+  'Thiếu khay giấy ra (Output tray missing)',
+  'Thiếu hộp mực/vật tư (Marker supply missing)',
+  'Khay ra sắp đầy (Output near full)',
+  'Khay ra đã đầy (Output full)',
+  'Khay nạp giấy rỗng (Input tray empty)',
+  'Quá hạn bảo dưỡng định kỳ (Overdue maintenance)',
+];
+
+function parsePrinterErrors(raw) {
+  if (raw === null || raw === undefined) return [];
+  const errors = [];
+  let bytes = [];
+  if (typeof raw === 'number') {
+    bytes = [raw & 0xff, (raw >> 8) & 0xff];
+  } else if (typeof raw === 'string') {
+    if (/^[0-9a-fA-F]+$/.test(raw) && raw.length % 2 === 0) {
+      bytes = Buffer.from(raw, 'hex');
+    } else {
+      bytes = Buffer.from(raw, 'latin1');
+    }
+  }
+  for (let i = 0; i < PRINTER_ERROR_BITS.length; i++) {
+    const byteIdx = Math.floor(i / 8);
+    const bitInByte = 7 - (i % 8);
+    if (bytes[byteIdx] !== undefined && (bytes[byteIdx] & (1 << bitInByte))) {
+      errors.push(PRINTER_ERROR_BITS[i]);
+    }
+  }
+  return errors;
+}
+
+const PRT_SCALARS = {
+  status: '1.3.6.1.2.1.25.3.5.1.1.1',
+  error_state: '1.3.6.1.2.1.25.3.5.1.2.1',
+  display: '1.3.6.1.2.1.43.16.5.1.2.1.1',
+  name: '1.3.6.1.2.1.43.5.1.1.16.1',
+  serial: '1.3.6.1.2.1.43.5.1.1.17.1',
+  pages: '1.3.6.1.2.1.43.10.2.1.4.1.1',
+  hp_pages: '1.3.6.1.4.1.11.2.3.9.4.2.1.4.1.2.5.0',
+  brother_pages: '1.3.6.1.4.1.2435.2.3.9.4.2.1.5.5.8.0',
+  brother_pages2: '1.3.6.1.4.1.2435.2.3.9.4.2.1.5.5.1.0',
+  canon_pages: '1.3.6.1.4.1.1602.1.11.1.3.1.4.1',
+};
+
+const PRT_SUPPLY_COLS = {
+  class: '1.3.6.1.2.1.43.11.1.1.4',
+  type: '1.3.6.1.2.1.43.11.1.1.5',
+  descr: '1.3.6.1.2.1.43.11.1.1.6',
+  unit: '1.3.6.1.2.1.43.11.1.1.7',
+  max: '1.3.6.1.2.1.43.11.1.1.8',
+  level: '1.3.6.1.2.1.43.11.1.1.9',
+};
+
+const PRT_INPUT_COLS = {
+  name: '1.3.6.1.2.1.43.8.2.1.13',
+  max: '1.3.6.1.2.1.43.8.2.1.9',
+  level: '1.3.6.1.2.1.43.8.2.1.10',
+  status: '1.3.6.1.2.1.43.8.2.1.11',
+};
+
+async function readPrinterDetails(rd, ident) {
+  let rawStatus = null, rawError = null, display = null, pName = null, serial = null, pages = null;
+  try { rawStatus = num(await rd.get(PRT_SCALARS.status)); } catch { /* optional */ }
+  try { rawError = await rd.get(PRT_SCALARS.error_state); } catch { /* optional */ }
+  try { display = String(await rd.get(PRT_SCALARS.display)).trim(); } catch { /* optional */ }
+  try { pName = String(await rd.get(PRT_SCALARS.name)).trim(); } catch { /* optional */ }
+  try { serial = String(await rd.get(PRT_SCALARS.serial)).trim(); } catch { /* optional */ }
+
+  for (const pOid of [PRT_SCALARS.pages, PRT_SCALARS.hp_pages, PRT_SCALARS.brother_pages, PRT_SCALARS.brother_pages2, PRT_SCALARS.canon_pages]) {
+    try {
+      const p = num(await rd.get(pOid));
+      if (p !== null && p >= 0) { pages = p; break; }
+    } catch { /* try next */ }
+  }
+
+  let supplyRows = null;
+  try { supplyRows = await rd.table(Object.values(PRT_SUPPLY_COLS), 32); } catch { /* optional */ }
+
+  let inputRows = null;
+  try { inputRows = await rd.table(Object.values(PRT_INPUT_COLS), 16); } catch { /* optional */ }
+
+  if (rawStatus === null && rawError === null && !display && !pName && !serial && pages === null && !supplyRows && !inputRows) {
+    return null;
+  }
+
+  const supplies = [];
+  const tonerPercents = [];
+  const drumPercents = [];
+
+  if (supplyRows) {
+    for (const [idx, r] of Object.entries(supplyRows)) {
+      const descr = String(r[PRT_SUPPLY_COLS.descr] || `Vật tư ${idx}`).trim();
+      const type = num(r[PRT_SUPPLY_COLS.type]);
+      const unit = num(r[PRT_SUPPLY_COLS.unit]);
+      const max = num(r[PRT_SUPPLY_COLS.max]);
+      const level = num(r[PRT_SUPPLY_COLS.level]);
+      const supClass = num(r[PRT_SUPPLY_COLS.class]);
+
+      let percent = null;
+      if (max !== null && level !== null && max > 0 && level >= 0) {
+        percent = Math.min(100, Math.max(0, Math.round((level / max) * 100)));
+      } else if (unit === 19 && level !== null && level >= 0 && level <= 100) {
+        percent = Math.round(level);
+      }
+
+      let kind = 'other';
+      const descrLower = descr.toLowerCase();
+      if (type === 9 || /drum|opc|photoconductor|trống/i.test(descrLower)) {
+        kind = 'drum';
+        if (percent !== null) drumPercents.push(percent);
+      } else if (type === 4 || /waste|thải/i.test(descrLower)) {
+        kind = 'waste';
+      } else if ([3, 5, 6, 19].includes(type) || /toner|cartridge|black|cyan|magenta|yellow|mực/i.test(descrLower)) {
+        kind = 'toner';
+        if (percent !== null) tonerPercents.push(percent);
+      } else if ([15, 17].includes(type) || /fuser|sấy/i.test(descrLower)) {
+        kind = 'fuser';
+      } else if (type === 18 || /transfer|băng tải/i.test(descrLower)) {
+        kind = 'transfer';
+      }
+
+      supplies.push({
+        index: idx,
+        name: descr,
+        type: type ?? 1,
+        kind,
+        unit,
+        max,
+        level,
+        percent,
+        status: level === 0 ? 'Hết vật tư' : (level === -3 ? 'Còn vật tư' : (percent != null ? `${percent}%` : 'Không rõ')),
+      });
+    }
+  }
+
+  const trays = [];
+  if (inputRows) {
+    for (const [idx, r] of Object.entries(inputRows)) {
+      const name = String(r[PRT_INPUT_COLS.name] || `Khay ${idx}`).trim();
+      const max = num(r[PRT_INPUT_COLS.max]);
+      const level = num(r[PRT_INPUT_COLS.level]);
+      const st = num(r[PRT_INPUT_COLS.status]);
+      let status = 'Bình thường';
+      if (level === 0 || st === 0) status = 'Hết giấy';
+      else if (level === -3) status = 'Còn giấy';
+      else if (max && level && max > 0 && level > 0) status = `${level}/${max} tờ (${Math.round((level / max) * 100)}%)`;
+      trays.push({ name, max, level, status });
+    }
+  }
+
+  const errors = parsePrinterErrors(rawError);
+
+  return {
+    status_code: rawStatus,
+    status_text: PRT_STATUS_NAMES[rawStatus] || 'Bình thường',
+    display: display || '',
+    model: pName || (ident && ident.sysDescr ? ident.sysDescr.split(',')[0].trim() : ''),
+    serial: serial || '',
+    page_count: pages,
+    toner: tonerPercents.length ? Math.min(...tonerPercents) : null,
+    drum: drumPercents.length ? Math.min(...drumPercents) : null,
+    errors,
+    supplies,
+    trays,
+  };
+}
+
 async function pollDevice({ host, port = 161, community = 'public', profile = '' }) {
   const conn = { host, port, community };
   let id;
@@ -354,6 +542,23 @@ async function pollDevice({ host, port = 161, community = 'public', profile = ''
   if (ifc) info.if_counters = ifc;
   const pkt = await readPktCounters(rd);
   if (pkt) info.pkt_counters = pkt;
+
+  const isPrinterCandidate = chosen.id.includes('printer')
+    || /printer|laserjet|deskjet|pagewide|canon|brother|epson|xerox|ricoh/i.test(ident.sysDescr)
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.2435')
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.1602')
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.11.2.3.9')
+    || chosen.metrics.toner || chosen.metrics.drum;
+  if (isPrinterCandidate) {
+    const prn = await readPrinterDetails(rd, ident);
+    if (prn) {
+      info.printer = prn;
+      if (info.toner == null && prn.toner != null) info.toner = prn.toner;
+      if (info.drum == null && prn.drum != null) info.drum = prn.drum;
+      if (info.page_count == null && prn.page_count != null) info.page_count = prn.page_count;
+    }
+  }
+
   return info;
 }
 

@@ -33,6 +33,8 @@
       ]
     },
     "disk": null,
-    "toner": null
+    "toner": null,
+    "drum": null,
+    "page_count": null
   }
 }

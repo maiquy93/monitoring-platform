@@ -51,6 +51,8 @@
       ]
     },
     "toner": null,
+    "drum": null,
+    "page_count": null,
     "fortios_version": {
       "label": "Phiên bản FortiOS",
       "optional": true,

@@ -294,6 +294,153 @@ test('synology: detected by sysDescr, old DSM without SYNOLOGY-SYSTEM-MIB utilis
   } finally { r.close(); }
 });
 
+// ---- Máy in: HP, Brother, Canon (dữ liệu TỔNG HỢP theo Printer-MIB RFC 3805 / RFC 2790 / Vendor MIB) ----
+const hpPrinterRows = () => [
+  ['1.3.6.1.2.1.1.1.0', 'HP LaserJet Pro M404dn', 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.11.2.3.9.1', 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 450000, 'TIMETICKS'],
+  ['1.3.6.1.2.1.1.5.0', 'HPLaserJet-Office', 'STRING'],
+  ['1.3.6.1.2.1.25.3.5.1.1.1', 3, 'INTEGER'], // hrPrinterStatus: idle (sẵn sàng)
+  ['1.3.6.1.2.1.25.3.5.1.2.1', 0, 'INTEGER'], // không có lỗi
+  ['1.3.6.1.2.1.43.5.1.1.16.1', 'HP LaserJet Pro M404dn', 'STRING'],
+  ['1.3.6.1.2.1.43.5.1.1.17.1', 'VNC3K04921', 'STRING'],
+  ['1.3.6.1.2.1.43.10.2.1.4.1.1', 14520, 'COUNTER32'], // tổng số trang in
+  ['1.3.6.1.2.1.43.16.5.1.2.1.1', 'Ready', 'STRING'],
+  // Hộp mực Black Toner (68%)
+  ['1.3.6.1.2.1.43.11.1.1.4.1.1', 2, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.5.1.1', 3, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.6.1.1', 'HP Black Toner Cartridge CF276A', 'STRING'],
+  ['1.3.6.1.2.1.43.11.1.1.7.1.1', 7, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.8.1.1', 10000, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.9.1.1', 6800, 'INTEGER'],
+  // Cụm trống Drum (74%)
+  ['1.3.6.1.2.1.43.11.1.1.4.1.2', 2, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.5.1.2', 9, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.6.1.2', 'HP LaserJet Imaging Drum', 'STRING'],
+  ['1.3.6.1.2.1.43.11.1.1.7.1.2', 7, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.8.1.2', 25000, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.9.1.2', 18500, 'INTEGER'],
+  // Khay nạp giấy Tray 1
+  ['1.3.6.1.2.1.43.8.2.1.9.1.1', 250, 'INTEGER'],
+  ['1.3.6.1.2.1.43.8.2.1.10.1.1', 180, 'INTEGER'],
+  ['1.3.6.1.2.1.43.8.2.1.11.1.1', 0, 'INTEGER'],
+  ['1.3.6.1.2.1.43.8.2.1.13.1.1', 'Tray 1 (Cassette)', 'STRING'],
+];
+
+test('detectProfile: hp / brother / canon printers by sysObjectID or sysDescr', () => {
+  const d = (sysObjectID, sysDescr = '') => engine.detectProfile({ sysObjectID, sysDescr }).id;
+  assert.equal(d('1.3.6.1.4.1.11.2.3.9.1'), 'hp-printer');
+  assert.equal(d('.1.3.6.1.4.1.11.2.3.9.1'), 'hp-printer');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'HP LaserJet Pro M404dn'), 'hp-printer');
+  assert.equal(d('1.3.6.1.4.1.2435.2.1.1'), 'brother-printer');
+  assert.equal(d('.1.3.6.1.4.1.2435.2.1.1'), 'brother-printer');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Brother HL-L2366DW series'), 'brother-printer');
+  assert.equal(d('1.3.6.1.4.1.1602.1.1.2'), 'canon-printer');
+  assert.equal(d('.1.3.6.1.4.1.1602.1.1.2'), 'canon-printer');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Canon imageRUNNER ADVANCE C3530i'), 'canon-printer');
+});
+
+test('hp printer (synthetic MIB data): auto-detected, reads toner, drum life, page count, supplies and trays', async () => {
+  const r = await startReplay(null, { rows: hpPrinterRows() });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'hp-printer');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.toner, 68);
+    assert.equal(out.drum, 74);
+    assert.equal(out.page_count, 14520);
+    assert.equal(out.uptime, 4500);
+    assert.ok(out.printer, 'cần có thông tin printer');
+    assert.equal(out.printer.model, 'HP LaserJet Pro M404dn');
+    assert.equal(out.printer.serial, 'VNC3K04921');
+    assert.equal(out.printer.display, 'Ready');
+    assert.equal(out.printer.status_text, 'Sẵn sàng (Ready/Idle)');
+    assert.equal(out.printer.errors.length, 0);
+    assert.equal(out.printer.supplies.length, 2);
+    assert.equal(out.printer.trays.length, 1);
+  } finally { r.close(); }
+});
+
+const brotherPrinterRows = () => [
+  ['1.3.6.1.2.1.1.1.0', 'Brother HL-L2366DW series', 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.2435.2.1.1', 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 320000, 'TIMETICKS'],
+  ['1.3.6.1.2.1.1.5.0', 'Brother-Office', 'STRING'],
+  ['1.3.6.1.2.1.25.3.5.1.1.1', 3, 'INTEGER'],
+  ['1.3.6.1.2.1.25.3.5.1.2.1', 0, 'INTEGER'],
+  ['1.3.6.1.2.1.43.5.1.1.16.1', 'Brother HL-L2366DW series', 'STRING'],
+  ['1.3.6.1.2.1.43.5.1.1.17.1', 'E73890H8J29381', 'STRING'],
+  ['1.3.6.1.2.1.43.10.2.1.4.1.1', 8920, 'COUNTER32'],
+  ['1.3.6.1.2.1.43.16.5.1.2.1.1', 'Sleep', 'STRING'],
+  // Toner cartridge TN-2385 (20%)
+  ['1.3.6.1.2.1.43.11.1.1.4.1.1', 2, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.5.1.1', 3, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.6.1.1', 'Toner Cartridge (TN-2385)', 'STRING'],
+  ['1.3.6.1.2.1.43.11.1.1.7.1.1', 7, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.8.1.1', 2600, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.9.1.1', 520, 'INTEGER'],
+  // Drum unit DR-2385 (12%)
+  ['1.3.6.1.2.1.43.11.1.1.4.1.2', 2, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.5.1.2', 9, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.6.1.2', 'Drum Unit (DR-2385)', 'STRING'],
+  ['1.3.6.1.2.1.43.11.1.1.7.1.2', 7, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.8.1.2', 12000, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.9.1.2', 1440, 'INTEGER'],
+];
+
+test('brother printer (synthetic MIB data): auto-detected, reads separated toner (TN) and drum (DR), page count', async () => {
+  const r = await startReplay(null, { rows: brotherPrinterRows() });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'brother-printer');
+    assert.equal(out.toner, 20);
+    assert.equal(out.drum, 12);
+    assert.equal(out.page_count, 8920);
+    assert.equal(out.printer.serial, 'E73890H8J29381');
+    assert.equal(out.printer.display, 'Sleep');
+  } finally { r.close(); }
+});
+
+const canonPrinterRows = (jammed = false) => [
+  ['1.3.6.1.2.1.1.1.0', 'Canon imageRUNNER ADVANCE C3530i', 'STRING'],
+  ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.1602.1.1.2', 'OID'],
+  ['1.3.6.1.2.1.1.3.0', 780000, 'TIMETICKS'],
+  ['1.3.6.1.2.1.1.5.0', 'Canon-iR-ADV', 'STRING'],
+  ['1.3.6.1.2.1.25.3.5.1.1.1', jammed ? 1 : 3, 'INTEGER'],
+  ['1.3.6.1.2.1.25.3.5.1.2.1', jammed ? 0x04 : 0, 'INTEGER'], // bit 5 jammed: 0x04
+  ['1.3.6.1.2.1.43.5.1.1.16.1', 'Canon iR-ADV C3530i', 'STRING'],
+  ['1.3.6.1.2.1.43.5.1.1.17.1', 'QNA04918', 'STRING'],
+  ['1.3.6.1.2.1.43.10.2.1.4.1.1', 53400, 'COUNTER32'],
+  ['1.3.6.1.2.1.43.16.5.1.2.1.1', jammed ? 'Paper Jam Tray 2' : 'Ready to print', 'STRING'],
+  // Canon supplies (unit 19 = percent)
+  ['1.3.6.1.2.1.43.11.1.1.4.1.1', 2, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.5.1.1', 3, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.6.1.1', 'Canon NPG-67 Black Toner', 'STRING'],
+  ['1.3.6.1.2.1.43.11.1.1.7.1.1', 19, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.8.1.1', 100, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.9.1.1', 85, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.4.1.2', 2, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.5.1.2', 9, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.6.1.2', 'Canon NPG-67 Drum Unit', 'STRING'],
+  ['1.3.6.1.2.1.43.11.1.1.7.1.2', 19, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.8.1.2', 100, 'INTEGER'],
+  ['1.3.6.1.2.1.43.11.1.1.9.1.2', 92, 'INTEGER'],
+];
+
+test('canon printer (synthetic MIB data): auto-detected, reads toner, drum life, and detects paper jam error', async () => {
+  const r = await startReplay(null, { rows: canonPrinterRows(true) });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'canon-printer');
+    assert.equal(out.toner, 85);
+    assert.equal(out.drum, 92);
+    assert.equal(out.page_count, 53400);
+    assert.equal(out.printer.serial, 'QNA04918');
+    assert.equal(out.printer.display, 'Paper Jam Tray 2');
+    assert.ok(out.printer.errors.some((e) => /kẹt giấy/i.test(e)), 'phải phát hiện lỗi kẹt giấy');
+  } finally { r.close(); }
+});
+
 test('profile validation: table percent accepts used+free without total, rejects incomplete combinations', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prof-'));
   try {

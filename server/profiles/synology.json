@@ -67,6 +67,8 @@
       "sources": [{ "get": "1.3.6.1.4.1.6574.1.2.0", "unverified": true }]
     },
     "toner": null,
+    "drum": null,
+    "page_count": null,
     "dsm_version": {
       "label": "Phiên bản DSM",
       "optional": true,

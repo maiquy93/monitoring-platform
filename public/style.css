@@ -154,6 +154,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .t-badge-alert.alert-dos { background: #c0392b; }
 .t-badge-alert.alert-smart { background: #d35400; }
 .t-badge-alert.alert-thermal { background: #e67e22; }
+.t-badge-alert.alert-printer { background: #8e44ad; }
 @keyframes badge-pulse { 50% { opacity: 0.8; transform: scale(0.97); } }
 
 /* ---------- device page ---------- */

@@ -37,19 +37,46 @@
     else if (d.status === 'warning') sub = d.reasons[0];
     else if (d.status === 'maint') sub = 'Đang bảo trì (tắt cảnh báo)';
     else if (d.status === 'unknown') sub = 'Chưa có dữ liệu';
-    else sub = [d.address, d.rtt != null ? `${d.rtt} ms` : null, d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : null].filter(Boolean).join(' · ');
+    else {
+      const parts = [d.address, d.rtt != null ? `${d.rtt} ms` : null];
+      if (d.type === 'printer') {
+        if (d.printer_status) parts.push(d.printer_status);
+        if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString('vi-VN')} trang`);
+      } else if (d.uptime != null) {
+        parts.push(`up ${M.fmtDur(d.uptime)}`);
+      }
+      sub = parts.filter(Boolean).join(' · ');
+    }
     let bars = '';
     if (d.status === 'up' || d.status === 'warning') {
-      const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram'], ['Disk', d.disk, 'disk']]
-        .filter(([, value]) => value != null);
-      const metricBars = metrics.map(([label, value, key]) => bar(label, value, key));
-      if (d.temperature != null) {
-        const tTh = (th() && th().temp) || 85;
-        const tLv = d.temperature >= tTh ? 'crit' : d.temperature >= tTh - 10 ? 'hi' : '';
-        metricBars.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
+      const pBars = [];
+      if (d.toner != null) {
+        const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
+        pBars.push(`<div class="bar ${lv}">Mực ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
       }
-      if (metricBars.length) bars = `<div class="bars">${metricBars.join('')}</div>`;
-      else if (d.toner != null) bars = `<div class="bars"><div class="bar ${d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : ''}">Mực ${d.toner}%<i><b style="width:${d.toner}%"></b></i></div></div>`;
+      if (d.drum != null) {
+        const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
+        pBars.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
+      }
+
+      if (d.type === 'printer') {
+        if (pBars.length) bars = `<div class="bars">${pBars.join('')}</div>`;
+      } else {
+        const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram'], ['Disk', d.disk, 'disk']]
+          .filter(([, value]) => value != null);
+        const metricBars = metrics.map(([label, value, key]) => bar(label, value, key));
+        if (d.temperature != null) {
+          const tTh = (th() && th().temp) || 85;
+          const tLv = d.temperature >= tTh ? 'crit' : d.temperature >= tTh - 10 ? 'hi' : '';
+          metricBars.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
+        }
+        if (pBars.length && !metricBars.length) {
+          bars = `<div class="bars">${pBars.join('')}</div>`;
+        } else if (metricBars.length) {
+          if (pBars.length) metricBars.push(...pBars);
+          bars = `<div class="bars">${metricBars.join('')}</div>`;
+        }
+      }
     }
     let alertBadges = '';
     const al = d.alerts;
@@ -67,6 +94,16 @@
       }
       if (al.thermal || (d.temperature != null && d.temperature >= ((th() && th().temp) || 85))) {
         items.push(`<span class="t-badge-alert alert-thermal" title="Báo động nhiệt độ CPU quá cao (Thermal Throttling)">🔥 ${Math.round(d.temperature)}°C</span>`);
+      }
+      if (al.printer || (d.printer_errors && d.printer_errors.length)) {
+        const errText = d.printer_errors && d.printer_errors.length ? d.printer_errors[0] : 'Sự cố máy in';
+        items.push(`<span class="t-badge-alert alert-printer" title="${esc(d.printer_errors ? d.printer_errors.join('; ') : errText)}">⚠️ ${esc(errText)}</span>`);
+      }
+      if (d.toner != null && d.toner <= 10) {
+        items.push(`<span class="t-badge-alert alert-power" title="Hộp mực sắp hết: còn ${d.toner}%">🖨️ Mực ${d.toner}%</span>`);
+      }
+      if (d.drum != null && d.drum <= 10) {
+        items.push(`<span class="t-badge-alert alert-smart" title="Cụm drum sắp hết hạn: còn ${d.drum}%, cần thay drum">🔄 Drum ${d.drum}%</span>`);
       }
       if (items.length) {
         alertBadges = `<div class="t-alert-row">${items.join('')}</div>`;
@@ -100,6 +137,16 @@
     return `<div class="gauge"><svg viewBox="0 0 130 130"><circle cx="65" cy="65" r="52" fill="none" stroke="var(--panel2)" stroke-width="12"/>
       <circle cx="65" cy="65" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(v / 100) * C} ${C}" transform="rotate(-90 65 65)"/>
       <text x="65" y="74" text-anchor="middle" font-size="26" font-weight="700" fill="var(--text)">${Math.round(v)}%</text></svg>
+      <div class="g-label">${label}${sub ? `<br>${sub}` : ''}</div></div>`;
+  };
+
+  M.consumableGauge = (label, v, sub) => {
+    const C = 2 * Math.PI * 52;
+    const val = Math.min(100, Math.max(0, v));
+    const col = val <= 10 ? 'var(--c-critical)' : val <= 25 ? 'var(--c-medium)' : 'var(--c-ok)';
+    return `<div class="gauge"><svg viewBox="0 0 130 130"><circle cx="65" cy="65" r="52" fill="none" stroke="var(--panel2)" stroke-width="12"/>
+      <circle cx="65" cy="65" r="52" fill="none" stroke="${col}" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(val / 100) * C} ${C}" transform="rotate(-90 65 65)"/>
+      <text x="65" y="74" text-anchor="middle" font-size="26" font-weight="700" fill="var(--text)">${Math.round(val)}%</text></svg>
       <div class="g-label">${label}${sub ? `<br>${sub}` : ''}</div></div>`;
   };
 
@@ -873,7 +920,14 @@
         const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
         gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
       }
-      if (d.toner != null) gs.push(M.gauge('Mực in', d.toner, 'cpu'));
+      if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
+      if (d.drum != null) gs.push(M.consumableGauge('Độ bền Drum', d.drum));
+      if (d.page_count != null) gs.push(stat('Tổng số trang in', Number(d.page_count).toLocaleString('vi-VN') + ' trang'));
+      if (d.printer && (d.printer.status_text || d.printer.display)) {
+        const pSt = d.printer.display || d.printer.status_text;
+        const pCol = (d.printer_errors && d.printer_errors.length) ? 'var(--c-critical)' : 'var(--c-ok)';
+        gs.push(`<div class="gauge"><div style="font-size:18px;font-weight:700;padding:42px 0 6px;color:${pCol}">🖨️ ${esc(pSt)}</div><div class="g-label">Trạng thái máy in</div></div>`);
+      }
       if (d.temperature != null) {
         const tTh = (th() && th().temp) || 85;
         const tCol = d.temperature >= tTh ? 'var(--c-critical)' : d.temperature >= tTh - 10 ? 'var(--c-medium)' : 'var(--c-ok)';
@@ -907,6 +961,44 @@
         if (a.disks.length) {
           html += `<h2>Ổ đĩa</h2><table class="tbl"><tbody>${a.disks.map((x) => `<tr><td>${esc(x.mount)}</td><td>${M.fmtBytes(x.used)} / ${M.fmtBytes(x.total)}</td>
             <td style="width:70px">${bar('', x.percent ?? 0, 'disk')}</td></tr>`).join('')}</tbody></table>`;
+        }
+      }
+      if (d.printer || (d.snmp && d.snmp.printer)) {
+        const prn = d.printer || d.snmp.printer;
+        html += `<h2>Thông số máy in</h2><dl class="kv">
+          ${kv('Model máy in', prn.model || d.name)}
+          ${kv('Số Serial', prn.serial)}
+          ${kv('Màn hình LCD', prn.display)}
+          ${kv('Trạng thái', prn.status_text)}
+          ${kv('Tổng trang đã in', prn.page_count != null ? `${Number(prn.page_count).toLocaleString('vi-VN')} trang` : '—')}
+        </dl>`;
+
+        if (prn.errors && prn.errors.length) {
+          html += `<div class="reason" style="margin:8px 0;background:rgba(239,68,68,0.15);padding:10px 14px;border-radius:6px;border:1px solid var(--c-critical);color:var(--text)">
+            <b style="color:var(--c-critical)">⚠️ Sự cố máy in phát hiện:</b><br>${prn.errors.map((e) => `• ${esc(e)}`).join('<br>')}
+          </div>`;
+        }
+
+        if (prn.supplies && prn.supplies.length) {
+          html += `<h2>Chi tiết vật tư tiêu hao (Mực & Drum)</h2>
+          <table class="tbl"><thead><tr><th>Tên vật tư</th><th>Phân loại</th><th>Mức còn lại</th><th>Dung lượng</th></tr></thead><tbody>
+          ${prn.supplies.map((s) => {
+            const kindName = { toner: 'Hộp mực (Toner)', drum: 'Cụm trống (Drum)', waste: 'Hộp mực thải', fuser: 'Cụm sấy (Fuser)', transfer: 'Băng tải' }[s.kind] || 'Vật tư khác';
+            const col = s.kind === 'drum' ? 'var(--c-maint)' : (s.percent != null && s.percent <= 10 ? 'var(--c-critical)' : (s.percent != null && s.percent <= 25 ? 'var(--c-medium)' : 'var(--c-ok)'));
+            const barHtml = s.percent != null
+              ? `<div class="bar" style="width:110px">${s.percent}%<i><b style="width:${s.percent}%;background:${col}"></b></i></div>`
+              : (s.status || '—');
+            const capText = (s.level != null && s.max != null && s.max > 0 && s.level >= 0) ? `${Number(s.level).toLocaleString('vi-VN')} / ${Number(s.max).toLocaleString('vi-VN')}` : (s.status || '—');
+            return `<tr><td><b>${esc(s.name)}</b></td><td><span class="muted">${kindName}</span></td><td>${barHtml}</td><td>${esc(capText)}</td></tr>`;
+          }).join('')}
+          </tbody></table>`;
+        }
+
+        if (prn.trays && prn.trays.length) {
+          html += `<h2>Khay nạp giấy</h2>
+          <table class="tbl"><thead><tr><th>Khay giấy</th><th>Tình trạng</th><th>Sức chứa</th></tr></thead><tbody>
+          ${prn.trays.map((t) => `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.status)}</td><td>${t.max != null ? `${t.max} tờ` : '—'}</td></tr>`).join('')}
+          </tbody></table>`;
         }
       }
       if (d.snmp_enabled) html += this.snmpSection(d, kv);
@@ -992,6 +1084,12 @@
       }
       if (has('temp')) {
         html += `<h2>Nhiệt độ CPU (°C)</h2>${M.chart(points, [{ key: 'temp', color: 'var(--c-high)', label: 'Nhiệt độ (°C)' }], this.range, 120, (v) => `${Math.round(v)}°`)}`;
+      }
+      if (has('toner') || has('drum')) {
+        const pSeries = [];
+        if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: 'Mực in (%)' });
+        if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: 'Độ bền Drum (%)' });
+        html += `<h2>Lịch sử Mực in & Độ bền Drum (%)</h2>${M.chart(points, pSeries, this.range, 100)}`;
       }
       $('#d-charts').innerHTML = html || '<div class="muted" style="padding:20px">Chưa có dữ liệu lịch sử</div>';
     },
