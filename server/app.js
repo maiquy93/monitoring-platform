@@ -100,7 +100,7 @@ function cleanDevice(b, partial = false) {
   }
   if (!partial || has('severity')) {
     const s = b.severity || null;
-    if (s && !SEV_RANK[s]) throw bad('Mức cảnh báo không hợp lệ');
+    if (s && SEV_RANK[s] === undefined) throw bad('Mức cảnh báo không hợp lệ');
     out.severity = s;
   }
   for (const k of ['location', 'notes']) {
@@ -421,7 +421,7 @@ function createApp(db, monitor, opts = {}) {
     if (b.type_severity) {
       const t = {};
       for (const k of TYPES) if (b.type_severity[k]) {
-        if (!SEV_RANK[b.type_severity[k]]) throw bad('Mức cảnh báo không hợp lệ');
+        if (SEV_RANK[b.type_severity[k]] === undefined) throw bad('Mức cảnh báo không hợp lệ');
         t[k] = b.type_severity[k];
       }
       setSetting(db, 'type_severity', t);

@@ -5,7 +5,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { getSettings } = require('./db');
 
-const SEV_RANK = { low: 1, medium: 2, high: 3, critical: 4 };
+const SEV_RANK = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
 const ADDR_RE = /^[A-Za-z0-9][A-Za-z0-9.:_-]{0,252}$/;
 const IS_WIN = process.platform === 'win32';
 
@@ -156,8 +156,9 @@ class Monitor extends EventEmitter {
   stop() { clearInterval(this.timer); this.timer = null; }
 
   severityOf(d) {
-    if (d.severity && SEV_RANK[d.severity]) return d.severity;
-    return this.settings.type_severity[d.type] || 'medium';
+    if (d.severity && SEV_RANK[d.severity] !== undefined) return d.severity;
+    const def = this.settings.type_severity[d.type];
+    return (def && SEV_RANK[def] !== undefined) ? def : 'medium';
   }
 
   // ---- data ingestion -------------------------------------------------
@@ -292,10 +293,10 @@ class Monitor extends EventEmitter {
           }
         }
         const toner = st.snmp.info && st.snmp.info.toner;
-        if (toner != null && toner <= 10) reasons.push(`Mực còn ${toner}%`);
+        if (toner != null && toner >= 0 && toner <= 10) reasons.push(`Mực còn ${toner}%`);
         const drum = st.snmp.info && st.snmp.info.drum;
-        if (drum != null && drum <= 10) reasons.push(`Độ bền drum còn ${drum}% (cần thay drum)`);
-        else if (drum != null && drum <= 20) reasons.push(`Độ bền drum sắp hết: ${drum}%`);
+        if (drum != null && drum >= 0 && drum <= 10) reasons.push(`Độ bền drum còn ${drum}% (cần thay drum)`);
+        else if (drum != null && drum >= 0 && drum <= 20) reasons.push(`Độ bền drum sắp hết: ${drum}%`);
 
         const prn = st.snmp.info && st.snmp.info.printer;
         if (prn && prn.errors && prn.errors.length) {
@@ -367,7 +368,8 @@ class Monitor extends EventEmitter {
           this._event(d, 'power', 'ok', `${d.name}: Đã có điện lưới trở lại (nguồn AC ổn định)`);
         }
 
-        if (reasons.length) status = 'warning';
+        const devSev = this.severityOf(d);
+        if (reasons.length && devSev !== 'none') status = 'warning';
       } else if (checks.every((c) => c.ok === false)) {
         status = 'down';
         reasons.push(...checks.map((c) => ({
@@ -391,10 +393,12 @@ class Monitor extends EventEmitter {
     const sev = this.severityOf(d);
     const dur = Math.round((now - st.since) / 1000);
     const hasCritAlert = st.alerts && (st.alerts.dos || st.alerts.smart || st.alerts.thermal || st.alerts.ups);
-    if (next === 'down') this._event(d, 'down', sev, `${d.name} mất kết nối: ${st.reasons.join(', ')}`);
-    else if (next === 'warning') this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), `${d.name}: ${st.reasons.join('; ')}`);
-    else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
-      this._event(d, 'up', 'ok', `${d.name} hoạt động trở lại sau ${dur}s`);
+    if (sev !== 'none') {
+      if (next === 'down') this._event(d, 'down', sev, `${d.name} mất kết nối: ${st.reasons.join(', ')}`);
+      else if (next === 'warning') this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), `${d.name}: ${st.reasons.join('; ')}`);
+      else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
+        this._event(d, 'up', 'ok', `${d.name} hoạt động trở lại sau ${dur}s`);
+      }
     }
     st.status = next;
     st.since = now;
@@ -402,6 +406,7 @@ class Monitor extends EventEmitter {
   }
 
   _event(d, kind, severity, message) {
+    if (this.severityOf(d) === 'none' && kind !== 'audit') return;
     this.db.prepare('INSERT INTO events(ts,device_id,device_name,kind,severity,message) VALUES(?,?,?,?,?,?)')
       .run(Date.now(), d.id, d.name, kind, severity, message);
     this.emit('event', { device_id: d.id, kind, severity, message });
@@ -577,9 +582,10 @@ class Monitor extends EventEmitter {
       if (d.status === 'warning') s.warning++;
       if (d.status === 'unknown') s.unknown++;
       if (d.status === 'down' || d.status === 'warning') {
+        if (d.severity === 'none') continue;
         const hasCrit = d.alerts && (d.alerts.dos || d.alerts.smart || d.alerts.thermal || d.alerts.power);
         const sev = d.status === 'down' ? d.severity : (hasCrit ? 'critical' : (d.severity === 'low' ? 'low' : 'medium'));
-        worst = Math.max(worst, SEV_RANK[sev]);
+        worst = Math.max(worst, SEV_RANK[sev] || 0);
         if (!d.acked) s.unacked++;
       }
     }

@@ -4,8 +4,8 @@
   const { esc, $ } = M;
   const W = 1600, H = 900, NW = 176, NH = 60;
   const canEdit = () => M.S.user.role !== 'viewer';
-  const COL = { critical: 'var(--c-critical)', high: 'var(--c-high)', medium: 'var(--c-medium)', low: 'var(--c-low)', up: 'var(--c-ok)', unknown: 'var(--c-unknown)' };
-  const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+  const COL = { critical: 'var(--c-critical)', high: 'var(--c-high)', medium: 'var(--c-medium)', low: 'var(--c-low)', up: 'var(--c-ok)', unknown: 'var(--c-unknown)', none: 'var(--muted)' };
+  const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
 
   M.views.maps = {
     async render(el) {

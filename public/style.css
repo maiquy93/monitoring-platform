@@ -131,9 +131,11 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .bar i { display: block; height: 5px; border-radius: 3px; background: var(--panel2); margin-top: 3px; overflow: hidden; }
 .bar i b { display: block; height: 100%; background: var(--c-ok); }
 .bar.hi i b { background: var(--c-medium); } .bar.crit i b { background: var(--c-critical); }
+.bar.bar-na { opacity: 0.6; } .bar.bar-na i b { display: none; }
 .tile.up { --s: var(--c-ok); }
 .tile.warning { --s: var(--c-medium); }
 .tile.maint { --s: var(--c-maint); }
+.tile.sev-none { --s: var(--c-unknown); }
 .tile.sev-low { --s: var(--c-low); } .tile.sev-medium { --s: var(--c-medium); }
 .tile.sev-high { --s: var(--c-high); } .tile.sev-critical { --s: var(--c-critical); }
 .tile.down:not(.acked) { animation: pulse 1.4s infinite; }
@@ -161,6 +163,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .hero { --s: var(--c-unknown); display: flex; gap: 18px; align-items: center; padding: 18px 22px; border-radius: var(--radius);
   background: color-mix(in srgb, var(--s) 14%, var(--panel)); border: 1px solid var(--s); box-shadow: 0 0 18px color-mix(in srgb, var(--s) 30%, transparent); }
 .hero.up { --s: var(--c-ok); } .hero.warning { --s: var(--c-medium); } .hero.maint { --s: var(--c-maint); }
+.hero.sev-none { --s: var(--c-unknown); }
 .hero.sev-low { --s: var(--c-low); } .hero.sev-medium { --s: var(--c-medium); } .hero.sev-high { --s: var(--c-high); } .hero.sev-critical { --s: var(--c-critical); }
 .hero .h-ico { font-size: 44px; }
 .hero h1 { margin: 0; font-size: 28px; }
@@ -198,6 +201,8 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .sev-badge { padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 700; color: #000; background: var(--c-unknown); }
 .sev-badge.low { background: var(--c-low); } .sev-badge.medium { background: var(--c-medium); } .sev-badge.high { background: var(--c-high); }
 .sev-badge.critical { background: var(--c-critical); color: #fff; } .sev-badge.ok { background: var(--c-ok); }
+.sev-badge.none { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
+.dot.sev-none { background: var(--muted); }
 
 /* ---------- modal / toast / login ---------- */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 20px; }
@@ -223,6 +228,7 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .m-node .m-sub { fill: var(--muted); font-size: 12px; }
 .m-node.sel rect { stroke-width: 5; }
 .m-node.up { --s: var(--c-ok); } .m-node.warning { --s: var(--c-medium); } .m-node.maint { --s: var(--c-maint); } .m-node { --s: var(--c-unknown); cursor: pointer; }
+.m-node.sev-none { --s: var(--c-unknown); }
 .m-node.sev-low { --s: var(--c-low); } .m-node.sev-medium { --s: var(--c-medium); } .m-node.sev-high { --s: var(--c-high); } .m-node.sev-critical { --s: var(--c-critical); }
 .m-node.down:not(.acked) rect { animation: nodepulse 1.4s infinite; }
 @keyframes nodepulse { 50% { stroke-width: 6; } }

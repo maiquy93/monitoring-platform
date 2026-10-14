@@ -3,12 +3,12 @@
   const { esc, $ } = M;
   const th = () => M.S.settings.thresholds;
   const devs = () => (M.S.snap ? M.S.snap.devices : []);
-  const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+  const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
   const STATE_RANK = { down: 0, warning: 1, unknown: 2, up: 3, maint: 4 };
 
   const defaultSort = (a, b) =>
     STATE_RANK[a.status] - STATE_RANK[b.status] ||
-    (a.status === 'down' ? SEV_RANK[b.severity] - SEV_RANK[a.severity] : 0) ||
+    (a.status === 'down' ? (SEV_RANK[b.severity] || 0) - (SEV_RANK[a.severity] || 0) : 0) ||
     a.name.localeCompare(b.name);
 
   const sortDevices = (list) => {
@@ -34,34 +34,49 @@
     const ago = M.fmtDur((Date.now() - d.since) / 1000);
     let sub;
     if (d.status === 'down') sub = `${d.reasons[0] || 'Mất kết nối'} · ${ago}`;
-    else if (d.status === 'warning') sub = d.reasons[0];
     else if (d.status === 'maint') sub = 'Đang bảo trì (tắt cảnh báo)';
     else if (d.status === 'unknown') sub = 'Chưa có dữ liệu';
+    else if (d.type === 'printer') {
+      const parts = [d.address];
+      if (d.printer_status) parts.push(d.printer_status);
+      else if (d.rtt != null) parts.push(`${d.rtt} ms`);
+      if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString('vi-VN')} trang`);
+      if (d.printer_errors && d.printer_errors.length && d.severity !== 'none') parts.unshift(d.printer_errors[0]);
+      sub = parts.filter(Boolean).join(' · ');
+    } else if (d.status === 'warning') sub = d.reasons[0];
     else {
       const parts = [d.address, d.rtt != null ? `${d.rtt} ms` : null];
-      if (d.type === 'printer') {
-        if (d.printer_status) parts.push(d.printer_status);
-        if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString('vi-VN')} trang`);
-      } else if (d.uptime != null) {
-        parts.push(`up ${M.fmtDur(d.uptime)}`);
-      }
+      if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
       sub = parts.filter(Boolean).join(' · ');
     }
     let bars = '';
     if (d.status === 'up' || d.status === 'warning') {
       const pBars = [];
-      if (d.toner != null) {
-        const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
-        pBars.push(`<div class="bar ${lv}">Mực ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
-      }
-      if (d.drum != null) {
-        const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
-        pBars.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
-      }
-
       if (d.type === 'printer') {
-        if (pBars.length) bars = `<div class="bars">${pBars.join('')}</div>`;
+        // 1. Drum (tuổi thọ trống từ)
+        if (d.drum != null) {
+          const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
+          pBars.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
+        } else {
+          pBars.push(`<div class="bar bar-na" title="Hộp mực tích hợp (all-in-one) hoặc không có cảm biến drum riêng">Drum —<i><b style="width:0%"></b></i></div>`);
+        }
+        // 2. Mực (lượng mực còn lại)
+        if (d.toner != null) {
+          const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
+          pBars.push(`<div class="bar ${lv}">Mực ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
+        } else {
+          pBars.push(`<div class="bar bar-na" title="Không đọc được dữ liệu mức mực">Mực —<i><b style="width:0%"></b></i></div>`);
+        }
+        bars = `<div class="bars">${pBars.join('')}</div>`;
       } else {
+        if (d.drum != null) {
+          const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
+          pBars.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
+        }
+        if (d.toner != null) {
+          const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
+          pBars.push(`<div class="bar ${lv}">Mực ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
+        }
         const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram'], ['Disk', d.disk, 'disk']]
           .filter(([, value]) => value != null);
         const metricBars = metrics.map(([label, value, key]) => bar(label, value, key));
@@ -80,7 +95,7 @@
     }
     let alertBadges = '';
     const al = d.alerts;
-    if (al) {
+    if (al && d.severity !== 'none') {
       const items = [];
       if (al.dos || d.dos_alert) {
         items.push(`<span class="t-badge-alert alert-dos" title="Nghi ngờ tấn công Flood/DoS${d.pkt_rate ? ` (${d.pkt_rate} gói/s)` : ''}">🛡️ DoS</span>`);
@@ -99,10 +114,10 @@
         const errText = d.printer_errors && d.printer_errors.length ? d.printer_errors[0] : 'Sự cố máy in';
         items.push(`<span class="t-badge-alert alert-printer" title="${esc(d.printer_errors ? d.printer_errors.join('; ') : errText)}">⚠️ ${esc(errText)}</span>`);
       }
-      if (d.toner != null && d.toner <= 10) {
+      if (d.toner != null && d.toner >= 0 && d.toner <= 10) {
         items.push(`<span class="t-badge-alert alert-power" title="Hộp mực sắp hết: còn ${d.toner}%">🖨️ Mực ${d.toner}%</span>`);
       }
-      if (d.drum != null && d.drum <= 10) {
+      if (d.drum != null && d.drum >= 0 && d.drum <= 10) {
         items.push(`<span class="t-badge-alert alert-smart" title="Cụm drum sắp hết hạn: còn ${d.drum}%, cần thay drum">🔄 Drum ${d.drum}%</span>`);
       }
       if (items.length) {
@@ -920,8 +935,10 @@
         const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
         gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
       }
-      if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
       if (d.drum != null) gs.push(M.consumableGauge('Độ bền Drum', d.drum));
+      else if (d.type === 'printer') gs.push(stat('Độ bền Drum', '<span class="muted" style="font-size:18px">Tích hợp</span>'));
+      if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
+      else if (d.type === 'printer') gs.push(stat('Lượng mực in', '<span class="muted" style="font-size:18px">—</span>'));
       if (d.page_count != null) gs.push(stat('Tổng số trang in', Number(d.page_count).toLocaleString('vi-VN') + ' trang'));
       if (d.printer && (d.printer.status_text || d.printer.display)) {
         const pSt = d.printer.display || d.printer.status_text;

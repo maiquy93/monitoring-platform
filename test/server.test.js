@@ -403,6 +403,62 @@ test('snmp printer: low drum life or low toner or paper jam triggers warning sta
   } finally { t.close(); }
 });
 
+test('severity: "none" (không cảnh báo) keeps device up, prevents alert events, and does not raise system summary level', async () => {
+  const printerState = {
+    sysDescr: 'Brother HL-L2366DW',
+    sysName: 'Brother-HR',
+    uptime: 1000,
+    toner: 0,
+    drum: 0,
+    page_count: 9500,
+    printer: {
+      status_code: 1,
+      status_text: 'Cảnh báo',
+      display: 'No Toner',
+      errors: ['Hết mực (No toner)'],
+      supplies: [],
+      trays: []
+    }
+  };
+  const t = await boot({ snmpFn: async () => printerState });
+  try {
+    await loginAdmin(t);
+    // 1. Tạo thiết bị với severity: 'none'
+    const c = await t.api('POST', '/api/devices', {
+      name: 'silent-printer', type: 'printer', address: '10.0.0.99', check_icmp: false, snmp_enabled: true, severity: 'none'
+    });
+    assert.equal(c.status, 201);
+    const devGet = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.equal(devGet.severity, 'none');
+    assert.equal(devGet.severity_override, 'none');
+
+    t.monitor.tick();
+    await new Promise((r) => setTimeout(r, 30));
+
+    // Thiết bị không bị chuyển sang trạng thái warning
+    const snap = t.monitor.snapshot();
+    const v = snap.devices.find((d) => d.id === c.body.id);
+    assert.equal(v.status, 'up');
+    assert.equal(v.severity, 'none');
+
+    // Không sinh ra bất kỳ sự kiện warning nào trong bảng events
+    const events = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events;
+    assert.equal(events.length, 0);
+
+    // Không kéo summary.level lên warning/critical/low
+    assert.equal(snap.summary.level, 'ok');
+    assert.equal(snap.summary.unacked, 0);
+
+    // 2. Cài đặt type_severity cho printer là 'none' qua API settings
+    const sRes = await t.api('PUT', '/api/settings', {
+      type_severity: { printer: 'none' }
+    });
+    assert.equal(sRes.status, 200);
+    const updatedSettings = (await t.api('GET', '/api/settings')).body;
+    assert.equal(updatedSettings.type_severity.printer, 'none');
+  } finally { t.close(); }
+});
+
 test('version: health and settings expose build info', async () => {
   const t = await boot();
   try {

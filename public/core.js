@@ -21,7 +21,7 @@ const esc = M.esc;
 
 M.ICON = { server: '🖥️', vm: '☁️', router: '🌐', switch: '🔀', firewall: '🛡️', ap: '📶', printer: '🖨️', ups: '🔋', pc: '💻', other: '📦' };
 M.TYPE_NAME = { server: 'Máy chủ', vm: 'Máy ảo (VM)', router: 'Router', switch: 'Switch', firewall: 'Firewall', ap: 'Access Point', printer: 'Máy in', ups: 'UPS', pc: 'Máy trạm', other: 'Khác' };
-M.SEV_NAME = { critical: 'Nghiêm trọng', high: 'Cao', medium: 'Trung bình', low: 'Thấp' };
+M.SEV_NAME = { critical: 'Nghiêm trọng', high: 'Cao', medium: 'Trung bình', low: 'Thấp', none: 'Không cảnh báo' };
 M.STATE_NAME = { up: 'Hoạt động', warning: 'Cảnh báo', down: 'Mất kết nối', unknown: 'Chưa rõ', maint: 'Bảo trì' };
 
 // ---------- helpers ----------
@@ -287,10 +287,10 @@ M.updateChrome = () => {
   document.title = `${s.down ? `(${s.down} DOWN) ` : ''}${s.alive}/${s.total} – ${M.S.settings.org_name}`;
   const banner = $('#banner');
   if (!banner) return;
-  const bad = snap.devices.filter((d) => d.status === 'down' || d.status === 'warning');
+  const bad = snap.devices.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
   if (!bad.length) { banner.innerHTML = ''; return; }
   const down = bad.filter((d) => d.status === 'down');
-  const rank = { critical: 4, high: 3, medium: 2, low: 1 };
+  const rank = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
   bad.sort((a, b) => (b.status === 'down') - (a.status === 'down') || rank[b.severity] - rank[a.severity]);
   const title = down.length ? `⚠ ${down.length} thiết bị mất kết nối` : `⚠ ${bad.length} thiết bị cảnh báo`;
   const extra = down.length && bad.length > down.length ? ` · ${bad.length - down.length} cảnh báo` : '';
@@ -315,7 +315,7 @@ let prevDown = new Set();
 M.onSnapshot = (snap) => {
   M.S.snap = snap;
   M.S.lastSnapAt = Date.now();
-  const nowDown = new Set(snap.devices.filter((d) => d.status === 'down').map((d) => d.id));
+  const nowDown = new Set(snap.devices.filter((d) => d.status === 'down' && d.severity !== 'none').map((d) => d.id));
   const fresh = snap.devices.filter((d) => nowDown.has(d.id) && !prevDown.has(d.id));
   if (prevDown.size || M.S.firstSnapDone) {
     if (fresh.length) { M.toast(`Mất kết nối: ${fresh.map((d) => d.name).join(', ')}`); M.beep(); }
