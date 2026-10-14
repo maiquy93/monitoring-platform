@@ -303,17 +303,33 @@ async function readIfCounters(rd) {
   return { rows: Object.fromEntries(use.map((x) => [x.idx, x.row])) };
 }
 
-// ---- packet counters for Flood/DoS detection (TCP-MIB & UDP-MIB) ------------
+// ---- packet counters for Flood/DoS detection (TCP-MIB & UDP-MIB / IF-MIB fallback) ----
 const TCP_IN_SEGS = '1.3.6.1.2.1.6.10.0';
 const UDP_IN_DATAGRAMS = '1.3.6.1.2.1.7.1.0';
+const IF_HC_IN_PKTS = '1.3.6.1.2.1.31.1.1.1.7';
+const IF_IN_UCAST_PKTS = '1.3.6.1.2.1.2.2.1.11';
 
 // -> { tcp: number|null, udp: number|null } or null when unsupported.
 async function readPktCounters(rd) {
   let tcp = null, udp = null;
   try { tcp = num(await rd.get(TCP_IN_SEGS)); } catch { /* optional TCP-MIB */ }
   try { udp = num(await rd.get(UDP_IN_DATAGRAMS)); } catch { /* optional UDP-MIB */ }
-  if (tcp === null && udp === null) return null;
-  return { tcp, udp };
+  if (tcp !== null || udp !== null) return { tcp, udp };
+
+  // Fallback to interface packets (for routers like MikroTik RouterOS without host transport MIBs)
+  try {
+    const tbl = await rd.table([IF_HC_IN_PKTS, IF_IN_UCAST_PKTS], 32);
+    if (tbl) {
+      let sum = 0, found = false;
+      for (const r of Object.values(tbl)) {
+        const v = num(r[IF_HC_IN_PKTS]) !== null ? num(r[IF_HC_IN_PKTS]) : num(r[IF_IN_UCAST_PKTS]);
+        if (v !== null && v > 0) { sum += v; found = true; }
+      }
+      if (found) return { tcp: 0, udp: sum };
+    }
+  } catch { /* optional IF-MIB */ }
+
+  return null;
 }
 
 // ---- printer status, supplies and counters (Printer-MIB & HOST-RESOURCES) ----

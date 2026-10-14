@@ -778,6 +778,43 @@ test('dos: SNMP TCP/UDP packet rate spike triggers critical Flood/DoS event and 
   } finally { t.close(); }
 });
 
+test('dos: mockDos triggers critical Flood/DoS alert, spikes bandwidth and recovers cleanly', async () => {
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'router-test-dos', type: 'router', address: '192.168.60.50', check_icmp: false, snmp_enabled: true,
+    });
+    assert.equal(c.status, 201);
+    const devId = c.body.id;
+
+    // Trigger mock DoS
+    const r1 = await t.api('POST', `/api/devices/${devId}/mock-dos`, {
+      active: true, pps: 60000, bandwidth_mbps: 90, ports: [53, 123], attack_type: 'DNS/NTP UDP Flood (cổng 53, 123)',
+    });
+    assert.equal(r1.status, 200);
+    assert.equal(r1.body.ok, true);
+    assert.equal(r1.body.result.pps, 60000);
+
+    const snap = t.monitor.snapshot();
+    const d = snap.devices.find((x) => x.id === devId);
+    assert.equal(d.dos_alert, true);
+    assert.equal(d.alerts.dos, true);
+    assert.equal(d.pkt_rate, 60000);
+    assert.equal(d.status, 'warning');
+    assert.equal(snap.summary.level, 'critical');
+
+    // Recover
+    const r2 = await t.api('POST', `/api/devices/${devId}/mock-dos`, { active: false });
+    assert.equal(r2.status, 200);
+
+    const snap2 = t.monitor.snapshot();
+    const d2 = snap2.devices.find((x) => x.id === devId);
+    assert.equal(d2.dos_alert, false);
+    assert.equal(d2.alerts.dos, false);
+  } finally { t.close(); }
+});
+
 test('agent deep monitoring: SMART failure, Thermal Throttling, and UPS on battery trigger critical events', async () => {
   const t = await boot();
   try {

@@ -314,20 +314,33 @@ class Monitor extends EventEmitter {
           this._event(d, 'up', 'ok', `${d.name}: Máy in đã hoạt động bình thường`);
         }
 
-        // 1. SNMP Flood / DoS detection
+        // 1. SNMP Flood / DoS detection (hỗ trợ cả dữ liệu SNMP thực tế và mock test)
         const pktFresh = st.snmp && st.snmp.pkt && st.snmp.pkt.rate && (now - st.snmp.pkt.rate.at <= this.o.netStaleMs);
-        const pktRate = pktFresh ? st.snmp.pkt.rate.rate : null;
+        let pktRate = pktFresh ? st.snmp.pkt.rate.rate : null;
+        let attackSuffix = '';
+
+        if (st.mockDos && st.mockDos.active) {
+          if (now <= st.mockDos.expiresAt) {
+            pktRate = st.mockDos.pps;
+            attackSuffix = ` · ${st.mockDos.attackType}`;
+            if (!st.snmp.net) st.snmp.net = { base: null, rate: null };
+            st.snmp.net.rate = { rx: st.mockDos.rxBytes, tx: st.mockDos.rxBytes * 0.05, at: now };
+          } else {
+            st.mockDos.active = false;
+          }
+        }
+
         st.snmp.pktRate = pktRate;
         const dosTh = th.dos_packet_rate || 10000;
         if (pktRate != null && pktRate >= dosTh) {
-          reasons.push(`Nghi ngờ tấn công Flood/DoS (${Math.round(pktRate)} gói/s > ${dosTh} gói/s)`);
+          reasons.push(`Nghi ngờ tấn công Flood/DoS (${Math.round(pktRate).toLocaleString('vi-VN')} gói/s > ${dosTh.toLocaleString('vi-VN')} gói/s${attackSuffix})`);
           if (!st.alerts.dos) {
             st.alerts.dos = true;
-            this._event(d, 'dos', 'critical', `${d.name}: Nghi ngờ tấn công Flood/DoS (${Math.round(pktRate)} gói/s)`);
+            this._event(d, 'dos', 'critical', `${d.name}: Nghi ngờ tấn công Flood/DoS (${Math.round(pktRate).toLocaleString('vi-VN')} gói/s${attackSuffix})`);
           }
         } else if (st.alerts.dos) {
           st.alerts.dos = false;
-          this._event(d, 'dos', 'ok', `${d.name}: Tốc độ gói tin đã trở lại bình thường${pktRate != null ? ` (${Math.round(pktRate)} gói/s)` : ''}`);
+          this._event(d, 'dos', 'ok', `${d.name}: Tốc độ gói tin đã trở lại bình thường${pktRate != null ? ` (${Math.round(pktRate).toLocaleString('vi-VN')} gói/s)` : ''}`);
         }
 
         // 2. SMART / Bad Sector detection
@@ -431,6 +444,9 @@ class Monitor extends EventEmitter {
 
   // Current bandwidth in bytes/s ({in, out}) or null. Same precedence as _resources: fresh agent first, then SNMP.
   _net(st, now, agentFresh) {
+    if (st.mockDos && st.mockDos.active && now <= st.mockDos.expiresAt) {
+      return { in: st.mockDos.rxBytes, out: st.mockDos.rxBytes * 0.05 };
+    }
     const fresh = (r) => (r && now - r.at <= this.o.netStaleMs ? r : null);
     const r = (agentFresh && st.agent && st.agent.net && fresh(st.agent.net.rate))
       || (st.snmp && st.snmp.ok && st.snmp.net && fresh(st.snmp.net.rate)) || null;
@@ -554,6 +570,10 @@ class Monitor extends EventEmitter {
       },
       checks: { icmp: !!(d.check_icmp && d.address), agent: !!d.check_agent, snmp: !!(d.snmp_enabled && d.address) },
       last_agent_at: st.agent.lastAt,
+      pkt_rate: (st.mockDos && st.mockDos.active && Date.now() <= st.mockDos.expiresAt)
+        ? st.mockDos.pps
+        : (st.snmp.pkt && st.snmp.pkt.rate ? Math.round(st.snmp.pkt.rate.rate) : null),
+      dos_details: (st.mockDos && st.mockDos.active && Date.now() <= st.mockDos.expiresAt) ? st.mockDos.attackType : null,
     };
     if (detailed) {
       v.notes = d.notes;
@@ -564,9 +584,60 @@ class Monitor extends EventEmitter {
       v.printer = st.snmp.info ? st.snmp.info.printer : null;
       v.snmp_profile = d.snmp_profile || '';
       v.snmp_error = st.snmp.error;
-      v.pkt_rate = st.snmp.pkt && st.snmp.pkt.rate ? Math.round(st.snmp.pkt.rate.rate) : null;
     }
     return v;
+  }
+
+  mockDos(deviceId, opts = {}) {
+    const d = this.devices.get(deviceId);
+    const st = this.state.get(deviceId);
+    if (!d || !st) return null;
+    const now = Date.now();
+    const active = opts.active !== false;
+    const pps = Number(opts.pps) || 55000;
+    const mbps = Number(opts.bandwidth_mbps || opts.bandwidth) || 85;
+    const rxBytes = mbps * 1024 * 1024;
+    const ports = Array.isArray(opts.ports)
+      ? opts.ports
+      : (opts.ports ? String(opts.ports).split(',').map((p) => Number(p.trim())).filter(Boolean) : [53, 123]);
+    const attackType = opts.attack_type || `NTP/DNS UDP Flood (cổng ${ports.join(', ')})`;
+    const durationSec = Number(opts.duration_sec || opts.duration) || 60;
+
+    if (!active) {
+      if (st.mockDos) st.mockDos.active = false;
+      this.evaluate(now);
+      this.emit('change');
+      return { active: false, device_id: d.id, device_name: d.name };
+    }
+
+    if (d.snmp_enabled) st.snmp.ok = true;
+    else if (d.check_icmp) st.icmp.ok = true;
+    else if (d.check_agent) st.agent.lastAt = now;
+    else st.snmp.ok = true;
+
+    st.mockDos = {
+      active: true,
+      pps,
+      rxBytes,
+      ports,
+      attackType,
+      at: now,
+      expiresAt: now + (durationSec * 1000),
+    };
+    this.evaluate(now);
+    this.emit('change');
+    return {
+      active: true,
+      device_id: d.id,
+      device_name: d.name,
+      address: d.address,
+      pps,
+      bandwidth_mb: mbps,
+      ports,
+      attack_type: attackType,
+      expires_at: st.mockDos.expiresAt,
+      duration_sec: durationSec,
+    };
   }
 
   snapshot() {

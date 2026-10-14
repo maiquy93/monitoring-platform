@@ -100,7 +100,9 @@
     if (al && !d.mute_local_alerts) {
       const items = [];
       if (al.dos || d.dos_alert) {
-        items.push(`<span class="t-badge-alert alert-dos" title="Nghi ngờ tấn công Flood/DoS${d.pkt_rate ? ` (${d.pkt_rate} gói/s)` : ''}">🛡️ DoS</span>`);
+        const ppsStr = d.pkt_rate ? ` ${Math.round(d.pkt_rate / 1000)}k pps` : '';
+        const titleStr = `Nghi ngờ tấn công Flood/DoS${d.pkt_rate ? ` (${d.pkt_rate.toLocaleString('vi-VN')} gói/s)` : ''}${d.dos_details ? ` · ${d.dos_details}` : ''}`;
+        items.push(`<span class="t-badge-alert alert-dos" title="${esc(titleStr)}">🛡️ DoS${ppsStr}</span>`);
       }
       if (al.power || (d.power && d.power.on_battery)) {
         const pct = d.power && d.power.battery_percent != null ? ` ${d.power.battery_percent}%` : '';
@@ -991,7 +993,8 @@
           gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${sCol}">${sOk ? '✅ Bình thường' : '❌ Lỗi SMART'}</div><div class="g-label">Trạng thái đĩa cứng</div></div>`);
         }
         if (d.dos_alert || (d.alerts && d.alerts.dos)) {
-          gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:var(--c-critical)">🛡️ Cảnh báo DoS</div><div class="g-label">${d.pkt_rate ? `${d.pkt_rate} gói/s` : 'Lưu lượng bất thường'}</div></div>`);
+          const detail = d.dos_details ? `<div style="font-size:12px;opacity:.85;margin-top:3px">${esc(d.dos_details)}</div>` : '';
+          gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:36px 0 6px;color:var(--c-critical)">🛡️ Cảnh báo DoS</div><div class="g-label">${d.pkt_rate ? `${d.pkt_rate.toLocaleString('vi-VN')} gói/s` : 'Lưu lượng bất thường'}${detail}</div></div>`);
         }
       }
       $('#d-gauges').innerHTML = `<div class="gauges" style="margin:0">${gs.join('')}</div>`;
@@ -1201,7 +1204,9 @@
 
     // 1. Deep monitoring flags
     if ((d.alerts && d.alerts.dos) || d.dos_alert) {
-      items.push({ icon: '🛡️', title: 'Tấn công Flood/DoS', text: `Nghi ngờ tấn công mạng (lưu lượng ${d.pkt_rate || 0} gói/giây)`, cls: 'crit' });
+      const ppsStr = d.pkt_rate ? `${d.pkt_rate.toLocaleString('vi-VN')} gói/giây` : 'Lưu lượng cao';
+      const detailStr = d.dos_details ? ` - ${d.dos_details}` : '';
+      items.push({ icon: '🛡️', title: 'Tấn công Flood/DoS', text: `Nghi ngờ tấn công mạng (lưu lượng ${ppsStr}${detailStr})`, cls: 'crit' });
     }
     if ((d.alerts && d.alerts.power) || (d.power && d.power.on_battery)) {
       const bat = d.power && d.power.battery_percent != null ? ` (pin còn ${d.power.battery_percent}%)` : '';

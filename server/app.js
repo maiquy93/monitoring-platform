@@ -284,6 +284,30 @@ function createApp(db, monitor, opts = {}) {
     send(ctx.res, 200, { ok: true });
   });
 
+  // Mock DoS / Flood injection for testing alert thresholds and dashboard responses
+  route('POST', '/api/devices/:id/mock-dos', null, async (ctx) => {
+    const id = idOf(ctx.p.id);
+    const d = monitor.devices.get(id);
+    if (!d) throw new HttpError(404, 'Không tìm thấy thiết bị');
+
+    // Auth: localhost loopback OR agent_token OR logged-in operator/admin
+    const remote = ctx.req.socket.remoteAddress || '';
+    const isLoopback = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(remote);
+    const authHeader = ctx.req.headers.authorization || '';
+    const tokenMatch = /^Bearer\s+(\S+)$/.exec(authHeader);
+    const tokenValid = tokenMatch && tokenMatch[1] === d.agent_token;
+    const userRole = ctx.user && (ctx.user.role === 'admin' || ctx.user.role === 'operator');
+
+    if (!isLoopback && !tokenValid && !userRole) {
+      throw new HttpError(403, 'Yêu cầu quyền quản trị, agent token hoặc chạy từ localhost');
+    }
+
+    const body = await readBody(ctx.req);
+    const result = monitor.mockDos(id, body);
+    if (!result) throw new HttpError(404, 'Không thể kích hoạt giả lập DoS');
+    send(ctx.res, 200, { ok: true, result });
+  });
+
   route('POST', '/api/devices/:id/regen-token', 'admin', (ctx) => {
     const id = idOf(ctx.p.id);
     if (!monitor.devices.has(id)) throw new HttpError(404, 'Không tìm thấy thiết bị');
