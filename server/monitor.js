@@ -654,7 +654,7 @@ class Monitor extends EventEmitter {
       s.total++;
       if (d.status === 'up' || d.status === 'warning') s.alive++;
       if (d.status === 'down') s.down++;
-      if (d.status === 'warning') s.warning++;
+      if (d.status === 'warning' && d.severity !== 'none') s.warning++;
       if (d.status === 'unknown') s.unknown++;
       if (d.status === 'down' || d.status === 'warning') {
         if (d.severity === 'none') continue;

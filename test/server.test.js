@@ -455,8 +455,9 @@ test('severity: "none" (không cảnh báo) keeps device up, prevents alert even
     const events = (await t.api('GET', `/api/events?device=${c.body.id}`)).body.events;
     assert.equal(events.length, 0);
 
-    // Không kéo summary.level lên warning/critical/low
+    // Không kéo summary.level lên warning/critical/low và warning count = 0
     assert.equal(snap.summary.level, 'ok');
+    assert.equal(snap.summary.warning, 0);
     assert.equal(snap.summary.unacked, 0);
 
     // 2. Cài đặt severity về 0 hoặc '0' qua PUT /api/devices/:id

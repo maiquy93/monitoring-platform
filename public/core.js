@@ -69,10 +69,11 @@ M.summarize = (devs) => {
     s.total++;
     if (d.status === 'up' || d.status === 'warning') s.alive++;
     if (d.status === 'down') s.down++;
-    if (d.status === 'warning') s.warning++;
+    if (d.status === 'warning' && d.severity !== 'none') s.warning++;
     if (d.status === 'unknown') s.unknown++;
     if (d.status === 'down' || d.status === 'warning') {
-      worst = Math.max(worst, rank[d.status === 'down' ? d.severity : (d.severity === 'low' ? 'low' : 'medium')]);
+      if (d.severity === 'none') continue;
+      worst = Math.max(worst, rank[d.status === 'down' ? d.severity : (d.severity === 'low' ? 'low' : 'medium')] || 0);
       if (!d.acked) s.unacked++;
     }
   }

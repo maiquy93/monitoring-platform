@@ -686,8 +686,8 @@
       let list = snap.devices;
       if (F.q) list = list.filter((d) => (d.name + d.address + d.location).toLowerCase().includes(F.q.toLowerCase()));
       if (F.type) list = list.filter((d) => d.type === F.type);
-      if (F.status === 'problem') list = list.filter((d) => d.status === 'down' || d.status === 'warning');
-      else if (F.status) list = list.filter((d) => d.status === F.status);
+      if (F.status === 'problem') list = list.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
+      else if (F.status) list = list.filter((d) => d.status === F.status && (F.status !== 'warning' || d.severity !== 'none'));
       $('#grid').innerHTML = list.length ? sortDevices(list).map(M.tile).join('')
         : `<div class="muted">${snap.devices.length ? 'Không có thiết bị phù hợp' : 'Chưa có thiết bị nào. Vào mục "Thiết bị" để thêm.'}</div>`;
 
@@ -737,7 +737,7 @@
           ? `<div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(200px, 1fr))">${M.S.groups.map(M.groupTile).join('')}</div>`
           : '<div class="muted">Chưa có nhóm thiết bị nào.</div>';
       } else if (dualTab === 'problems') {
-        const probs = snap.devices.filter((d) => d.status === 'down' || d.status === 'warning');
+        const probs = snap.devices.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
         if (!probs.length) {
           body.innerHTML = `<div class="panel" style="text-align:center;padding:36px 16px;border-color:var(--c-ok)">
             <div style="font-size:40px;margin-bottom:8px">✅</div>
@@ -817,7 +817,7 @@
       } else if (tab === 'groups') {
         body.innerHTML = `<div class="grid">${M.S.groups.map(M.groupTile).join('')}</div>`;
       } else if (tab === 'problems') {
-        const probs = snap.devices.filter((d) => d.status === 'down' || d.status === 'warning');
+        const probs = snap.devices.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
         body.innerHTML = probs.length
           ? `<div class="grid">${sortDevices(probs).map(M.tile).join('')}</div>`
           : '<div class="panel" style="text-align:center;padding:40px;border-color:var(--c-ok);color:var(--c-ok)"><h3>✅ Tất cả thiết bị đang hoạt động ổn định</h3></div>';
@@ -1271,6 +1271,7 @@
       title = 'Thiết bị đang Cảnh báo';
       isWarningModal = true;
       list = allDevs.filter((d) => {
+        if (d.severity === 'none') return false;
         if (d.status === 'warning') return true;
         const hasCritAlert = d.alerts && (d.alerts.dos || d.alerts.smart || d.alerts.thermal || d.alerts.power || d.alerts.printer);
         const hasSupplyAlert = (d.toner != null && d.toner >= 0 && d.toner <= 10) || (d.drum != null && d.drum >= 0 && d.drum <= 10);
