@@ -14,7 +14,9 @@ try {
   };
 } catch {}
 const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
 M.$ = $;
+M.$$ = $$;
 
 M.esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const esc = M.esc;
@@ -114,20 +116,57 @@ M.applyTheme = (t, broadcast = true) => {
   }
 };
 
+M.closeModal = () => {
+  const root = $('#modal-root');
+  if (root) root.innerHTML = '';
+  document.body.classList.remove('has-modal');
+  document.documentElement.classList.remove('has-modal');
+};
+
+const modalRootEl = $('#modal-root');
+if (modalRootEl) {
+  new MutationObserver(() => {
+    const open = modalRootEl.children.length > 0;
+    document.body.classList.toggle('has-modal', open);
+    document.documentElement.classList.toggle('has-modal', open);
+  }).observe(modalRootEl, { childList: true });
+}
+
 // Modal with a form. onSubmit(formEl) may throw an Error to show a message and keep the dialog open.
 M.modal = (title, bodyHtml, onSubmit, opts = {}) => {
   const root = $('#modal-root');
-  root.innerHTML = `<div class="overlay"><form class="modal" autocomplete="off"><h3>${esc(title)}</h3>${bodyHtml}
+  document.body.classList.add('has-modal');
+  document.documentElement.classList.add('has-modal');
+  root.innerHTML = `<div class="overlay"><form class="modal ${opts.wide ? 'modal-lg' : ''}" autocomplete="off"><h3>${esc(title)}</h3>${bodyHtml}
     <div class="err" id="m-err"></div><div class="actions">
     ${opts.noCancel ? '' : '<button type="button" class="btn" data-close>Hủy</button>'}
     <button class="btn primary" type="submit">${esc(opts.submit || 'Lưu')}</button></div></form></div>`;
   const form = $('form', root);
-  const close = () => { root.innerHTML = ''; };
-  form.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) close(); });
-  if (!opts.noCancel) root.firstElementChild.addEventListener('mousedown', (e) => { if (e.target === e.currentTarget) close(); });
+  const overlay = root.firstElementChild;
+  const onKey = (e) => {
+    if (e.key === 'Escape') {
+      window.removeEventListener('keydown', onKey);
+      close();
+    }
+  };
+  window.addEventListener('keydown', onKey);
+  const close = () => {
+    window.removeEventListener('keydown', onKey);
+    M.closeModal();
+  };
+  form.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close]') || e.target.closest('a[href]')) close();
+  });
+  if (!opts.noCancel) overlay.addEventListener('mousedown', (e) => { if (e.target === e.currentTarget) close(); });
+  overlay.addEventListener('wheel', (e) => { if (e.target === e.currentTarget) e.preventDefault(); }, { passive: false });
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    try { await onSubmit(form); close(); } catch (err) { $('#m-err').textContent = err.message; }
+    try {
+      if (onSubmit) await onSubmit(form);
+      close();
+    } catch (err) {
+      $('#m-err').textContent = err.message;
+    }
   });
   const first = $('input:not([type=checkbox]), select', form);
   if (first) first.focus();
@@ -156,7 +195,7 @@ M.beep = () => {
 M.showLogin = () => {
   M.es && M.es.close();
   document.body.dataset.level = 'ok';
-  $('#modal-root').innerHTML = '';
+  M.closeModal();
   $('#app').innerHTML = `<div class="login-wrap"><form class="panel login" id="login-form">
     <h1>◉ Monitoring</h1>
     <div class="field"><label>Tên đăng nhập</label><input class="inp" name="username" autocomplete="username" required autofocus></div>

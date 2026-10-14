@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-  const { esc, $ } = M;
+  const { esc, $, $$ } = M;
   const th = () => M.S.settings.thresholds;
   const devs = () => (M.S.snap ? M.S.snap.devices : []);
   const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
@@ -666,9 +666,19 @@
     update(snap) {
       if (!snap || !$('#kpis') || isDragging) return;
       const s = snap.summary;
-      const k = (cls, label, v, zero) => `<div class="kpi ${cls} ${zero && !v ? 'zero' : ''}"><div class="label">${label}</div><div class="val">${v}</div></div>`;
-      $('#kpis').innerHTML = `<div class="kpi big"><div class="label">Thiết bị đang hoạt động</div><div class="val">${s.alive}<small>/${s.total}</small></div></div>
-        ${k('k-down', 'Mất kết nối', s.down, true)}${k('k-warn', 'Cảnh báo', s.warning, true)}${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance)}`;
+      const k = (cls, label, v, zero, kpiKey, titleHint) => `
+        <div class="kpi clickable ${cls} ${zero && !v ? 'zero' : ''}" data-kpi="${kpiKey}" title="${titleHint}">
+          <div class="label">${label} <span class="kpi-hint">🔍 Chi tiết</span></div>
+          <div class="val">${v}</div>
+        </div>`;
+      $('#kpis').innerHTML = `
+        <div class="kpi big clickable" data-kpi="alive" title="Bấm để xem danh sách thiết bị đang hoạt động">
+          <div class="label">Thiết bị đang hoạt động <span class="kpi-hint">🔍 Chi tiết</span></div>
+          <div class="val">${s.alive}<small>/${s.total}</small></div>
+        </div>
+        ${k('k-down', 'Mất kết nối', s.down, true, 'down', 'Bấm để xem danh sách thiết bị mất kết nối')}
+        ${k('k-warn', 'Cảnh báo', s.warning, true, 'warn', 'Bấm để xem danh sách chi tiết các cảnh báo')}
+        ${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance, 'unk', 'Bấm để xem thiết bị chưa rõ hoặc đang bảo trì')}`;
       $('#groups-sec').innerHTML = M.S.groups.length
         ? `<h2>Nhóm thiết bị</h2><div class="grid">${M.S.groups.map(M.groupTile).join('')}</div>` : '';
       let list = snap.devices;
@@ -810,11 +820,20 @@
           ? `<div class="grid">${sortDevices(probs).map(M.tile).join('')}</div>`
           : '<div class="panel" style="text-align:center;padding:40px;border-color:var(--c-ok);color:var(--c-ok)"><h3>✅ Tất cả thiết bị đang hoạt động ổn định</h3></div>';
       } else if (tab === 'wallboard') {
-        const k = (cls, label, v, zero) => `<div class="kpi ${cls} ${zero && !v ? 'zero' : ''}"><div class="label">${label}</div><div class="val">${v}</div></div>`;
+        const k = (cls, label, v, zero, kpiKey, titleHint) => `
+          <div class="kpi clickable ${cls} ${zero && !v ? 'zero' : ''}" data-kpi="${kpiKey}" title="${titleHint}">
+            <div class="label">${label} <span class="kpi-hint">🔍 Chi tiết</span></div>
+            <div class="val">${v}</div>
+          </div>`;
         body.innerHTML = `
           <div class="kpis">
-            <div class="kpi big"><div class="label">Thiết bị đang hoạt động</div><div class="val">${s.alive}<small>/${s.total}</small></div></div>
-            ${k('k-down', 'Mất kết nối', s.down, true)}${k('k-warn', 'Cảnh báo', s.warning, true)}${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance)}
+            <div class="kpi big clickable" data-kpi="alive" title="Bấm để xem danh sách thiết bị đang hoạt động">
+              <div class="label">Thiết bị đang hoạt động <span class="kpi-hint">🔍 Chi tiết</span></div>
+              <div class="val">${s.alive}<small>/${s.total}</small></div>
+            </div>
+            ${k('k-down', 'Mất kết nối', s.down, true, 'down', 'Bấm để xem danh sách thiết bị mất kết nối')}
+            ${k('k-warn', 'Cảnh báo', s.warning, true, 'warn', 'Bấm để xem danh sách chi tiết các cảnh báo')}
+            ${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance, 'unk', 'Bấm để xem thiết bị chưa rõ hoặc đang bảo trì')}
           </div>
           <div class="grid" style="margin-top:20px">${sortDevices(snap.devices).map(M.tile).join('')}</div>`;
       }
@@ -1174,4 +1193,228 @@
       if ($('#ev-body')) $('#ev-body').innerHTML = M.eventsTable(k ? events.filter((e) => e.kind === k) : events, true);
     },
   };
+
+  // ---------- KPI details popup ----------
+  function getDeviceAlertDetails(d) {
+    const items = [];
+    const thConf = (typeof th === 'function' ? th() : null) || (M.S.settings && M.S.settings.thresholds) || { cpu: 90, ram: 90, disk: 90, temp: 85 };
+
+    // 1. Deep monitoring flags
+    if ((d.alerts && d.alerts.dos) || d.dos_alert) {
+      items.push({ icon: '🛡️', title: 'Tấn công Flood/DoS', text: `Nghi ngờ tấn công mạng (lưu lượng ${d.pkt_rate || 0} gói/giây)`, cls: 'crit' });
+    }
+    if ((d.alerts && d.alerts.power) || (d.power && d.power.on_battery)) {
+      const bat = d.power && d.power.battery_percent != null ? ` (pin còn ${d.power.battery_percent}%)` : '';
+      items.push({ icon: '🔋', title: 'Mất điện lưới', text: `Đang chạy nguồn pin dự phòng UPS${bat}`, cls: 'crit' });
+    }
+    if ((d.alerts && d.alerts.smart) || (d.smart && d.smart.ok === false)) {
+      items.push({ icon: '💾', title: 'Lỗi ổ đĩa SMART', text: (d.smart && d.smart.details) || 'Phát hiện Bad Sector hoặc đĩa sắp hỏng', cls: 'crit' });
+    }
+    if ((d.alerts && d.alerts.thermal) || (d.temperature != null && d.temperature >= thConf.temp)) {
+      items.push({ icon: '🔥', title: 'Nhiệt độ CPU quá cao', text: `Nhiệt độ hiện tại: ${Math.round(d.temperature)}°C (vượt ngưỡng an toàn ${thConf.temp}°C)`, cls: 'crit' });
+    }
+
+    // 2. Printer specific alerts
+    if (d.printer_errors && d.printer_errors.length) {
+      d.printer_errors.forEach((err) => {
+        items.push({ icon: '⚠️', title: 'Sự cố máy in', text: err, cls: 'crit' });
+      });
+    }
+    if (d.toner != null && d.toner >= 0 && d.toner <= 10) {
+      items.push({ icon: '🖨️', title: 'Lượng mực in sắp hết', text: `Hộp mực chỉ còn ${d.toner}%, cần chuẩn bị mực thay thế`, cls: d.toner === 0 ? 'crit' : 'hi' });
+    }
+    if (d.drum != null && d.drum >= 0 && d.drum <= 10) {
+      items.push({ icon: '🔄', title: 'Tuổi thọ Drum sắp hết', text: `Độ bền trống từ chỉ còn ${d.drum}%, cần thay drum`, cls: d.drum === 0 ? 'crit' : 'hi' });
+    }
+
+    // 3. Reasons (thresholds, agent silence, ICMP, etc.)
+    if (d.reasons && d.reasons.length) {
+      d.reasons.forEach((r) => {
+        const isDup = items.some((it) => it.text.includes(r) || r.includes(it.title) || it.title.includes(r));
+        if (!isDup) {
+          const isCrit = r.toLowerCase().includes('critical') || r.toLowerCase().includes('khẩn');
+          items.push({ icon: '⚠️', title: 'Cảnh báo hệ thống', text: r, cls: isCrit ? 'crit' : 'hi' });
+        }
+      });
+    }
+
+    if (!items.length && d.status === 'warning') {
+      items.push({ icon: '⚠️', title: 'Cảnh báo', text: 'Thiết bị đang ghi nhận cảnh báo hoạt động', cls: 'hi' });
+    }
+
+    return items;
+  }
+
+  M.showKpiModal = (kpiKey, snap) => {
+    if (!snap) snap = M.S.snap || { devices: [], summary: {} };
+    const allDevs = snap.devices || [];
+
+    let title = '';
+    let list = [];
+    let emptyIcon = '✅';
+    let emptyTitle = '';
+    let emptyText = '';
+    let isWarningModal = false;
+
+    if (kpiKey === 'down') {
+      title = 'Thiết bị Mất kết nối';
+      list = allDevs.filter((d) => d.status === 'down');
+      emptyIcon = '✅';
+      emptyTitle = 'Tất cả thiết bị đang kết nối tốt!';
+      emptyText = 'Hiện tại không có thiết bị nào bị ngắt kết nối mạng hoặc mất tín hiệu.';
+    } else if (kpiKey === 'warn') {
+      title = 'Thiết bị đang Cảnh báo';
+      isWarningModal = true;
+      list = allDevs.filter((d) => {
+        if (d.status === 'warning') return true;
+        const hasCritAlert = d.alerts && (d.alerts.dos || d.alerts.smart || d.alerts.thermal || d.alerts.power || d.alerts.printer);
+        const hasSupplyAlert = (d.toner != null && d.toner >= 0 && d.toner <= 10) || (d.drum != null && d.drum >= 0 && d.drum <= 10);
+        const hasPrinterErr = d.printer_errors && d.printer_errors.length;
+        return hasCritAlert || hasSupplyAlert || hasPrinterErr;
+      });
+      emptyIcon = '🎉';
+      emptyTitle = 'Hệ thống an toàn, không có cảnh báo!';
+      emptyText = 'Tất cả thông số vận hành (CPU, RAM, Đĩa, Mực in, Drum, Cảm biến,...) đều ở mức an toàn.';
+    } else if (kpiKey === 'unk') {
+      title = 'Thiết bị Chưa rõ / Bảo trì';
+      list = allDevs.filter((d) => d.status === 'unknown' || d.status === 'maint');
+      emptyIcon = '👌';
+      emptyTitle = 'Không có thiết bị cần lưu ý!';
+      emptyText = 'Hiện không có thiết bị nào đang trong chế độ bảo trì hoặc chưa rõ dữ liệu.';
+    } else {
+      title = 'Thiết bị đang Hoạt động';
+      list = allDevs.filter((d) => d.status === 'up' || d.status === 'warning');
+      emptyIcon = 'ℹ️';
+      emptyTitle = 'Chưa có thiết bị nào hoạt động';
+      emptyText = 'Hãy kiểm tra lại danh sách thiết bị hoặc thêm thiết bị mới vào hệ thống.';
+    }
+
+    let bodyHtml = '';
+    if (!list.length) {
+      bodyHtml = `
+        <div class="kpi-empty-box">
+          <div class="kpi-empty-icon">${emptyIcon}</div>
+          <b style="font-size:16px">${esc(emptyTitle)}</b>
+          <span>${esc(emptyText)}</span>
+        </div>`;
+    } else {
+      const searchBox = list.length > 3
+        ? `<div style="margin-bottom:12px"><input class="inp" id="kpi-modal-search" placeholder="🔍 Lọc thiết bị theo tên, IP, loại..." style="width:100%"></div>`
+        : '';
+
+      const itemsHtml = list.map((d) => {
+        const typeIcon = M.ICON[d.type] || '📟';
+        const typeName = M.TYPE_NAME[d.type] || d.type;
+
+        let statusBadge = '';
+        if (d.status === 'down') {
+          statusBadge = `<span class="sev-badge critical">Mất kết nối</span>`;
+        } else if (d.status === 'warning') {
+          statusBadge = `<span class="sev-badge medium">Cảnh báo</span>`;
+        } else if (d.status === 'maint') {
+          statusBadge = `<span class="sev-badge" style="background:var(--c-maint);color:#fff">Bảo trì</span>`;
+        } else if (d.status === 'unknown') {
+          statusBadge = `<span class="sev-badge none">Chưa rõ</span>`;
+        } else {
+          statusBadge = `<span class="sev-badge ok">Online</span>`;
+        }
+
+        let detailSection = '';
+        if (kpiKey === 'down') {
+          const ago = M.fmtDur((Date.now() - d.since) / 1000);
+          const reason = (d.reasons && d.reasons.length) ? d.reasons.join(' · ') : 'Không phản hồi ICMP / Mất tín hiệu agent';
+          detailSection = `
+            <div class="kpi-alert-list">
+              <div class="kpi-alert-item crit">
+                <span class="kpi-alert-item-icon">⚠️</span>
+                <div>
+                  <span class="kpi-alert-item-title">Lý do:</span>
+                  <span class="kpi-alert-item-text">${esc(reason)}</span>
+                </div>
+              </div>
+              <div class="muted" style="font-size:12px">Mất kết nối từ: <b>${ago}</b> trước (lúc ${M.fmtTime(d.since)})</div>
+            </div>`;
+        } else if (isWarningModal) {
+          const alerts = getDeviceAlertDetails(d);
+          detailSection = `
+            <div class="kpi-alert-list">
+              ${alerts.map((it) => `
+                <div class="kpi-alert-item ${it.cls || ''}">
+                  <span class="kpi-alert-item-icon">${it.icon}</span>
+                  <div>
+                    <span class="kpi-alert-item-title">${esc(it.title)}:</span>
+                    <span class="kpi-alert-item-text">${esc(it.text)}</span>
+                  </div>
+                </div>`).join('')}
+            </div>`;
+        } else if (kpiKey === 'unk') {
+          const desc = d.status === 'maint'
+            ? 'Thiết bị đang đặt ở chế độ bảo trì (đã tạm ngắt cảnh báo âm thanh & thông báo).'
+            : 'Chưa nhận được dữ liệu giám sát hoặc thiết bị mới được thêm vào.';
+          detailSection = `<div class="muted" style="font-size:13px">${esc(desc)}</div>`;
+        } else {
+          const parts = [];
+          if (d.rtt != null) parts.push(`Ping: ${d.rtt} ms`);
+          if (d.uptime != null) parts.push(`Uptime: ${M.fmtDur(d.uptime)}`);
+          if (d.type === 'printer') {
+            if (d.toner != null) parts.push(`Mực: ${d.toner}%`);
+            if (d.drum != null) parts.push(`Drum: ${d.drum}%`);
+            if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString('vi-VN')} trang`);
+          } else {
+            if (d.cpu != null) parts.push(`CPU: ${Math.round(d.cpu)}%`);
+            if (d.ram != null) parts.push(`RAM: ${Math.round(d.ram)}%`);
+            if (d.disk != null) parts.push(`Disk: ${Math.round(d.disk)}%`);
+            if (d.temperature != null) parts.push(`Temp: ${Math.round(d.temperature)}°C`);
+          }
+          detailSection = `<div class="muted" style="font-size:13px">${esc(parts.join(' · ') || 'Đang phản hồi tốt')}</div>`;
+        }
+
+        return `
+          <div class="kpi-dev-item">
+            <div class="kpi-dev-top">
+              <div class="kpi-dev-main">
+                <span style="font-size:18px">${typeIcon}</span>
+                <a href="#/device/${d.id}" class="kpi-dev-name" title="${esc(d.name)}">${esc(d.name)}</a>
+                ${statusBadge}
+              </div>
+              <a href="#/device/${d.id}" class="btn sm">Xem chi tiết →</a>
+            </div>
+            <div class="kpi-dev-meta">${esc(d.address)} · ${typeName}${d.location ? ` · ${esc(d.location)}` : ''}</div>
+            ${detailSection}
+          </div>`;
+      }).join('');
+
+      bodyHtml = `
+        <div class="kpi-modal-head">
+          <span class="muted" style="font-size:14px">Hiển thị <b>${list.length}</b> thiết bị</span>
+        </div>
+        ${searchBox}
+        <div class="kpi-modal-list">${itemsHtml}</div>`;
+    }
+
+    const { form } = M.modal(
+      `${title} (${list.length})`,
+      bodyHtml,
+      async () => {},
+      { submit: 'Đóng', noCancel: true, wide: true }
+    );
+
+    const sInp = $('#kpi-modal-search', form);
+    if (sInp) {
+      sInp.addEventListener('input', (e) => {
+        const q = e.target.value.toLowerCase().trim();
+        $$('.kpi-dev-item', form).forEach((el) => {
+          el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+      });
+      setTimeout(() => sInp.focus(), 80);
+    }
+  };
+
+  document.addEventListener('click', (e) => {
+    const kpiEl = e.target.closest('.kpi[data-kpi]');
+    if (kpiEl && kpiEl.dataset.kpi) {
+      M.showKpiModal(kpiEl.dataset.kpi, M.S.snap);
+    }
+  });
 })();

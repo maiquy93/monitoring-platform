@@ -53,7 +53,7 @@
     const del = $('#f-del', form);
     if (del) del.onclick = () => M.confirm(`Xóa thiết bị "${d.name}" cùng toàn bộ lịch sử?`, async () => {
       await M.api('DELETE', `/api/devices/${id}`);
-      $('#modal-root').innerHTML = '';
+      M.closeModal();
       if (M.current === M.views.devices) M.views.devices.paint();
       else location.hash = '#/devices';
     });
@@ -80,7 +80,7 @@
     if (del) del.onclick = () => M.confirm(`Xóa nhóm "${g.name}"? (thiết bị không bị xóa)`, async () => {
       await M.api('DELETE', `/api/groups/${g.id}`);
       await M.loadGroups();
-      $('#modal-root').innerHTML = '';
+      M.closeModal();
       location.hash = '#/groups';
     });
   };
