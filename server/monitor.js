@@ -525,7 +525,7 @@ class Monitor extends EventEmitter {
     const net = this._net(st, Date.now(), !stale && a != null);
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
-      maintenance: !!d.maintenance, severity: this.severityOf(d), groups: d.groups,
+      maintenance: !!d.maintenance, mute_local_alerts: !!d.mute_local_alerts, severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,
       rtt: st.icmp.rtt,
       net_in: net ? Math.round(net.in) : null,

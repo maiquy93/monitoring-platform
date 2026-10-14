@@ -80,7 +80,7 @@ function cleanDevice(b, partial = false) {
     if (a && !ADDR_RE.test(a)) throw bad('Địa chỉ IP/hostname không hợp lệ');
     out.address = a;
   }
-  for (const k of ['check_icmp', 'check_agent', 'snmp_enabled', 'maintenance']) {
+  for (const k of ['check_icmp', 'check_agent', 'snmp_enabled', 'maintenance', 'mute_local_alerts']) {
     if (!partial || has(k)) out[k] = b[k] ? 1 : 0;
   }
   if (!partial || has('snmp_community')) {
@@ -224,9 +224,9 @@ function createApp(db, monitor, opts = {}) {
     const token = crypto.randomBytes(24).toString('hex');
     const r = db.prepare(
       `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,snmp_profile,severity,
-        location,notes,maintenance,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        location,notes,maintenance,mute_local_alerts,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, token, Date.now());
+        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, token, Date.now());
     return { id: Number(r.lastInsertRowid), token };
   };
 
@@ -258,9 +258,9 @@ function createApp(db, monitor, opts = {}) {
     const d = cleanDevice({ ...cur, ...b });
     db.prepare(
       `UPDATE devices SET name=?,type=?,address=?,check_icmp=?,check_agent=?,snmp_enabled=?,snmp_community=?,
-        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=? WHERE id=?`)
+        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,mute_local_alerts=? WHERE id=?`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, id);
+        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
     monitor.evaluate();

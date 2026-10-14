@@ -477,6 +477,15 @@ test('severity: "none" (không cảnh báo) keeps device up, prevents alert even
     assert.equal(sRes.status, 200);
     const updatedSettings = (await t.api('GET', '/api/settings')).body;
     assert.equal(updatedSettings.type_severity.printer, 'none');
+
+    // 4. Kiểm tra bật / tắt tính năng mute_local_alerts (tắt cảnh báo trên thẻ local)
+    assert.equal(devGet.mute_local_alerts, false);
+    const mRes = await t.api('PUT', `/api/devices/${c.body.id}`, { mute_local_alerts: true });
+    assert.equal(mRes.status, 200);
+    const devMuted = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.equal(devMuted.mute_local_alerts, true);
+    const snapMuted = t.monitor.snapshot().devices.find((d) => d.id === c.body.id);
+    assert.equal(snapMuted.mute_local_alerts, true);
   } finally { t.close(); }
 });
 

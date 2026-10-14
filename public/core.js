@@ -22,7 +22,7 @@ const esc = M.esc;
 M.ICON = { server: '🖥️', vm: '☁️', router: '🌐', switch: '🔀', firewall: '🛡️', ap: '📶', printer: '🖨️', ups: '🔋', pc: '💻', other: '📦' };
 M.TYPE_NAME = { server: 'Máy chủ', vm: 'Máy ảo (VM)', router: 'Router', switch: 'Switch', firewall: 'Firewall', ap: 'Access Point', printer: 'Máy in', ups: 'UPS', pc: 'Máy trạm', other: 'Khác' };
 M.SEV_NAME = { critical: 'Nghiêm trọng', high: 'Cao', medium: 'Trung bình', low: 'Thấp', none: 'Không cảnh báo' };
-M.STATE_NAME = { up: 'Hoạt động', warning: 'Cảnh báo', down: 'Mất kết nối', unknown: 'Chưa rõ', maint: 'Bảo trì' };
+M.STATE_NAME = { up: 'Online', warning: 'Cảnh báo', down: 'Mất kết nối', unknown: 'Chưa rõ', maint: 'Bảo trì' };
 
 M.statusClass = (d) => {
   if (d.severity === 'none') {

@@ -44,7 +44,7 @@ smart_data() {
 }
 thermal_data() {
   temp=
-  for z in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp1_input; do
+  for z in /sys/class/thermal/thermal_zone*/temp /sys/class/hwmon/hwmon*/temp*_input; do
     if [ -r "$z" ]; then
       read -r raw < "$z" 2>/dev/null || raw=
       if [ -n "$raw" ] && [ "$raw" -gt 0 ] 2>/dev/null; then
@@ -57,6 +57,14 @@ thermal_data() {
       fi
     fi
   done
+  if [ -z "$temp" ] && command -v sensors >/dev/null 2>&1; then
+    stemp=$(sensors 2>/dev/null | awk '/Core 0|Package id 0|temp1/ {gsub("+",""); gsub("°C",""); print $2; exit}')
+    if [ -n "$stemp" ] && [ "$stemp" != "0" ]; then temp="$stemp"; fi
+  fi
+  if [ -z "$temp" ] && command -v vcgencmd >/dev/null 2>&1; then
+    vtemp=$(vcgencmd measure_temp 2>/dev/null | awk -F= '{gsub("'\''C",""); print $2}')
+    if [ -n "$vtemp" ]; then temp="$vtemp"; fi
+  fi
   if [ -n "$temp" ]; then printf '%s' "$temp"; else printf 'null'; fi
 }
 power_data() {

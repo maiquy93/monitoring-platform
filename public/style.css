@@ -121,10 +121,10 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 :root[data-theme="neon"] .tile.tile-drag-clone {
   box-shadow: 0 20px 48px rgba(0, 0, 0, .8), 0 0 28px var(--accent) !important;
 }
-.tile .t-top { display: flex; align-items: center; gap: 8px; }
-.tile .t-name { font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.tile .t-ico { font-size: 20px; }
-.tile .t-state { font-size: 12px; font-weight: 700; color: var(--s); text-transform: uppercase; letter-spacing: .5px; }
+.tile .t-top { display: flex; align-items: center; gap: 6px; }
+.tile .t-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.tile .t-ico { font-size: 18px; flex-shrink: 0; }
+.tile .t-state { font-size: 11px; font-weight: 700; color: var(--s); text-transform: uppercase; letter-spacing: .3px; flex-shrink: 0; white-space: nowrap; }
 .tile .t-sub { font-size: 12px; color: var(--muted); margin-top: 3px; min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px; margin-top: 8px; }
 .bar { font-size: 11px; color: var(--muted); }
@@ -197,8 +197,9 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .btn.sm { padding: 3px 9px; font-size: 13px; }
 .field { margin-bottom: 12px; } .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
 .field.inline label { display: inline; margin-left: 6px; color: var(--text); }
-.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
-.sev-badge { padding: 2px 8px; border-radius: 99px; font-size: 12px; font-weight: 700; color: #000; background: var(--c-unknown); }
+.field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+.field-grid .field.span-2, .field-grid .field.full { grid-column: 1 / -1; }
+select.sel.inp { width: 100%; max-width: 100%; }
 .sev-badge.low { background: var(--c-low); } .sev-badge.medium { background: var(--c-medium); } .sev-badge.high { background: var(--c-high); }
 .sev-badge.critical { background: var(--c-critical); color: #fff; } .sev-badge.ok { background: var(--c-ok); }
 .sev-badge.none { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }

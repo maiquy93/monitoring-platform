@@ -41,7 +41,7 @@
       if (d.printer_status) parts.push(d.printer_status);
       else if (d.rtt != null) parts.push(`${d.rtt} ms`);
       if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString('vi-VN')} trang`);
-      if (d.printer_errors && d.printer_errors.length && d.severity !== 'none') parts.unshift(d.printer_errors[0]);
+      if (d.printer_errors && d.printer_errors.length && !d.mute_local_alerts) parts.unshift(d.printer_errors[0]);
       sub = parts.filter(Boolean).join(' · ');
     } else if (d.status === 'warning') sub = d.reasons[0];
     else {
@@ -84,6 +84,8 @@
           const tTh = (th() && th().temp) || 85;
           const tLv = d.temperature >= tTh ? 'crit' : d.temperature >= tTh - 10 ? 'hi' : '';
           metricBars.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
+        } else if (d.type === 'vm' || d.type === 'server' || (d.checks && d.checks.agent)) {
+          metricBars.push(`<div class="bar bar-na" title="Môi trường máy ảo (VM) hoặc phần cứng không có cảm biến nhiệt">Temp —<i><b style="width:0%"></b></i></div>`);
         }
         if (pBars.length && !metricBars.length) {
           bars = `<div class="bars">${pBars.join('')}</div>`;
@@ -95,7 +97,7 @@
     }
     let alertBadges = '';
     const al = d.alerts;
-    if (al && d.severity !== 'none') {
+    if (al && !d.mute_local_alerts) {
       const items = [];
       if (al.dos || d.dos_alert) {
         items.push(`<span class="t-badge-alert alert-dos" title="Nghi ngờ tấn công Flood/DoS${d.pkt_rate ? ` (${d.pkt_rate} gói/s)` : ''}">🛡️ DoS</span>`);
@@ -224,8 +226,6 @@
       saved[slots[i]] = visibleIds[i];
     }
     localStorage.setItem('device_order', JSON.stringify(saved));
-    const resetBtn = $('#btn-reset-order');
-    if (resetBtn) resetBtn.style.display = 'inline-block';
   }
 
   function reorderDevices(srcId, dstId) {
@@ -263,11 +263,10 @@
               <div class="kpis" id="kpis"></div>
               <div id="groups-sec"></div>
               <div class="row" style="margin:20px 0 10px"><h2 style="margin:0">Thiết bị</h2>
-                <button class="btn sm" id="btn-reset-order" style="display:none;margin-left:8px" title="Khôi phục thứ tự mặc định">↺ Thứ tự mặc định</button>
                 <span class="spacer"></span>
                 <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:160px" value="${esc(F.q)}">
                 <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
-                  <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Hoạt động</option></select>
+                  <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Online</option></select>
                 <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
               </div>
               <div class="grid" id="grid"></div>
@@ -313,11 +312,10 @@
         el.innerHTML = `<div class="kpis" id="kpis"></div>
           <div id="groups-sec"></div>
           <div class="row" style="margin:22px 0 10px"><h2 style="margin:0">Thiết bị</h2>
-            <button class="btn sm" id="btn-reset-order" style="display:none;margin-left:8px" title="Khôi phục thứ tự mặc định">↺ Thứ tự mặc định</button>
             <span class="spacer"></span>
             <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:200px" value="${esc(F.q)}">
             <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
-              <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Hoạt động</option></select>
+              <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Online</option></select>
             <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></div>
           <div class="grid" id="grid"></div>`;
       }
@@ -326,14 +324,6 @@
       $('#f-q').addEventListener('input', (e) => { F.q = e.target.value; this.update(M.S.snap); });
       $('#f-status').addEventListener('change', (e) => { F.status = e.target.value; this.update(M.S.snap); });
       $('#f-type').addEventListener('change', (e) => { F.type = e.target.value; this.update(M.S.snap); });
-      const resetBtn = $('#btn-reset-order');
-      if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-          localStorage.removeItem('device_order');
-          this.update(M.S.snap);
-          M.toast('Đã khôi phục thứ tự mặc định');
-        });
-      }
       this.bindDragDrop();
     },
     destroy() {
@@ -681,8 +671,6 @@
         ${k('k-down', 'Mất kết nối', s.down, true)}${k('k-warn', 'Cảnh báo', s.warning, true)}${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance)}`;
       $('#groups-sec').innerHTML = M.S.groups.length
         ? `<h2>Nhóm thiết bị</h2><div class="grid">${M.S.groups.map(M.groupTile).join('')}</div>` : '';
-      const resetBtn = $('#btn-reset-order');
-      if (resetBtn) resetBtn.style.display = localStorage.getItem('device_order') ? 'inline-block' : 'none';
       let list = snap.devices;
       if (F.q) list = list.filter((d) => (d.name + d.address + d.location).toLowerCase().includes(F.q.toLowerCase()));
       if (F.type) list = list.filter((d) => d.type === F.type);
@@ -954,8 +942,8 @@
         if (d.disk != null) gs.push(M.gauge('Ổ đĩa (cao nhất)', d.disk, 'disk'));
         gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)), stat('Ping', d.rtt != null ? `${d.rtt} ms` : '—'));
         if (d.net_in != null || d.net_out != null) {
-          const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
-          gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
+          const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)" title="Download">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px" title="Upload">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
+          gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông (Download / Upload)</div></div>`);
         }
         if (d.drum != null) gs.push(M.consumableGauge('Độ bền Drum', d.drum));
         if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
@@ -969,6 +957,8 @@
           const tTh = (th() && th().temp) || 85;
           const tCol = d.temperature >= tTh ? 'var(--c-critical)' : d.temperature >= tTh - 10 ? 'var(--c-medium)' : 'var(--c-ok)';
           gs.push(`<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px;color:${tCol}">${Math.round(d.temperature)}°C</div><div class="g-label">Nhiệt độ CPU</div></div>`);
+        } else if (d.type === 'vm' || (d.checks && d.checks.agent)) {
+          gs.push(`<div class="gauge"><div style="font-size:24px;font-weight:700;padding:42px 0 6px;color:var(--muted)">N/A</div><div class="g-label">Nhiệt độ CPU (VM)</div></div>`);
         }
         if (d.power) {
           const pState = d.power.on_battery ? 'Đang chạy PIN' : 'Điện lưới AC';
@@ -1144,8 +1134,8 @@
         if (has('rtt')) html += `<h2>Độ trễ ping (ms)</h2>${M.chart(points, [{ key: 'rtt', color: 'var(--c-ok)', label: 'RTT' }], this.range)}`;
         if (has('net_in') || has('net_out')) {
           html += `<h2>Tổng băng thông sử dụng</h2>${M.chart(points, [
-            { key: 'net_in', color: 'var(--c-low)', label: 'Tải xuống (In)' },
-            { key: 'net_out', color: 'var(--c-maint)', label: 'Tải lên (Out)' },
+            { key: 'net_in', color: 'var(--c-low)', label: 'Download' },
+            { key: 'net_out', color: 'var(--c-maint)', label: 'Upload' },
           ], this.range, null, M.fmtRate)}`;
         }
         if (has('temp')) {
