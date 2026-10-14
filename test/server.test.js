@@ -313,14 +313,18 @@ test('snmp printer: toner/drum/page_count/status are shown on overview tile and 
       display: 'Ready',
       model: 'HP LaserJet Pro M404dn',
       serial: 'VNC3K04921',
+      firmware: '1L7EWK2',
+      duplex: 'Có (In 2 mặt tự động)',
       page_count: 15420,
+      memory: { total: 134217728, used: 42467328, percent: 32 },
+      languages: ['PJL', 'PCLXL', 'PCL', 'PDF', 'POSTSCRIPT'],
       errors: [],
       supplies: [
         { name: 'HP Black Toner CF276A', kind: 'toner', percent: 65, status: '65%' },
         { name: 'HP Imaging Drum Unit', kind: 'drum', percent: 82, status: '82%' }
       ],
       trays: [
-        { name: 'Tray 1', status: 'Còn giấy', max: 250, level: 180 }
+        { name: 'Tray 1', status: 'Còn giấy', max: 250, level: 180, media_type: 'Plain', media_name: 'A4', vendor: 'Hewlett-Packard' }
       ]
     }
   };
@@ -348,8 +352,14 @@ test('snmp printer: toner/drum/page_count/status are shown on overview tile and 
     assert.ok(detail.printer);
     assert.equal(detail.printer.model, 'HP LaserJet Pro M404dn');
     assert.equal(detail.printer.serial, 'VNC3K04921');
+    assert.equal(detail.printer.firmware, '1L7EWK2');
+    assert.equal(detail.printer.duplex, 'Có (In 2 mặt tự động)');
+    assert.equal(detail.printer.memory.percent, 32);
+    assert.ok(detail.printer.languages.includes('PCLXL'));
     assert.equal(detail.printer.supplies.length, 2);
     assert.equal(detail.printer.trays.length, 1);
+    assert.equal(detail.printer.trays[0].media_type, 'Plain');
+    assert.equal(detail.printer.trays[0].media_name, 'A4');
 
     // Lưu vào bảng metrics
     t.monitor.tick(Date.now() + 60000);
@@ -449,9 +459,20 @@ test('severity: "none" (không cảnh báo) keeps device up, prevents alert even
     assert.equal(snap.summary.level, 'ok');
     assert.equal(snap.summary.unacked, 0);
 
-    // 2. Cài đặt type_severity cho printer là 'none' qua API settings
+    // 2. Cài đặt severity về 0 hoặc '0' qua PUT /api/devices/:id
+    const uRes = await t.api('PUT', `/api/devices/${c.body.id}`, { severity: 0 });
+    assert.equal(uRes.status, 200);
+    const devAfter0 = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.equal(devAfter0.severity, 'none');
+
+    const uResStr0 = await t.api('PUT', `/api/devices/${c.body.id}`, { severity: '0' });
+    assert.equal(uResStr0.status, 200);
+    const devAfterStr0 = (await t.api('GET', `/api/devices/${c.body.id}`)).body;
+    assert.equal(devAfterStr0.severity, 'none');
+
+    // 3. Cài đặt type_severity cho printer là 0 qua API settings
     const sRes = await t.api('PUT', '/api/settings', {
-      type_severity: { printer: 'none' }
+      type_severity: { printer: 0 }
     });
     assert.equal(sRes.status, 200);
     const updatedSettings = (await t.api('GET', '/api/settings')).body;

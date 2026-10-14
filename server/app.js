@@ -99,7 +99,9 @@ function cleanDevice(b, partial = false) {
     out.snmp_profile = p;
   }
   if (!partial || has('severity')) {
-    const s = b.severity || null;
+    let s = b.severity;
+    if (s === 0 || s === '0' || s === 'none') s = 'none';
+    else if (!s) s = null;
     if (s && SEV_RANK[s] === undefined) throw bad('Mức cảnh báo không hợp lệ');
     out.severity = s;
   }
@@ -261,6 +263,7 @@ function createApp(db, monitor, opts = {}) {
         d.severity, d.location, d.notes, d.maintenance, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
+    monitor.evaluate();
     monitor.emit('change');
     send(ctx.res, 200, { ok: true });
   });
@@ -420,9 +423,11 @@ function createApp(db, monitor, opts = {}) {
     const b = await readBody(ctx.req);
     if (b.type_severity) {
       const t = {};
-      for (const k of TYPES) if (b.type_severity[k]) {
-        if (SEV_RANK[b.type_severity[k]] === undefined) throw bad('Mức cảnh báo không hợp lệ');
-        t[k] = b.type_severity[k];
+      for (const k of TYPES) if (b.type_severity[k] !== undefined && b.type_severity[k] !== '') {
+        let val = b.type_severity[k];
+        if (val === 0 || val === '0' || val === 'none') val = 'none';
+        if (SEV_RANK[val] === undefined) throw bad('Mức cảnh báo không hợp lệ');
+        t[k] = val;
       }
       setSetting(db, 'type_severity', t);
     }

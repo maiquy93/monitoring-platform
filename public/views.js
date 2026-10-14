@@ -926,43 +926,64 @@
 
       const a = d.agent;
       const gs = [];
-      if (d.cpu != null) gs.push(M.gauge('CPU', d.cpu, 'cpu', a && a.cores ? `${a.cores} nhân` : ''));
-      if (d.ram != null) gs.push(M.gauge('RAM', d.ram, 'ram', a && a.ram.total ? `${M.fmtBytes(a.ram.used)} / ${M.fmtBytes(a.ram.total)}` : ''));
-      if (d.disk != null) gs.push(M.gauge('Ổ đĩa (cao nhất)', d.disk, 'disk'));
       const stat = (label, v) => `<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px">${v}</div><div class="g-label">${label}</div></div>`;
-      gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)), stat('Ping', d.rtt != null ? `${d.rtt} ms` : '—'));
-      if (d.net_in != null || d.net_out != null) {
-        const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
-        gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
-      }
-      if (d.drum != null) gs.push(M.consumableGauge('Độ bền Drum', d.drum));
-      else if (d.type === 'printer') gs.push(stat('Độ bền Drum', '<span class="muted" style="font-size:18px">Tích hợp</span>'));
-      if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
-      else if (d.type === 'printer') gs.push(stat('Lượng mực in', '<span class="muted" style="font-size:18px">—</span>'));
-      if (d.page_count != null) gs.push(stat('Tổng số trang in', Number(d.page_count).toLocaleString('vi-VN') + ' trang'));
-      if (d.printer && (d.printer.status_text || d.printer.display)) {
-        const pSt = d.printer.display || d.printer.status_text;
-        const pCol = (d.printer_errors && d.printer_errors.length) ? 'var(--c-critical)' : 'var(--c-ok)';
-        gs.push(`<div class="gauge"><div style="font-size:18px;font-weight:700;padding:42px 0 6px;color:${pCol}">🖨️ ${esc(pSt)}</div><div class="g-label">Trạng thái máy in</div></div>`);
-      }
-      if (d.temperature != null) {
-        const tTh = (th() && th().temp) || 85;
-        const tCol = d.temperature >= tTh ? 'var(--c-critical)' : d.temperature >= tTh - 10 ? 'var(--c-medium)' : 'var(--c-ok)';
-        gs.push(`<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px;color:${tCol}">${Math.round(d.temperature)}°C</div><div class="g-label">Nhiệt độ CPU</div></div>`);
-      }
-      if (d.power) {
-        const pState = d.power.on_battery ? 'Đang chạy PIN' : 'Điện lưới AC';
-        const pCol = d.power.on_battery ? 'var(--c-critical)' : 'var(--c-ok)';
-        const pSub = d.power.battery_percent != null ? `Pin: ${d.power.battery_percent}%` : '';
-        gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${pCol}">${d.power.on_battery ? '🔋 ' : '⚡ '}${pState}</div><div class="g-label">Nguồn / UPS${pSub ? `<br>${pSub}` : ''}</div></div>`);
-      }
-      if (d.smart) {
-        const sOk = d.smart.ok !== false;
-        const sCol = sOk ? 'var(--c-ok)' : 'var(--c-critical)';
-        gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${sCol}">${sOk ? '✅ Bình thường' : '❌ Lỗi SMART'}</div><div class="g-label">Trạng thái đĩa cứng</div></div>`);
-      }
-      if (d.dos_alert || (d.alerts && d.alerts.dos)) {
-        gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:var(--c-critical)">🛡️ Cảnh báo DoS</div><div class="g-label">${d.pkt_rate ? `${d.pkt_rate} gói/s` : 'Lưu lượng bất thường'}</div></div>`);
+
+      if (d.type === 'printer') {
+        const prn = d.printer || (d.snmp && d.snmp.printer);
+        if (d.drum != null) gs.push(M.consumableGauge('Độ bền Drum', d.drum));
+        else gs.push(stat('Độ bền Drum', '<span class="muted" style="font-size:18px">Tích hợp</span>'));
+        if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
+        else gs.push(stat('Lượng mực in', '<span class="muted" style="font-size:18px">—</span>'));
+        if (prn && prn.memory) {
+          gs.push(M.gauge('Bộ nhớ RAM', prn.memory.percent, 'ram', `${M.fmtBytes(prn.memory.used)} / ${M.fmtBytes(prn.memory.total)}`));
+        } else if (d.ram != null) {
+          gs.push(M.gauge('Bộ nhớ RAM', d.ram, 'ram'));
+        }
+        if (d.page_count != null) {
+          gs.push(stat('Tổng số trang in', Number(d.page_count).toLocaleString('vi-VN') + ' trang'));
+        }
+        if (prn && (prn.display || prn.status_text)) {
+          const pSt = prn.display || prn.status_text;
+          const pCol = (prn.errors && prn.errors.length) ? 'var(--c-critical)' : 'var(--c-ok)';
+          gs.push(`<div class="gauge"><div style="font-size:18px;font-weight:700;padding:42px 0 6px;color:${pCol}">🖨️ ${esc(pSt)}</div><div class="g-label">Màn hình điều khiển</div></div>`);
+        }
+        gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)));
+      } else {
+        if (d.cpu != null) gs.push(M.gauge('CPU', d.cpu, 'cpu', a && a.cores ? `${a.cores} nhân` : ''));
+        if (d.ram != null) gs.push(M.gauge('RAM', d.ram, 'ram', a && a.ram.total ? `${M.fmtBytes(a.ram.used)} / ${M.fmtBytes(a.ram.total)}` : ''));
+        if (d.disk != null) gs.push(M.gauge('Ổ đĩa (cao nhất)', d.disk, 'disk'));
+        gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)), stat('Ping', d.rtt != null ? `${d.rtt} ms` : '—'));
+        if (d.net_in != null || d.net_out != null) {
+          const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
+          gs.push(`<div class="gauge">${netHtml}<div class="g-label">Băng thông hiện tại</div></div>`);
+        }
+        if (d.drum != null) gs.push(M.consumableGauge('Độ bền Drum', d.drum));
+        if (d.toner != null) gs.push(M.consumableGauge('Lượng mực in', d.toner));
+        if (d.page_count != null) gs.push(stat('Tổng số trang in', Number(d.page_count).toLocaleString('vi-VN') + ' trang'));
+        if (d.printer && (d.printer.status_text || d.printer.display)) {
+          const pSt = d.printer.display || d.printer.status_text;
+          const pCol = (d.printer_errors && d.printer_errors.length) ? 'var(--c-critical)' : 'var(--c-ok)';
+          gs.push(`<div class="gauge"><div style="font-size:18px;font-weight:700;padding:42px 0 6px;color:${pCol}">🖨️ ${esc(pSt)}</div><div class="g-label">Trạng thái máy in</div></div>`);
+        }
+        if (d.temperature != null) {
+          const tTh = (th() && th().temp) || 85;
+          const tCol = d.temperature >= tTh ? 'var(--c-critical)' : d.temperature >= tTh - 10 ? 'var(--c-medium)' : 'var(--c-ok)';
+          gs.push(`<div class="gauge"><div style="font-size:30px;font-weight:700;padding:38px 0 6px;color:${tCol}">${Math.round(d.temperature)}°C</div><div class="g-label">Nhiệt độ CPU</div></div>`);
+        }
+        if (d.power) {
+          const pState = d.power.on_battery ? 'Đang chạy PIN' : 'Điện lưới AC';
+          const pCol = d.power.on_battery ? 'var(--c-critical)' : 'var(--c-ok)';
+          const pSub = d.power.battery_percent != null ? `Pin: ${d.power.battery_percent}%` : '';
+          gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${pCol}">${d.power.on_battery ? '🔋 ' : '⚡ '}${pState}</div><div class="g-label">Nguồn / UPS${pSub ? `<br>${pSub}` : ''}</div></div>`);
+        }
+        if (d.smart) {
+          const sOk = d.smart.ok !== false;
+          const sCol = sOk ? 'var(--c-ok)' : 'var(--c-critical)';
+          gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:${sCol}">${sOk ? '✅ Bình thường' : '❌ Lỗi SMART'}</div><div class="g-label">Trạng thái đĩa cứng</div></div>`);
+        }
+        if (d.dos_alert || (d.alerts && d.alerts.dos)) {
+          gs.push(`<div class="gauge"><div style="font-size:20px;font-weight:700;padding:42px 0 6px;color:var(--c-critical)">🛡️ Cảnh báo DoS</div><div class="g-label">${d.pkt_rate ? `${d.pkt_rate} gói/s` : 'Lưu lượng bất thường'}</div></div>`);
+        }
       }
       $('#d-gauges').innerHTML = `<div class="gauges" style="margin:0">${gs.join('')}</div>`;
 
@@ -980,14 +1001,25 @@
             <td style="width:70px">${bar('', x.percent ?? 0, 'disk')}</td></tr>`).join('')}</tbody></table>`;
         }
       }
-      if (d.printer || (d.snmp && d.snmp.printer)) {
-        const prn = d.printer || d.snmp.printer;
-        html += `<h2>Thông số máy in</h2><dl class="kv">
-          ${kv('Model máy in', prn.model || d.name)}
+      if (d.printer || (d.snmp && d.snmp.printer) || d.type === 'printer') {
+        const prn = d.printer || (d.snmp && d.snmp.printer) || {};
+        const memStr = prn.memory
+          ? `${M.fmtBytes(prn.memory.used)} / ${M.fmtBytes(prn.memory.total)} (${prn.memory.percent}%)`
+          : (d.ram != null ? `${d.ram}%` : null);
+        const langsStr = (prn.languages && prn.languages.length)
+          ? prn.languages.map((l) => `<span class="badge" style="background:var(--panel2);border:1px solid var(--border);padding:2px 6px;border-radius:4px;font-size:12px;margin-right:4px">${esc(l)}</span>`).join('')
+          : null;
+
+        html += `<h2>Cấu hình sản phẩm & In ấn (Product & Print Settings)</h2><dl class="kv">
+          ${kv('Model sản phẩm', prn.model || d.name)}
           ${kv('Số Serial', prn.serial)}
-          ${kv('Màn hình LCD', prn.display)}
-          ${kv('Trạng thái', prn.status_text)}
-          ${kv('Tổng trang đã in', prn.page_count != null ? `${Number(prn.page_count).toLocaleString('vi-VN')} trang` : '—')}
+          ${prn.firmware ? kv('Mã Firmware', prn.firmware) : ''}
+          ${prn.duplex ? kv('In 2 mặt tự động', prn.duplex) : ''}
+          ${memStr ? kv('Bộ nhớ RAM máy in', memStr) : ''}
+          ${langsStr ? `<dt>Ngôn ngữ in hỗ trợ</dt><dd>${langsStr}</dd>` : ''}
+          ${kv('Màn hình điều khiển LCD', prn.display)}
+          ${kv('Trạng thái thiết bị', prn.status_text)}
+          ${kv('Tổng trang đã in (Impressions)', (prn.page_count != null || d.page_count != null) ? `${Number(prn.page_count ?? d.page_count).toLocaleString('vi-VN')} trang` : '—')}
         </dl>`;
 
         if (prn.errors && prn.errors.length) {
@@ -997,7 +1029,7 @@
         }
 
         if (prn.supplies && prn.supplies.length) {
-          html += `<h2>Chi tiết vật tư tiêu hao (Mực & Drum)</h2>
+          html += `<h2>Vật tư tiêu hao (Mực in & Cụm trống Drum)</h2>
           <table class="tbl"><thead><tr><th>Tên vật tư</th><th>Phân loại</th><th>Mức còn lại</th><th>Dung lượng</th></tr></thead><tbody>
           ${prn.supplies.map((s) => {
             const kindName = { toner: 'Hộp mực (Toner)', drum: 'Cụm trống (Drum)', waste: 'Hộp mực thải', fuser: 'Cụm sấy (Fuser)', transfer: 'Băng tải' }[s.kind] || 'Vật tư khác';
@@ -1012,9 +1044,15 @@
         }
 
         if (prn.trays && prn.trays.length) {
-          html += `<h2>Khay nạp giấy</h2>
-          <table class="tbl"><thead><tr><th>Khay giấy</th><th>Tình trạng</th><th>Sức chứa</th></tr></thead><tbody>
-          ${prn.trays.map((t) => `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.status)}</td><td>${t.max != null ? `${t.max} tờ` : '—'}</td></tr>`).join('')}
+          html += `<h2>Cấu hình khay nạp giấy & Giấy in (Paper Settings)</h2>
+          <table class="tbl"><thead><tr><th>Khay nạp</th><th>Loại giấy (Media)</th><th>Khổ giấy</th><th>Tình trạng</th><th>Sức chứa</th></tr></thead><tbody>
+          ${prn.trays.map((t) => {
+            const isWarn = t.status === 'Hết giấy';
+            const stBadge = isWarn
+              ? `<span style="color:var(--c-critical);font-weight:700">⚠️ ${esc(t.status)}</span>`
+              : `<span style="color:var(--c-ok)">${esc(t.status)}</span>`;
+            return `<tr><td><b>${esc(t.name)}</b></td><td>${esc(t.media_type || 'Mặc định')}</td><td>${esc(t.media_name || 'A4 / Mặc định')}</td><td>${stBadge}</td><td>${t.max != null && t.max > 0 ? `${t.max} tờ` : '—'}</td></tr>`;
+          }).join('')}
           </tbody></table>`;
         }
       }
@@ -1091,22 +1129,34 @@
       if (!$('#d-charts')) return;
       const has = (k) => points.some((p) => p[k] != null);
       let html = '';
-      if (has('cpu')) html += `<h2>CPU / RAM / Ổ đĩa (%)</h2>${M.chart(points, [{ key: 'cpu', color: 'var(--c-low)', label: 'CPU' }, { key: 'ram', color: 'var(--c-medium)', label: 'RAM' }, { key: 'disk', color: 'var(--c-high)', label: 'Disk' }], this.range, 100)}`;
-      if (has('rtt')) html += `<h2>Độ trễ ping (ms)</h2>${M.chart(points, [{ key: 'rtt', color: 'var(--c-ok)', label: 'RTT' }], this.range)}`;
-      if (has('net_in') || has('net_out')) {
-        html += `<h2>Tổng băng thông sử dụng</h2>${M.chart(points, [
-          { key: 'net_in', color: 'var(--c-low)', label: 'Tải xuống (In)' },
-          { key: 'net_out', color: 'var(--c-maint)', label: 'Tải lên (Out)' },
-        ], this.range, null, M.fmtRate)}`;
-      }
-      if (has('temp')) {
-        html += `<h2>Nhiệt độ CPU (°C)</h2>${M.chart(points, [{ key: 'temp', color: 'var(--c-high)', label: 'Nhiệt độ (°C)' }], this.range, 120, (v) => `${Math.round(v)}°`)}`;
-      }
-      if (has('toner') || has('drum')) {
-        const pSeries = [];
-        if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: 'Mực in (%)' });
-        if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: 'Độ bền Drum (%)' });
-        html += `<h2>Lịch sử Mực in & Độ bền Drum (%)</h2>${M.chart(points, pSeries, this.range, 100)}`;
+      if (this.D && this.D.type === 'printer') {
+        if (has('toner') || has('drum')) {
+          const pSeries = [];
+          if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: 'Mực in (%)' });
+          if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: 'Độ bền Drum (%)' });
+          html += `<h2>Lịch sử tiêu hao Vật tư (Mực in & Drum %)</h2>${M.chart(points, pSeries, this.range, 100)}`;
+        }
+        if (has('ram')) {
+          html += `<h2>Lịch sử sử dụng Bộ nhớ máy in (RAM %)</h2>${M.chart(points, [{ key: 'ram', color: 'var(--c-medium)', label: 'RAM máy in (%)' }], this.range, 100)}`;
+        }
+      } else {
+        if (has('cpu')) html += `<h2>CPU / RAM / Ổ đĩa (%)</h2>${M.chart(points, [{ key: 'cpu', color: 'var(--c-low)', label: 'CPU' }, { key: 'ram', color: 'var(--c-medium)', label: 'RAM' }, { key: 'disk', color: 'var(--c-high)', label: 'Disk' }], this.range, 100)}`;
+        if (has('rtt')) html += `<h2>Độ trễ ping (ms)</h2>${M.chart(points, [{ key: 'rtt', color: 'var(--c-ok)', label: 'RTT' }], this.range)}`;
+        if (has('net_in') || has('net_out')) {
+          html += `<h2>Tổng băng thông sử dụng</h2>${M.chart(points, [
+            { key: 'net_in', color: 'var(--c-low)', label: 'Tải xuống (In)' },
+            { key: 'net_out', color: 'var(--c-maint)', label: 'Tải lên (Out)' },
+          ], this.range, null, M.fmtRate)}`;
+        }
+        if (has('temp')) {
+          html += `<h2>Nhiệt độ CPU (°C)</h2>${M.chart(points, [{ key: 'temp', color: 'var(--c-high)', label: 'Nhiệt độ (°C)' }], this.range, 120, (v) => `${Math.round(v)}°`)}`;
+        }
+        if (has('toner') || has('drum')) {
+          const pSeries = [];
+          if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: 'Mực in (%)' });
+          if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: 'Độ bền Drum (%)' });
+          html += `<h2>Lịch sử Mực in & Độ bền Drum (%)</h2>${M.chart(points, pSeries, this.range, 100)}`;
+        }
       }
       $('#d-charts').innerHTML = html || '<div class="muted" style="padding:20px">Chưa có dữ liệu lịch sử</div>';
     },

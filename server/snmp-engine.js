@@ -393,6 +393,9 @@ const PRT_INPUT_COLS = {
   max: '1.3.6.1.2.1.43.8.2.1.9',
   level: '1.3.6.1.2.1.43.8.2.1.10',
   status: '1.3.6.1.2.1.43.8.2.1.11',
+  media_type: '1.3.6.1.2.1.43.8.2.1.12',
+  vendor: '1.3.6.1.2.1.43.8.2.1.14',
+  media_name: '1.3.6.1.2.1.43.8.2.1.18',
 };
 
 async function readPrinterDetails(rd, ident) {
@@ -416,7 +419,42 @@ async function readPrinterDetails(rd, ident) {
   let inputRows = null;
   try { inputRows = await rd.table(Object.values(PRT_INPUT_COLS), 16); } catch { /* optional */ }
 
-  if (rawStatus === null && rawError === null && !display && !pName && !serial && pages === null && !supplyRows && !inputRows) {
+  // Printer Memory (HOST-RESOURCES-MIB hrStorageTable)
+  let memory = null;
+  try {
+    const storRows = await rd.table(['1.3.6.1.2.1.25.2.3.1.2', '1.3.6.1.2.1.25.2.3.1.3', '1.3.6.1.2.1.25.2.3.1.4', '1.3.6.1.2.1.25.2.3.1.5', '1.3.6.1.2.1.25.2.3.1.6'], 8);
+    for (const r of Object.values(storRows || {})) {
+      const type = r['1.3.6.1.2.1.25.2.3.1.2'];
+      const descr = String(r['1.3.6.1.2.1.25.2.3.1.3'] || '');
+      if (type === '1.3.6.1.2.1.25.2.1.2' || /ram|memory/i.test(descr)) {
+        const units = num(r['1.3.6.1.2.1.25.2.3.1.4']) || 1;
+        const size = num(r['1.3.6.1.2.1.25.2.3.1.5']);
+        const used = num(r['1.3.6.1.2.1.25.2.3.1.6']);
+        if (size && size > 0 && used != null && used >= 0) {
+          memory = {
+            total: size * units,
+            used: used * units,
+            percent: Math.min(100, Math.max(0, Math.round((used / size) * 100))),
+          };
+          break;
+        }
+      }
+    }
+  } catch { /* optional */ }
+
+  // Interpreters / Print Languages (prtInterpreterTable)
+  const languages = [];
+  try {
+    const intpRows = await rd.table(['1.3.6.1.2.1.43.15.1.1.5'], 16);
+    for (const r of Object.values(intpRows || {})) {
+      const lang = String(r['1.3.6.1.2.1.43.15.1.1.5'] || '').trim();
+      if (lang && !['Automatic Language Switching', 'URP'].includes(lang) && !languages.includes(lang)) {
+        languages.push(lang);
+      }
+    }
+  } catch { /* optional */ }
+
+  if (rawStatus === null && rawError === null && !display && !pName && !serial && pages === null && !supplyRows && !inputRows && !memory) {
     return null;
   }
 
@@ -465,7 +503,7 @@ async function readPrinterDetails(rd, ident) {
         max,
         level,
         percent,
-        status: level === 0 ? 'Hết vật tư' : (level === -3 ? 'Còn vật tư' : (percent != null ? `${percent}%` : 'Không rõ')),
+        status: level === 0 ? 'Hết vật tư' : (level === -3 ? 'Còn vật tư' : (level === -2 ? 'Không rõ' : (percent != null ? `${percent}%` : 'Không rõ'))),
       });
     }
   }
@@ -477,28 +515,61 @@ async function readPrinterDetails(rd, ident) {
       const max = num(r[PRT_INPUT_COLS.max]);
       const level = num(r[PRT_INPUT_COLS.level]);
       const st = num(r[PRT_INPUT_COLS.status]);
+      const mediaType = String(r[PRT_INPUT_COLS.media_type] || '').trim();
+      const mediaName = String(r[PRT_INPUT_COLS.media_name] || '').trim();
       let status = 'Bình thường';
-      if (level === 0 || st === 0) status = 'Hết giấy';
+      if (level === 0) status = 'Hết giấy';
       else if (level === -3) status = 'Còn giấy';
+      else if (level === -2 || level === -1) status = 'Không rõ';
       else if (max && level && max > 0 && level > 0) status = `${level}/${max} tờ (${Math.round((level / max) * 100)}%)`;
-      trays.push({ name, max, level, status });
+      else if (level > 0) status = `${level} tờ`;
+      trays.push({
+        name,
+        max,
+        level,
+        status,
+        media_type: mediaType || 'Mặc định',
+        media_name: mediaName && mediaName !== name ? mediaName : (mediaType || 'A4 / Mặc định'),
+        vendor: String(r[PRT_INPUT_COLS.vendor] || '').trim(),
+      });
     }
   }
 
   const errors = parsePrinterErrors(rawError);
 
+  let firmware = null;
+  if (ident && ident.sysDescr) {
+    const fnMatch = ident.sysDescr.match(/FN:([A-Za-z0-9._-]+)/i);
+    if (fnMatch) firmware = fnMatch[1];
+    if (!serial) {
+      const snMatch = ident.sysDescr.match(/SN:([A-Za-z0-9._-]+)/i);
+      if (snMatch) serial = snMatch[1];
+    }
+    if (!pName) {
+      const pidMatch = ident.sysDescr.match(/PID:([^,]+)/i);
+      if (pidMatch) pName = pidMatch[1].trim();
+    }
+  }
+
+  const model = pName || (ident && ident.sysDescr ? ident.sysDescr.split(',')[0].trim() : '');
+  const duplex = /(?:dn|dw|fdw|cdw|dtn|duplex)(?:$|[^a-z0-9])/i.test(model) ? 'Có (In 2 mặt tự động)' : null;
+
   return {
     status_code: rawStatus,
     status_text: PRT_STATUS_NAMES[rawStatus] || 'Bình thường',
     display: display || '',
-    model: pName || (ident && ident.sysDescr ? ident.sysDescr.split(',')[0].trim() : ''),
+    model,
     serial: serial || '',
+    firmware,
+    duplex,
     page_count: pages,
     toner: tonerPercents.length ? Math.min(...tonerPercents) : null,
     drum: drumPercents.length ? Math.min(...drumPercents) : null,
     errors,
     supplies,
     trays,
+    memory,
+    languages,
   };
 }
 
@@ -556,6 +627,7 @@ async function pollDevice({ host, port = 161, community = 'public', profile = ''
       if (info.toner == null && prn.toner != null) info.toner = prn.toner;
       if (info.drum == null && prn.drum != null) info.drum = prn.drum;
       if (info.page_count == null && prn.page_count != null) info.page_count = prn.page_count;
+      if (info.ram == null && prn.memory) info.ram = prn.memory.percent;
     }
   }
 

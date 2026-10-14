@@ -5,7 +5,7 @@ const path = require('node:path');
 const { execFile } = require('node:child_process');
 const { getSettings } = require('./db');
 
-const SEV_RANK = { none: 0, low: 1, medium: 2, high: 3, critical: 4 };
+const SEV_RANK = { none: 0, '0': 0, low: 1, medium: 2, high: 3, critical: 4 };
 const ADDR_RE = /^[A-Za-z0-9][A-Za-z0-9.:_-]{0,252}$/;
 const IS_WIN = process.platform === 'win32';
 
@@ -132,6 +132,7 @@ class Monitor extends EventEmitter {
     for (const id of [...this.devices.keys()]) {
       if (!seen.has(id)) { this.devices.delete(id); this.state.delete(id); }
     }
+    this.evaluate(Date.now());
   }
 
   _newState(id) {
@@ -156,8 +157,11 @@ class Monitor extends EventEmitter {
   stop() { clearInterval(this.timer); this.timer = null; }
 
   severityOf(d) {
-    if (d.severity && SEV_RANK[d.severity] !== undefined) return d.severity;
+    const s = d.severity;
+    if (s === 0 || s === '0' || s === 'none') return 'none';
+    if (s && SEV_RANK[s] !== undefined) return s;
     const def = this.settings.type_severity[d.type];
+    if (def === 0 || def === '0' || def === 'none') return 'none';
     return (def && SEV_RANK[def] !== undefined) ? def : 'medium';
   }
 

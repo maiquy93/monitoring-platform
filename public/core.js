@@ -24,8 +24,14 @@ M.TYPE_NAME = { server: 'Máy chủ', vm: 'Máy ảo (VM)', router: 'Router', sw
 M.SEV_NAME = { critical: 'Nghiêm trọng', high: 'Cao', medium: 'Trung bình', low: 'Thấp', none: 'Không cảnh báo' };
 M.STATE_NAME = { up: 'Hoạt động', warning: 'Cảnh báo', down: 'Mất kết nối', unknown: 'Chưa rõ', maint: 'Bảo trì' };
 
-// ---------- helpers ----------
-M.statusClass = (d) => (d.status === 'down' ? `down sev-${d.severity}${d.acked ? ' acked' : ''}` : d.status === 'unknown' ? '' : d.status);
+M.statusClass = (d) => {
+  if (d.severity === 'none') {
+    if (d.status === 'down') return 'down sev-none';
+    if (d.status === 'warning') return 'up';
+    return d.status === 'unknown' ? '' : d.status;
+  }
+  return (d.status === 'down' ? `down sev-${d.severity}${d.acked ? ' acked' : ''}` : d.status === 'unknown' ? '' : d.status);
+};
 M.fmtDur = (sec) => {
   if (sec == null) return '—';
   sec = Math.floor(sec);
