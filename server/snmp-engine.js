@@ -591,8 +591,8 @@ async function readPrinterDetails(rd, ident) {
 // ---- Access Point (AP) wireless metrics & ARP / Client tracking ----
 const AP_OIDS = {
   unifi: {
-    bssid: '1.3.6.1.4.1.41112.1.6.1.2.1.1',
-    radio: '1.3.6.1.4.1.41112.1.6.1.2.1.2',
+    bssid: '1.3.6.1.4.1.41112.1.6.1.2.1.2',
+    radio: '1.3.6.1.4.1.41112.1.6.1.2.1.9',
     channel: '1.3.6.1.4.1.41112.1.6.1.2.1.4',
     ssid: '1.3.6.1.4.1.41112.1.6.1.2.1.6',
     stations: '1.3.6.1.4.1.41112.1.6.1.2.1.8',
@@ -694,7 +694,12 @@ function formatIp(raw) {
   return str;
 }
 
-function parseBand(val) {
+function parseBand(val, channel) {
+  if (channel != null) {
+    if (channel >= 1 && channel <= 14) return '2.4 GHz';
+    if (channel >= 36 && channel <= 177) return '5 GHz';
+    if (channel >= 180) return '6 GHz';
+  }
   if (val == null) return '';
   const s = String(val).toLowerCase().trim();
   if (s === 'ng' || s === '1' || s.includes('2.4')) return '2.4 GHz';
@@ -723,8 +728,8 @@ async function readApDetails(rd, ident) {
         if (!name) continue;
         const clients = num(r[AP_OIDS.unifi.stations]) || 0;
         const bssid = formatMac(r[AP_OIDS.unifi.bssid]);
-        const band = parseBand(r[AP_OIDS.unifi.radio]);
         const channel = num(r[AP_OIDS.unifi.channel]);
+        const band = parseBand(r[AP_OIDS.unifi.radio], channel);
         ssids.push({ ssid: name, clients, bssid, band, channel });
       }
     }
