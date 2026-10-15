@@ -1095,16 +1095,22 @@
         const ssids = ap.ssids || [];
         const arpTable = ap.arp_table || [];
 
+        const bandSummary = ap.by_band && Object.keys(ap.by_band).length > 1
+          ? Object.entries(ap.by_band).map(([b, info]) => `${b}: ${info.count} SSID (${info.clients} client)`).join(' · ')
+          : '';
+
         html += `<h2>Thông tin mạng không dây & SSID (Wireless Networks)</h2>
           <dl class="kv">
             ${kv('Tổng số SSID phát sóng', ap.total_ssids != null ? `${ap.total_ssids} SSID` : (d.total_ssids != null ? `${d.total_ssids} SSID` : '—'))}
             ${kv('Tổng số Client đang kết nối', ap.total_clients != null ? `${Number(ap.total_clients).toLocaleString('vi-VN')} thiết bị (tính trên các SSID)` : (d.total_clients != null ? `${Number(d.total_clients).toLocaleString('vi-VN')} thiết bị` : '—'))}
+            ${bandSummary ? kv('Phân bổ theo băng tần', bandSummary) : ''}
             ${kv('Bảng theo dõi ARP', ap.has_arp ? `Có hỗ trợ (${arpTable.length} thiết bị ghi nhận)` : 'Không có dữ liệu ARP')}
           </dl>`;
 
         if (ssids.length) {
           const totCli = ap.total_clients || 1;
-          html += `<h2>Chi tiết các SSID & Số lượng Client kết nối (${ssids.length} SSID)</h2>
+          const ssidCountLabel = ap.total_ssids != null ? `${ap.total_ssids} SSID` : `${ssids.length} SSID`;
+          html += `<h2>Chi tiết các SSID & Số lượng Client kết nối (${ssidCountLabel})</h2>
           <table class="tbl"><thead><tr><th>Tên SSID</th><th>BSSID (MAC phát sóng)</th><th>Băng tần (Band)</th><th>Kênh</th><th>Client kết nối</th><th>Tỷ lệ Client</th></tr></thead><tbody>
           ${ssids.map((s) => {
             const pct = Math.min(100, Math.round(((s.clients || 0) / totCli) * 100));
@@ -1121,9 +1127,17 @@
           </tbody></table>`;
         }
 
+        const arpCountLabel = arpTable.length ? ` (${arpTable.length} thiết bị)` : '';
+        html += `<h2>Bảng theo dõi ARP & Thiết bị kết nối${arpCountLabel}</h2>
+        <div class="ap-arp-note">
+          <span class="note-icon">ℹ️</span>
+          <div class="note-content">
+            <b>Lưu ý:</b> Bảng ARP thu thập qua SNMP trên thiết bị AP có tính chất cục bộ (Local ARP Cache) và bị giới hạn bởi giao thức. Danh sách này phản ánh các thiết bị có giao tiếp Layer 3 trong mạng (như Gateway hoặc thiết bị cùng phân vầng), do đó có thể không hiển thị đầy đủ hoặc chính xác tuyệt đối IP và Hostname của tất cả các Client đang kết nối WiFi.
+          </div>
+        </div>`;
+
         if (arpTable.length) {
-          html += `<h2>Bảng theo dõi ARP & Thiết bị kết nối (${arpTable.length} thiết bị)</h2>
-          <div style="margin-bottom:8px">
+          html += `<div style="margin-bottom:8px">
             <input class="inp" id="arp-search-inp" placeholder="🔍 Tìm kiếm theo IP, MAC, Domain name / Hostname, SSID..." style="width:100%;max-width:380px">
           </div>
           <div style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
@@ -1144,6 +1158,8 @@
             </tr>`;
           }).join('')}
           </tbody></table></div>`;
+        } else {
+          html += `<div class="muted" style="padding:10px 0">Thiết bị hiện chưa ghi nhận bản ghi ARP nào hoặc không có dữ liệu phản hồi từ SNMP.</div>`;
         }
       }
       if (d.snmp_enabled) html += this.snmpSection(d, kv);

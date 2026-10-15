@@ -136,6 +136,23 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .bar i b { display: block; height: 100%; background: var(--c-ok); }
 .bar.bar-na { opacity: 0.6; } .bar.bar-na i b { display: none; }
 .bar.bar-ap { grid-column: 1 / -1; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; line-height: 18px; }
+.ap-arp-note {
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--c-low);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin: 8px 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ap-arp-note .note-icon { font-size: 16px; line-height: 1.2; flex-shrink: 0; }
+.ap-arp-note .note-content { flex: 1; }
+.ap-arp-note b { color: var(--c-low); }
 
 .tile.up { --s: var(--c-ok); }
 .tile.warning { --s: var(--c-medium); }

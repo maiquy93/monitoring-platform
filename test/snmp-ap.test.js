@@ -430,3 +430,150 @@ test('generic ieee 802.11 ap: reads standard dot11 SSID and station count', asyn
   }
 });
 
+// 10. Bộ lọc tổng quát (Flexible Filter) loại bỏ SSID rỗng, ẩn, hệ thống/quản lý
+test('isSystemOrHiddenSsid: filters out empty, hidden and system management SSIDs', () => {
+  const { isSystemOrHiddenSsid, isValidUserSsid, normalizeSsid } = engine;
+
+  // 1. Tên rỗng, khoảng trắng, null, undefined, control chars
+  assert.equal(isSystemOrHiddenSsid(''), true);
+  assert.equal(isSystemOrHiddenSsid('   '), true);
+  assert.equal(isSystemOrHiddenSsid(null), true);
+  assert.equal(isSystemOrHiddenSsid(undefined), true);
+  assert.equal(isSystemOrHiddenSsid('\x00\x00\x00'), true);
+  assert.equal(isSystemOrHiddenSsid('""'), true);
+  assert.equal(isSystemOrHiddenSsid("''"), true);
+
+  // 2. Tiền tố hệ thống/quản lý (element-, vwire-, mesh-, internal-, etc.)
+  assert.equal(isSystemOrHiddenSsid('element-4858cde0e05beede'), true);
+  assert.equal(isSystemOrHiddenSsid('vwire-a0c77db82f137fca'), true);
+  assert.equal(isSystemOrHiddenSsid('mesh-backhaul-link'), true);
+  assert.equal(isSystemOrHiddenSsid('internal-mgmt-vlan'), true);
+  assert.equal(isSystemOrHiddenSsid('_mesh_bridge'), true);
+  assert.equal(isSystemOrHiddenSsid('_internal_roaming'), true);
+  assert.equal(isSystemOrHiddenSsid('instant-mesh-uplink'), true);
+  assert.equal(isSystemOrHiddenSsid('setmeup-1234'), true);
+  assert.equal(isSystemOrHiddenSsid('setup-unifi'), true);
+
+  // 3. Chuỗi băm/mã hóa dài tự sinh do firmware (hex 24+ chars hoặc UUID)
+  assert.equal(isSystemOrHiddenSsid('4858cde0e05beede4858cde0'), true);
+  assert.equal(isSystemOrHiddenSsid('123e4567-e89b-12d3-a456-426614174000'), true);
+
+  // 4. Các SSID thực tế hợp lệ người dùng cấu hình
+  assert.equal(isSystemOrHiddenSsid('VLAN1'), false);
+  assert.equal(isSystemOrHiddenSsid('VLAN10'), false);
+  assert.equal(isSystemOrHiddenSsid('CongTy-WiFi'), false);
+  assert.equal(isSystemOrHiddenSsid('Khach-Hang-VIP'), false);
+  assert.equal(isSystemOrHiddenSsid('Office 5GHz'), false);
+  assert.equal(isValidUserSsid('VLAN1'), true);
+  assert.equal(isValidUserSsid('element-4858cde0e05beede'), false);
+  assert.equal(normalizeSsid('  "My-SSID"  '), 'My-SSID');
+});
+
+// 11. Ubiquiti UniFi AP có lẫn SSID ẩn hệ thống (element-, vwire-): kiểm tra lọc bỏ và thống kê theo băng tần
+test('ubiquiti unifi: filters system SSIDs (element-, vwire-), aggregates real SSIDs and computes band breakdown', async () => {
+  const rows = [
+    ['1.3.6.1.2.1.1.1.0', 'UAP-AC-Pro-Gen2 6.8.2.15592', 'STRING'],
+    ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.41112.1.4', 'OID'],
+    ['1.3.6.1.2.1.1.3.0', 900000, 'TIMETICKS'],
+
+    // CPU / RAM
+    ['1.3.6.1.2.1.25.3.3.1.2.1', 8, 'INTEGER'],
+    ['1.3.6.1.2.1.25.2.3.1.2.1', '1.3.6.1.2.1.25.2.1.2', 'OID'],
+    ['1.3.6.1.2.1.25.2.3.1.5.1', 1048576, 'INTEGER'],
+    ['1.3.6.1.2.1.25.2.3.1.6.1', 314572, 'INTEGER'],
+
+    // VAP 1: element-4858cde0e05beede (2.4 GHz) -> Ẩn / Hệ thống
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.1', 'fcecda17c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.1', 6, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.1', 'element-4858cde0e05beede', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.1', 0, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.1', 'ng', 'STRING'],
+
+    // VAP 2: VLAN1 (2.4 GHz) -> Hợp lệ
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.2', '02ecda17c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.2', 6, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.2', 'VLAN1', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.2', 0, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.2', 'ng', 'STRING'],
+
+    // VAP 3: VLAN10 (2.4 GHz) -> Hợp lệ
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.3', '06ecda17c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.3', 6, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.3', 'VLAN10', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.3', 0, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.3', 'ng', 'STRING'],
+
+    // VAP 4: element-4858cde0e05beede (5 GHz) -> Ẩn / Hệ thống
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.4', 'fcecda18c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.4', 48, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.4', 'element-4858cde0e05beede', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.4', 0, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.4', 'na', 'STRING'],
+
+    // VAP 5: vwire-a0c77db82f137fca (5 GHz) -> Ẩn / Hệ thống
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.5', '02ecda18c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.5', 48, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.5', 'vwire-a0c77db82f137fca', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.5', 0, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.5', 'na', 'STRING'],
+
+    // VAP 6: VLAN1 (5 GHz) -> Hợp lệ (1 Client đang kết nối)
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.6', '06ecda18c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.6', 48, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.6', 'VLAN1', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.6', 1, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.6', 'na', 'STRING'],
+
+    // VAP 7: VLAN10 (5 GHz) -> Hợp lệ
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.2.7', '0aecda18c363', 'HEX'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.4.7', 48, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.6.7', 'VLAN10', 'STRING'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.8.7', 0, 'INTEGER'],
+    ['1.3.6.1.4.1.41112.1.6.1.2.1.9.7', 'na', 'STRING'],
+  ];
+
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'ubiquiti-unifi');
+    // Tổng số SSID phát sóng thực tế (VLAN1, VLAN10) = 2
+    assert.equal(out.total_ssids, 2);
+    assert.equal(out.total_clients, 1);
+
+    assert.ok(out.ap);
+    assert.equal(out.ap.total_ssids, 2);
+    assert.equal(out.ap.total_clients, 1);
+
+    // Danh sách VAPs chỉ chứa 4 VAPs hợp lệ (2 của VLAN1, 2 của VLAN10)
+    assert.equal(out.ap.ssids.length, 4);
+    assert.ok(out.ap.ssids.every((s) => s.ssid === 'VLAN1' || s.ssid === 'VLAN10'));
+    assert.ok(!out.ap.ssids.some((s) => s.ssid.startsWith('element-') || s.ssid.startsWith('vwire-')));
+
+    // Kiểm tra phân bổ băng tần
+    assert.ok(out.ap.by_band);
+    assert.equal(out.ap.by_band['2.4 GHz'].count, 2);
+    assert.equal(out.ap.by_band['2.4 GHz'].clients, 0);
+    assert.equal(out.ap.by_band['5 GHz'].count, 2);
+    assert.equal(out.ap.by_band['5 GHz'].clients, 1);
+  } finally {
+    r.close();
+  }
+});
+
+// 12. Giao diện (UI): Kiểm tra nội dung chú thích kỹ thuật giới hạn dữ liệu tại Bảng theo dõi ARP
+test('frontend UI: contains technical note explaining ARP table limitation on APs', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const viewsJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'views.js'), 'utf8');
+  const styleCss = fs.readFileSync(path.join(__dirname, '..', 'public', 'style.css'), 'utf8');
+
+  // Kiểm tra class CSS .ap-arp-note
+  assert.ok(styleCss.includes('.ap-arp-note'));
+
+  // Kiểm tra đúng nguyên văn nội dung chú thích trong views.js
+  const plainText = viewsJs.replace(/<[^>]+>/g, '');
+  const requiredNote = 'Lưu ý: Bảng ARP thu thập qua SNMP trên thiết bị AP có tính chất cục bộ (Local ARP Cache) và bị giới hạn bởi giao thức. Danh sách này phản ánh các thiết bị có giao tiếp Layer 3 trong mạng (như Gateway hoặc thiết bị cùng phân vầng), do đó có thể không hiển thị đầy đủ hoặc chính xác tuyệt đối IP và Hostname của tất cả các Client đang kết nối WiFi.';
+  assert.ok(plainText.includes(requiredNote));
+  assert.ok(viewsJs.includes('ap-arp-note'));
+});
+
