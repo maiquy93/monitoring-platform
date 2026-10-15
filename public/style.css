@@ -134,8 +134,9 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .bar { font-size: 11px; color: var(--muted); }
 .bar i { display: block; height: 5px; border-radius: 3px; background: var(--panel2); margin-top: 3px; overflow: hidden; }
 .bar i b { display: block; height: 100%; background: var(--c-ok); }
-.bar.hi i b { background: var(--c-medium); } .bar.crit i b { background: var(--c-critical); }
 .bar.bar-na { opacity: 0.6; } .bar.bar-na i b { display: none; }
+.bar.bar-ap { grid-column: 1 / -1; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; line-height: 18px; }
+
 .tile.up { --s: var(--c-ok); }
 .tile.warning { --s: var(--c-medium); }
 .tile.maint { --s: var(--c-maint); }

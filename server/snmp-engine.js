@@ -7,8 +7,7 @@ const path = require('node:path');
 const snmp = require('./snmp');
 
 const PROFILES_DIR = path.join(__dirname, 'profiles');
-// Metrics the dashboard understands natively; any other metric is shown as an extra row.
-const CORE = ['cpu', 'ram', 'disk', 'temperature', 'toner', 'drum', 'page_count'];
+const CORE = ['cpu', 'ram', 'disk', 'temperature', 'toner', 'drum', 'page_count', 'total_ssids', 'total_clients'];
 const AGGS = new Set(['avg', 'max', 'min', 'sum', 'first']);
 
 const MESSAGES = {
@@ -589,6 +588,510 @@ async function readPrinterDetails(rd, ident) {
   };
 }
 
+// ---- Access Point (AP) wireless metrics & ARP / Client tracking ----
+const AP_OIDS = {
+  unifi: {
+    bssid: '1.3.6.1.4.1.41112.1.6.1.2.1.1',
+    radio: '1.3.6.1.4.1.41112.1.6.1.2.1.2',
+    channel: '1.3.6.1.4.1.41112.1.6.1.2.1.4',
+    ssid: '1.3.6.1.4.1.41112.1.6.1.2.1.6',
+    stations: '1.3.6.1.4.1.41112.1.6.1.2.1.8',
+  },
+  ruckus: {
+    ssid: '1.3.6.1.4.1.25053.1.2.2.1.1.1.2',
+    bssid: '1.3.6.1.4.1.25053.1.2.2.1.1.1.3',
+    stations: '1.3.6.1.4.1.25053.1.2.2.1.1.1.16',
+  },
+  ruckus_sta: {
+    mac: '1.3.6.1.4.1.25053.1.2.2.4.1.1.1',
+    rssi: '1.3.6.1.4.1.25053.1.2.2.4.1.1.3',
+    ip: '1.3.6.1.4.1.25053.1.2.2.4.1.1.4',
+    ssid: '1.3.6.1.4.1.25053.1.2.2.4.1.1.6',
+    user: '1.3.6.1.4.1.25053.1.2.2.4.1.1.8',
+    os: '1.3.6.1.4.1.25053.1.2.2.4.1.1.12',
+  },
+  aruba: {
+    ssid: '1.3.6.1.4.1.14823.2.2.1.5.2.1.7.1.2',
+    stations: '1.3.6.1.4.1.14823.2.2.1.5.2.1.7.1.3',
+    total_users: '1.3.6.1.4.1.14823.2.2.1.4.1.1.0',
+  },
+  aruba_user: {
+    ip: '1.3.6.1.4.1.14823.2.2.1.4.1.2.1.1',
+    mac: '1.3.6.1.4.1.14823.2.2.1.4.1.2.1.2',
+    user: '1.3.6.1.4.1.14823.2.2.1.4.1.2.1.3',
+    ssid: '1.3.6.1.4.1.14823.2.2.1.4.1.2.1.7',
+  },
+  cisco: {
+    ssid: '1.3.6.1.4.1.9.9.512.1.1.1.1.6',
+    stations: '1.3.6.1.4.1.9.9.512.1.1.1.1.5',
+  },
+  cisco_client: {
+    mac: '1.3.6.1.4.1.9.9.599.1.3.1.1.1',
+    ip: '1.3.6.1.4.1.9.9.599.1.3.1.1.10',
+    ssid: '1.3.6.1.4.1.9.9.599.1.3.1.1.27',
+    user: '1.3.6.1.4.1.9.9.599.1.3.1.1.28',
+  },
+  cisco_dot11: {
+    ssid: '1.3.6.1.4.1.9.9.273.1.1.2.1.1',
+  },
+  cisco_dot11_client: {
+    mac: '1.3.6.1.4.1.9.9.273.1.3.1.1.1',
+    ip: '1.3.6.1.4.1.9.9.273.1.3.1.1.3',
+    ssid: '1.3.6.1.4.1.9.9.273.1.3.1.1.7',
+  },
+  omada: {
+    ssid: '1.3.6.1.4.1.11863.6.4.1.2.1.1.2',
+    bssid: '1.3.6.1.4.1.11863.6.4.1.2.1.1.3',
+    stations: '1.3.6.1.4.1.11863.6.4.1.2.1.1.4',
+    radio: '1.3.6.1.4.1.11863.6.4.1.2.1.1.5',
+  },
+  grandstream: {
+    ssid: '1.3.6.1.4.1.42397.1.1.2.2.1.2',
+    bssid: '1.3.6.1.4.1.42397.1.1.2.2.1.3',
+    stations: '1.3.6.1.4.1.42397.1.1.2.2.1.4',
+    band: '1.3.6.1.4.1.42397.1.1.2.2.1.5',
+  },
+  dot11: {
+    ssid: '1.2.840.10036.1.1.1.9',
+    stations: '1.2.840.10036.2.2.1.4',
+  },
+  arp: {
+    ifIndex: '1.3.6.1.2.1.4.22.1.1',
+    physAddress: '1.3.6.1.2.1.4.22.1.2',
+    netAddress: '1.3.6.1.2.1.4.22.1.3',
+    type: '1.3.6.1.2.1.4.22.1.4',
+  },
+  arp_phys: {
+    netAddress: '1.3.6.1.2.1.4.35.1.3',
+    physAddress: '1.3.6.1.2.1.4.35.1.4',
+    type: '1.3.6.1.2.1.4.35.1.5',
+  },
+};
+
+function formatMac(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (/^[0-9a-fA-F]{12}$/.test(str)) {
+    return str.match(/.{1,2}/g).map((b) => b.toUpperCase()).join(':');
+  }
+  if (/^([0-9a-fA-F]{1,2}[:-]){5}[0-9a-fA-F]{1,2}$/.test(str)) {
+    return str.split(/[:-]/).map((b) => b.padStart(2, '0').toUpperCase()).join(':');
+  }
+  if (str.length === 6) {
+    return Array.from(str).map((c) => c.charCodeAt(0).toString(16).padStart(2, '0').toUpperCase()).join(':');
+  }
+  return str;
+}
+
+function formatIp(raw) {
+  if (!raw) return '';
+  const str = String(raw).trim();
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(str)) return str;
+  if (/^[0-9a-fA-F]{8}$/.test(str)) {
+    const bytes = Buffer.from(str, 'hex');
+    return Array.from(bytes).join('.');
+  }
+  return str;
+}
+
+function parseBand(val) {
+  if (val == null) return '';
+  const s = String(val).toLowerCase().trim();
+  if (s === 'ng' || s === '1' || s.includes('2.4')) return '2.4 GHz';
+  if (s === 'na' || s === '2' || s.includes('5g') || s.includes('5.0')) return '5 GHz';
+  if (s === '6g' || s === '3' || s.includes('6g')) return '6 GHz';
+  return String(val).trim();
+}
+
+async function readApDetails(rd, ident) {
+  const ssids = [];
+  const clientMap = new Map();
+  let totalClients = null;
+
+  // 1. Try Ubiquiti UniFi (UBNT-UniFi-MIB)
+  try {
+    const vapRows = await rd.table([
+      AP_OIDS.unifi.ssid,
+      AP_OIDS.unifi.stations,
+      AP_OIDS.unifi.bssid,
+      AP_OIDS.unifi.radio,
+      AP_OIDS.unifi.channel,
+    ], 32);
+    if (vapRows && Object.keys(vapRows).length) {
+      for (const [idx, r] of Object.entries(vapRows)) {
+        const name = String(r[AP_OIDS.unifi.ssid] || '').trim();
+        if (!name) continue;
+        const clients = num(r[AP_OIDS.unifi.stations]) || 0;
+        const bssid = formatMac(r[AP_OIDS.unifi.bssid]);
+        const band = parseBand(r[AP_OIDS.unifi.radio]);
+        const channel = num(r[AP_OIDS.unifi.channel]);
+        ssids.push({ ssid: name, clients, bssid, band, channel });
+      }
+    }
+  } catch { /* optional */ }
+
+  // 2. Try Ruckus Wireless (RUCKUS-ZD-WLAN-MIB)
+  if (!ssids.length) {
+    try {
+      const zdRows = await rd.table([
+        AP_OIDS.ruckus.ssid,
+        AP_OIDS.ruckus.stations,
+        AP_OIDS.ruckus.bssid,
+      ], 32);
+      if (zdRows && Object.keys(zdRows).length) {
+        for (const [idx, r] of Object.entries(zdRows)) {
+          const name = String(r[AP_OIDS.ruckus.ssid] || '').trim();
+          if (!name) continue;
+          const clients = num(r[AP_OIDS.ruckus.stations]) || 0;
+          const bssid = formatMac(r[AP_OIDS.ruckus.bssid]);
+          ssids.push({ ssid: name, clients, bssid, band: '', channel: null });
+        }
+      }
+    } catch { /* optional */ }
+  }
+
+  // 3. Try TP-Link Omada (TPLINK-EAP-MIB)
+  if (!ssids.length) {
+    try {
+      const eapRows = await rd.table([
+        AP_OIDS.omada.ssid,
+        AP_OIDS.omada.stations,
+        AP_OIDS.omada.bssid,
+        AP_OIDS.omada.radio,
+      ], 32);
+      if (eapRows && Object.keys(eapRows).length) {
+        for (const [idx, r] of Object.entries(eapRows)) {
+          const name = String(r[AP_OIDS.omada.ssid] || '').trim();
+          if (!name) continue;
+          const clients = num(r[AP_OIDS.omada.stations]) || 0;
+          const bssid = formatMac(r[AP_OIDS.omada.bssid]);
+          const band = parseBand(r[AP_OIDS.omada.radio]);
+          ssids.push({ ssid: name, clients, bssid, band, channel: null });
+        }
+      }
+    } catch { /* optional */ }
+  }
+
+  // 4. Try Grandstream GWN (GRANDSTREAM-GWN-MIB)
+  if (!ssids.length) {
+    try {
+      const gwnRows = await rd.table([
+        AP_OIDS.grandstream.ssid,
+        AP_OIDS.grandstream.stations,
+        AP_OIDS.grandstream.bssid,
+        AP_OIDS.grandstream.band,
+      ], 32);
+      if (gwnRows && Object.keys(gwnRows).length) {
+        for (const [idx, r] of Object.entries(gwnRows)) {
+          const name = String(r[AP_OIDS.grandstream.ssid] || '').trim();
+          if (!name) continue;
+          const clients = num(r[AP_OIDS.grandstream.stations]) || 0;
+          const bssid = formatMac(r[AP_OIDS.grandstream.bssid]);
+          const band = parseBand(r[AP_OIDS.grandstream.band]);
+          ssids.push({ ssid: name, clients, bssid, band, channel: null });
+        }
+      }
+    } catch { /* optional */ }
+  }
+
+  // 5. Try Aruba (WLSX-WLAN-MIB)
+  if (!ssids.length) {
+    try {
+      const arubaRows = await rd.table([
+        AP_OIDS.aruba.ssid,
+        AP_OIDS.aruba.stations,
+      ], 32);
+      if (arubaRows && Object.keys(arubaRows).length) {
+        for (const [idx, r] of Object.entries(arubaRows)) {
+          const name = String(r[AP_OIDS.aruba.ssid] || '').trim();
+          if (!name) continue;
+          const clients = num(r[AP_OIDS.aruba.stations]) || 0;
+          ssids.push({ ssid: name, clients, bssid: '', band: '', channel: null });
+        }
+      }
+    } catch { /* optional */ }
+    try {
+      const tot = num(await rd.get(AP_OIDS.aruba.total_users));
+      if (tot != null) totalClients = tot;
+    } catch { /* optional */ }
+  }
+
+  // 6. Try Cisco (CISCO-LWAPP-WLAN-MIB & CISCO-DOT11-ASSOCIATION-MIB)
+  if (!ssids.length) {
+    try {
+      const ciscoRows = await rd.table([
+        AP_OIDS.cisco.ssid,
+        AP_OIDS.cisco.stations,
+      ], 32);
+      if (ciscoRows && Object.keys(ciscoRows).length) {
+        for (const [idx, r] of Object.entries(ciscoRows)) {
+          const name = String(r[AP_OIDS.cisco.ssid] || '').trim();
+          if (!name) continue;
+          const clients = num(r[AP_OIDS.cisco.stations]) || 0;
+          ssids.push({ ssid: name, clients, bssid: '', band: '', channel: null });
+        }
+      }
+    } catch { /* optional */ }
+    if (!ssids.length) {
+      try {
+        const dot11Rows = await rd.table([AP_OIDS.cisco_dot11.ssid], 32);
+        if (dot11Rows && Object.keys(dot11Rows).length) {
+          for (const [idx, r] of Object.entries(dot11Rows)) {
+            const name = String(r[AP_OIDS.cisco_dot11.ssid] || '').trim();
+            if (!name) continue;
+            ssids.push({ ssid: name, clients: 0, bssid: '', band: '', channel: null });
+          }
+        }
+      } catch { /* optional */ }
+    }
+  }
+
+  // 7. Try Standard IEEE 802.11 MIB
+  if (!ssids.length) {
+    try {
+      const stdRows = await rd.table([AP_OIDS.dot11.ssid, AP_OIDS.dot11.stations], 32);
+      if (stdRows && Object.keys(stdRows).length) {
+        for (const [idx, r] of Object.entries(stdRows)) {
+          const name = String(r[AP_OIDS.dot11.ssid] || '').trim();
+          if (!name) continue;
+          const clients = num(r[AP_OIDS.dot11.stations]) || 0;
+          ssids.push({ ssid: name, clients, bssid: '', band: '', channel: null });
+        }
+      }
+    } catch { /* optional */ }
+  }
+
+  // Read vendor Client Station Tables (Ruckus, Aruba, Cisco)
+  try {
+    const staRows = await rd.table([
+      AP_OIDS.ruckus_sta.mac,
+      AP_OIDS.ruckus_sta.ip,
+      AP_OIDS.ruckus_sta.user,
+      AP_OIDS.ruckus_sta.ssid,
+      AP_OIDS.ruckus_sta.rssi,
+    ], 128);
+    if (staRows && Object.keys(staRows).length) {
+      for (const [idx, r] of Object.entries(staRows)) {
+        const mac = formatMac(r[AP_OIDS.ruckus_sta.mac]);
+        const ip = formatIp(r[AP_OIDS.ruckus_sta.ip]);
+        const user = String(r[AP_OIDS.ruckus_sta.user] || '').trim();
+        const ssid = String(r[AP_OIDS.ruckus_sta.ssid] || '').trim();
+        const rssi = num(r[AP_OIDS.ruckus_sta.rssi]);
+        if (mac || ip) {
+          const item = { mac, ip, hostname: user, ssid, rssi, type: 'Wireless (Wi-Fi)' };
+          if (mac) clientMap.set(mac, item);
+          if (ip) clientMap.set(ip, item);
+        }
+      }
+    }
+  } catch { /* optional */ }
+
+  try {
+    const userRows = await rd.table([
+      AP_OIDS.aruba_user.ip,
+      AP_OIDS.aruba_user.mac,
+      AP_OIDS.aruba_user.user,
+      AP_OIDS.aruba_user.ssid,
+    ], 128);
+    if (userRows && Object.keys(userRows).length) {
+      for (const [idx, r] of Object.entries(userRows)) {
+        const ip = formatIp(r[AP_OIDS.aruba_user.ip]);
+        const mac = formatMac(r[AP_OIDS.aruba_user.mac]);
+        const user = String(r[AP_OIDS.aruba_user.user] || '').trim();
+        const ssid = String(r[AP_OIDS.aruba_user.ssid] || '').trim();
+        if (mac || ip) {
+          const item = { mac, ip, hostname: user, ssid, type: 'Wireless (Wi-Fi)' };
+          if (mac) clientMap.set(mac, item);
+          if (ip) clientMap.set(ip, item);
+        }
+      }
+    }
+  } catch { /* optional */ }
+
+  try {
+    const ciscoCliRows = await rd.table([
+      AP_OIDS.cisco_client.mac,
+      AP_OIDS.cisco_client.ip,
+      AP_OIDS.cisco_client.user,
+      AP_OIDS.cisco_client.ssid,
+    ], 128);
+    if (ciscoCliRows && Object.keys(ciscoCliRows).length) {
+      for (const [idx, r] of Object.entries(ciscoCliRows)) {
+        const mac = formatMac(r[AP_OIDS.cisco_client.mac]);
+        const ip = formatIp(r[AP_OIDS.cisco_client.ip]);
+        const user = String(r[AP_OIDS.cisco_client.user] || '').trim();
+        const ssid = String(r[AP_OIDS.cisco_client.ssid] || '').trim();
+        if (mac || ip) {
+          const item = { mac, ip, hostname: user, ssid, type: 'Wireless (Wi-Fi)' };
+          if (mac) clientMap.set(mac, item);
+          if (ip) clientMap.set(ip, item);
+        }
+      }
+    }
+  } catch { /* optional */ }
+
+  try {
+    const dot11CliRows = await rd.table([
+      AP_OIDS.cisco_dot11_client.mac,
+      AP_OIDS.cisco_dot11_client.ip,
+      AP_OIDS.cisco_dot11_client.ssid,
+    ], 128);
+    if (dot11CliRows && Object.keys(dot11CliRows).length) {
+      for (const [idx, r] of Object.entries(dot11CliRows)) {
+        const mac = formatMac(r[AP_OIDS.cisco_dot11_client.mac]);
+        const ip = formatIp(r[AP_OIDS.cisco_dot11_client.ip]);
+        const ssid = String(r[AP_OIDS.cisco_dot11_client.ssid] || '').trim();
+        if (mac || ip) {
+          const item = { mac, ip, hostname: '', ssid, type: 'Wireless (Wi-Fi)' };
+          if (mac && !clientMap.has(mac)) clientMap.set(mac, item);
+          if (ip && !clientMap.has(ip)) clientMap.set(ip, item);
+        }
+      }
+    }
+  } catch { /* optional */ }
+
+  // If no ssids were discovered from tables, but we have clients grouped by ssid:
+  if (!ssids.length && clientMap.size > 0) {
+    const ssidCount = new Map();
+    const seen = new Set();
+    for (const cli of clientMap.values()) {
+      const key = cli.mac || cli.ip;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (cli.ssid) {
+        ssidCount.set(cli.ssid, (ssidCount.get(cli.ssid) || 0) + 1);
+      }
+    }
+    for (const [name, count] of ssidCount.entries()) {
+      ssids.push({ ssid: name, clients: count, bssid: '', band: '', channel: null });
+    }
+  }
+
+  // Read Standard ARP Tables (RFC 1213 / RFC 4293)
+  const arpTable = [];
+  const arpSeen = new Set();
+  const parseArpType = (v) => ({ 1: 'Khác', 2: 'Không hợp lệ', 3: 'Dynamic (Động)', 4: 'Static (Tĩnh)' }[num(v)] || 'Dynamic');
+
+  try {
+    const mediaRows = await rd.table([
+      AP_OIDS.arp.physAddress,
+      AP_OIDS.arp.netAddress,
+      AP_OIDS.arp.type,
+      AP_OIDS.arp.ifIndex,
+    ], 256);
+    if (mediaRows && Object.keys(mediaRows).length) {
+      for (const [idx, r] of Object.entries(mediaRows)) {
+        const rawType = num(r[AP_OIDS.arp.type]);
+        if (rawType === 2) continue;
+        let ip = formatIp(r[AP_OIDS.arp.netAddress]);
+        if (!ip || ip === '0.0.0.0') {
+          const parts = idx.split('.');
+          if (parts.length >= 4) ip = parts.slice(-4).join('.');
+        }
+        const mac = formatMac(r[AP_OIDS.arp.physAddress]);
+        if (!mac || mac === '00:00:00:00:00:00') continue;
+        if (!ip || ip === '0.0.0.0' || ip === '127.0.0.1' || ip.startsWith('255.')) continue;
+        const ifIdx = num(r[AP_OIDS.arp.ifIndex]) || (idx.split('.')[0] ? num(idx.split('.')[0]) : null);
+        const ifName = ifIdx ? `if${ifIdx}` : '';
+        const sta = clientMap.get(ip) || clientMap.get(mac);
+        const entry = {
+          ip,
+          mac,
+          hostname: sta && sta.hostname ? sta.hostname : '',
+          ssid: sta && sta.ssid ? sta.ssid : '',
+          interface: ifName,
+          type: parseArpType(rawType),
+        };
+        const key = `${ip}-${mac}`;
+        if (!arpSeen.has(key)) {
+          arpSeen.add(key);
+          arpTable.push(entry);
+        }
+      }
+    }
+  } catch { /* optional */ }
+
+  if (!arpTable.length) {
+    try {
+      const physRows = await rd.table([
+        AP_OIDS.arp_phys.netAddress,
+        AP_OIDS.arp_phys.physAddress,
+        AP_OIDS.arp_phys.type,
+      ], 256);
+      if (physRows && Object.keys(physRows).length) {
+        for (const [idx, r] of Object.entries(physRows)) {
+          let ip = formatIp(r[AP_OIDS.arp_phys.netAddress]);
+          const mac = formatMac(r[AP_OIDS.arp_phys.physAddress]);
+          if (!mac || mac === '00:00:00:00:00:00') continue;
+          if (!ip || ip === '0.0.0.0' || ip === '127.0.0.1') continue;
+          const sta = clientMap.get(ip) || clientMap.get(mac);
+          const entry = {
+            ip,
+            mac,
+            hostname: sta && sta.hostname ? sta.hostname : '',
+            ssid: sta && sta.ssid ? sta.ssid : '',
+            interface: '',
+            type: parseArpType(r[AP_OIDS.arp_phys.type]),
+          };
+          const key = `${ip}-${mac}`;
+          if (!arpSeen.has(key)) {
+            arpSeen.add(key);
+            arpTable.push(entry);
+          }
+        }
+      }
+    } catch { /* optional */ }
+  }
+
+  // Include any wireless client from vendor station tables not yet in ARP table
+  if (clientMap.size > 0) {
+    const seenCli = new Set();
+    for (const cli of clientMap.values()) {
+      const key = cli.mac || cli.ip;
+      if (seenCli.has(key)) continue;
+      seenCli.add(key);
+      const arpKey = `${cli.ip}-${cli.mac}`;
+      if (!arpSeen.has(arpKey) && (cli.ip || cli.mac)) {
+        arpSeen.add(arpKey);
+        arpTable.push({
+          ip: cli.ip || '—',
+          mac: cli.mac || '—',
+          hostname: cli.hostname || '',
+          ssid: cli.ssid || '',
+          interface: 'wlan',
+          type: 'Wireless (Wi-Fi)',
+        });
+      }
+    }
+  }
+
+  // Compute totals
+  let sumClients = 0;
+  for (const s of ssids) sumClients += (s.clients || 0);
+  if (totalClients == null) {
+    totalClients = sumClients;
+  }
+  if (totalClients === 0 && clientMap.size > 0) {
+    const uniqueMacs = new Set([...clientMap.values()].map((c) => c.mac || c.ip).filter(Boolean));
+    if (uniqueMacs.size > 0) totalClients = uniqueMacs.size;
+  }
+
+  const uniqueSsidNames = new Set(ssids.map((s) => s.ssid));
+  const totalSsids = uniqueSsidNames.size;
+
+  if (!ssids.length && !arpTable.length && totalClients == null) {
+    return null;
+  }
+
+  return {
+    total_ssids: totalSsids,
+    total_clients: totalClients != null ? totalClients : 0,
+    ssids,
+    arp_table: arpTable,
+    has_arp: arpTable.length > 0,
+  };
+}
+
 async function pollDevice({ host, port = 161, community = 'public', profile = '' }) {
   const conn = { host, port, community };
   let id;
@@ -644,6 +1147,27 @@ async function pollDevice({ host, port = 161, community = 'public', profile = ''
       if (info.drum == null && prn.drum != null) info.drum = prn.drum;
       if (info.page_count == null && prn.page_count != null) info.page_count = prn.page_count;
       if (info.ram == null && prn.memory) info.ram = prn.memory.percent;
+    }
+  }
+
+  const isApCandidate = chosen.id.includes('ap')
+    || chosen.id.includes('unifi')
+    || chosen.id.includes('ruckus')
+    || chosen.id.includes('aruba')
+    || chosen.id.includes('omada')
+    || chosen.id.includes('grandstream')
+    || /(?:access[ -]?point|\bap\b|wireless|unifi|ubnt|uap|u6|aruba|iap|instant.*ap|ruckus|zonedirector|smartzone|unleashed|omada|eap|grandstream|gwn|aironet|catalyst.*9800|c9800)/i.test(ident.sysDescr)
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.41112')
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.25053')
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.14823')
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.11863')
+    || ident.sysObjectID.startsWith('1.3.6.1.4.1.42397');
+  if (isApCandidate) {
+    const ap = await readApDetails(rd, ident);
+    if (ap) {
+      info.ap = ap;
+      if (info.total_ssids == null && ap.total_ssids != null) info.total_ssids = ap.total_ssids;
+      if (info.total_clients == null && ap.total_clients != null) info.total_clients = ap.total_clients;
     }
   }
 

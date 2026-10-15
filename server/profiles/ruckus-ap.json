@@ -1,0 +1,43 @@
+{
+  "id": "ruckus-ap",
+  "name": "Ruckus Wireless (ZoneDirector, SmartZone, Unleashed AP)",
+  "description": "Chuẩn RUCKUS-ZD-WLAN-MIB và RUCKUS-ZD-SYSTEM-MIB (1.3.6.1.4.1.25053). Hỗ trợ Ruckus Unleashed AP (R350/R550/R650/R750/R850), ZoneDirector và SmartZone: danh sách WLAN SSID (ruckusZDAllWLANTable), số lượng client kết nối, bảng Station/ARP chi tiết (IP, MAC, Hostname).",
+  "priority": 15,
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.25053.1", "1.3.6.1.4.1.25053"] },
+    { "sysDescr": "(ruckus|zonedirector|smartzone|unleashed|zoneflex)" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "get": "1.3.6.1.4.1.25053.1.1.1.15.0", "unverified": true },
+        { "table": { "columns": { "load": "1.3.6.1.2.1.25.3.3.1.2" }, "value": { "column": "load" }, "agg": "avg" }, "unverified": true }
+      ]
+    },
+    "ram": {
+      "label": "RAM",
+      "unit": "%",
+      "sources": [
+        { "get": "1.3.6.1.4.1.25053.1.1.1.16.0", "unverified": true },
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.2"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "first"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "disk": null,
+    "toner": null,
+    "drum": null,
+    "page_count": null
+  }
+}

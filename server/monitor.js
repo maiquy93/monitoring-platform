@@ -554,6 +554,10 @@ class Monitor extends EventEmitter {
       toner: st.snmp.info && st.snmp.info.toner != null ? st.snmp.info.toner : null,
       drum: st.snmp.info && st.snmp.info.drum != null ? st.snmp.info.drum : null,
       page_count: st.snmp.info && st.snmp.info.page_count != null ? st.snmp.info.page_count : null,
+      total_ssids: (st.snmp.info && st.snmp.info.total_ssids != null) ? st.snmp.info.total_ssids
+        : (st.snmp.info && st.snmp.info.ap ? st.snmp.info.ap.total_ssids : null),
+      total_clients: (st.snmp.info && st.snmp.info.total_clients != null) ? st.snmp.info.total_clients
+        : (st.snmp.info && st.snmp.info.ap ? st.snmp.info.ap.total_clients : null),
       printer_status: st.snmp.info && st.snmp.info.printer ? (st.snmp.info.printer.display || st.snmp.info.printer.status_text) : null,
       printer_errors: st.snmp.info && st.snmp.info.printer ? st.snmp.info.printer.errors : [],
       temperature: (!stale && a && a.temperature != null) ? a.temperature
@@ -582,6 +586,7 @@ class Monitor extends EventEmitter {
       v.severity_override = d.severity || '';
       v.agent = a; v.snmp = st.snmp.info;
       v.printer = st.snmp.info ? st.snmp.info.printer : null;
+      v.ap = st.snmp.info ? st.snmp.info.ap : null;
       v.snmp_profile = d.snmp_profile || '';
       v.snmp_error = st.snmp.error;
     }

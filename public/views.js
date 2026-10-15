@@ -43,16 +43,34 @@
       if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString('vi-VN')} trang`);
       if (d.printer_errors && d.printer_errors.length && !d.mute_local_alerts) parts.unshift(d.printer_errors[0]);
       sub = parts.filter(Boolean).join(' · ');
+    } else if (d.type === 'ap') {
+      const parts = [d.address];
+      if (d.rtt != null) parts.push(`${d.rtt} ms`);
+      if (d.total_ssids != null) parts.push(`📶 ${d.total_ssids} SSID`);
+      if (d.total_clients != null) parts.push(`👥 ${d.total_clients} client`);
+      if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
+      sub = parts.filter(Boolean).join(' · ');
     } else if (d.status === 'warning') sub = d.reasons[0];
     else {
       const parts = [d.address, d.rtt != null ? `${d.rtt} ms` : null];
+      if (d.total_ssids != null) parts.push(`📶 ${d.total_ssids} SSID`);
+      if (d.total_clients != null) parts.push(`👥 ${d.total_clients} client`);
       if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
       sub = parts.filter(Boolean).join(' · ');
     }
     let bars = '';
     if (d.status === 'up' || d.status === 'warning') {
       const pBars = [];
-      if (d.type === 'printer') {
+      if (d.type === 'ap') {
+        if (d.total_ssids != null || d.total_clients != null) {
+          const sText = d.total_ssids != null ? `${d.total_ssids} SSID` : '— SSID';
+          const cText = d.total_clients != null ? `${d.total_clients} client` : '— client';
+          pBars.push(`<div class="bar bar-ap" style="background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;display:flex;align-items:center;justify-content:space-between;line-height:18px" title="Tổng số lượng SSID phát sóng và Client kết nối"><span style="color:var(--c-low);font-weight:600">📶 ${sText}</span><span style="color:var(--c-ok);font-weight:700">👥 ${cText}</span></div>`);
+        }
+        const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram']].filter(([, value]) => value != null);
+        for (const [lbl, val, k] of metrics) pBars.push(bar(lbl, val, k));
+        bars = `<div class="bars">${pBars.join('')}</div>`;
+      } else if (d.type === 'printer') {
         // 1. Drum (tuổi thọ trống từ)
         if (d.drum != null) {
           const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
@@ -961,6 +979,10 @@
         if (d.cpu != null) gs.push(M.gauge('CPU', d.cpu, 'cpu', a && a.cores ? `${a.cores} nhân` : ''));
         if (d.ram != null) gs.push(M.gauge('RAM', d.ram, 'ram', a && a.ram.total ? `${M.fmtBytes(a.ram.used)} / ${M.fmtBytes(a.ram.total)}` : ''));
         if (d.disk != null) gs.push(M.gauge('Ổ đĩa (cao nhất)', d.disk, 'disk'));
+        if (d.type === 'ap' || d.total_ssids != null || d.total_clients != null) {
+          if (d.total_ssids != null) gs.push(stat('Tổng số SSID', `<span style="color:var(--c-low)">📶 ${d.total_ssids}</span>`));
+          if (d.total_clients != null) gs.push(stat('Client kết nối', `<span style="color:var(--c-ok)">👥 ${Number(d.total_clients).toLocaleString('vi-VN')}</span>`));
+        }
         gs.push(stat('Thời gian chạy', M.fmtDur(d.uptime)), stat('Ping', d.rtt != null ? `${d.rtt} ms` : '—'));
         if (d.net_in != null || d.net_out != null) {
           const netHtml = `<div style="font-size:18px;font-weight:700;padding:26px 0 2px;line-height:1.3"><span style="color:var(--c-low)" title="Download">↓ ${M.fmtRate(d.net_in || 0)}</span><br><span style="color:var(--c-maint);font-size:15px" title="Upload">↑ ${M.fmtRate(d.net_out || 0)}</span></div>`;
@@ -1068,6 +1090,62 @@
           </tbody></table>`;
         }
       }
+      if (d.type === 'ap' || d.ap || (d.snmp && d.snmp.ap)) {
+        const ap = d.ap || (d.snmp && d.snmp.ap) || {};
+        const ssids = ap.ssids || [];
+        const arpTable = ap.arp_table || [];
+
+        html += `<h2>Thông tin mạng không dây & SSID (Wireless Networks)</h2>
+          <dl class="kv">
+            ${kv('Tổng số SSID phát sóng', ap.total_ssids != null ? `${ap.total_ssids} SSID` : (d.total_ssids != null ? `${d.total_ssids} SSID` : '—'))}
+            ${kv('Tổng số Client đang kết nối', ap.total_clients != null ? `${Number(ap.total_clients).toLocaleString('vi-VN')} thiết bị (tính trên các SSID)` : (d.total_clients != null ? `${Number(d.total_clients).toLocaleString('vi-VN')} thiết bị` : '—'))}
+            ${kv('Bảng theo dõi ARP', ap.has_arp ? `Có hỗ trợ (${arpTable.length} thiết bị ghi nhận)` : 'Không có dữ liệu ARP')}
+          </dl>`;
+
+        if (ssids.length) {
+          const totCli = ap.total_clients || 1;
+          html += `<h2>Chi tiết các SSID & Số lượng Client kết nối (${ssids.length} SSID)</h2>
+          <table class="tbl"><thead><tr><th>Tên SSID</th><th>BSSID (MAC phát sóng)</th><th>Băng tần (Band)</th><th>Kênh</th><th>Client kết nối</th><th>Tỷ lệ Client</th></tr></thead><tbody>
+          ${ssids.map((s) => {
+            const pct = Math.min(100, Math.round(((s.clients || 0) / totCli) * 100));
+            const barHtml = `<div class="bar" style="width:110px">${s.clients || 0} client<i><b style="width:${pct}%;background:var(--c-ok)"></b></i></div>`;
+            return `<tr>
+              <td><b>📶 ${esc(s.ssid)}</b></td>
+              <td><code>${esc(s.bssid || '—')}</code></td>
+              <td><span class="badge" style="background:var(--panel2);border:1px solid var(--border);padding:2px 6px;border-radius:4px;font-size:12px">${esc(s.band || 'Mặc định')}</span></td>
+              <td>${s.channel != null ? `CH ${s.channel}` : '—'}</td>
+              <td><b style="color:var(--c-ok);font-size:14px">${Number(s.clients || 0).toLocaleString('vi-VN')}</b> client</td>
+              <td>${barHtml}</td>
+            </tr>`;
+          }).join('')}
+          </tbody></table>`;
+        }
+
+        if (arpTable.length) {
+          html += `<h2>Bảng theo dõi ARP & Thiết bị kết nối (${arpTable.length} thiết bị)</h2>
+          <div style="margin-bottom:8px">
+            <input class="inp" id="arp-search-inp" placeholder="🔍 Tìm kiếm theo IP, MAC, Domain name / Hostname, SSID..." style="width:100%;max-width:380px">
+          </div>
+          <div style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+          <table class="tbl" id="arp-table-el" style="margin:0"><thead><tr style="position:sticky;top:0;background:var(--panel);z-index:2">
+            <th>Địa chỉ IP</th><th>Địa chỉ MAC</th><th>Tên miền / Hostname</th><th>SSID kết nối</th><th>Giao diện</th><th>Phân loại</th>
+          </tr></thead><tbody>
+          ${arpTable.map((a) => {
+            const host = a.hostname ? `<b style="color:var(--text)">${esc(a.hostname)}</b>` : '<span class="muted">—</span>';
+            const ssidBadge = a.ssid ? `<span class="badge" style="background:var(--panel2);border:1px solid var(--border);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--c-low)">📶 ${esc(a.ssid)}</span>` : '<span class="muted">—</span>';
+            const typeCol = a.type === 'Dynamic (Động)' || a.type === 'Dynamic' ? 'var(--c-ok)' : (a.type && a.type.includes('Wireless') ? 'var(--c-low)' : 'var(--muted)');
+            return `<tr class="arp-row" data-q="${esc(`${a.ip} ${a.mac} ${a.hostname || ''} ${a.ssid || ''}`.toLowerCase())}">
+              <td><code><b>${esc(a.ip)}</b></code></td>
+              <td><code>${esc(a.mac)}</code></td>
+              <td>${host}</td>
+              <td>${ssidBadge}</td>
+              <td><span class="muted">${esc(a.interface || '—')}</span></td>
+              <td><span style="color:${typeCol};font-weight:600">${esc(a.type || 'Dynamic')}</span></td>
+            </tr>`;
+          }).join('')}
+          </tbody></table></div>`;
+        }
+      }
       if (d.snmp_enabled) html += this.snmpSection(d, kv);
       if (d.agent_token) {
         html += `<h2>Agent token</h2><details><summary class="muted">Hiện token (bí mật)</summary><code style="word-break:break-all">${esc(d.agent_token)}</code>
@@ -1079,6 +1157,17 @@
         $('#d-info').innerHTML = html;
         if (open && $('#d-info details')) $('#d-info details').open = true;
         this.bindSnmp(d);
+        const searchInp = $('#arp-search-inp');
+        if (searchInp) {
+          searchInp.oninput = () => {
+            const q = searchInp.value.toLowerCase().trim();
+            const rows = $$('.arp-row');
+            for (const row of rows) {
+              const text = row.getAttribute('data-q') || '';
+              row.style.display = (!q || text.includes(q)) ? '' : 'none';
+            }
+          };
+        }
       }
       const rg = $('#d-regen');
       if (rg) rg.onclick = () => M.confirm('Tạo token mới? Agent đang dùng token cũ sẽ bị từ chối.', async () => {

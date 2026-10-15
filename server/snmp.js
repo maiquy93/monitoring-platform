@@ -108,7 +108,7 @@ function decodeResponse(buf, expectedReqId, types) {
     switch (valT.tag) {
       case 0x02: val = decInt(raw); break;
       case 0x04:
-        if (types && !isPrintable(raw)) { val = raw.toString('hex'); types[oid] = 'HEX'; break; }
+        if (!isPrintable(raw)) { val = raw.toString('hex'); if (types) types[oid] = 'HEX'; break; }
         val = raw.toString('utf8').replace(/[\x00-\x1f\x7f]/g, '').trim();
         break;
       case 0x41: case 0x42: case 0x43: case 0x46: val = decUInt(raw); break;

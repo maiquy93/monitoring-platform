@@ -1,0 +1,43 @@
+{
+  "id": "ubiquiti-unifi",
+  "name": "Ubiquiti UniFi (Access Point & UDM)",
+  "description": "Chuẩn UBNT-UniFi-MIB (1.3.6.1.4.1.41112.1.6). Tự động nhận diện Access Point UniFi (UAP, U6, AC-Pro/Lite/LR/HD) và UniFi Dream Machine. Giám sát danh sách SSID (unifiVapTable), số lượng client kết nối trên mỗi SSID, bảng theo dõi ARP và tải hệ thống.",
+  "priority": 15,
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.41112.1.4", "1.3.6.1.4.1.41112.1.6", "1.3.6.1.4.1.41112"] },
+    { "sysDescr": "(unifi|ubnt|uap|u6|dream machine)" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "table": { "columns": { "load": "1.3.6.1.2.1.25.3.3.1.2" }, "value": { "column": "load" }, "agg": "avg" }, "unverified": true },
+        { "get": "1.3.6.1.4.1.2021.11.11.0", "invert": true, "unverified": true }
+      ]
+    },
+    "ram": {
+      "label": "RAM",
+      "unit": "%",
+      "sources": [
+        {
+          "table": {
+            "columns": { "type": "1.3.6.1.2.1.25.2.3.1.2", "size": "1.3.6.1.2.1.25.2.3.1.5", "used": "1.3.6.1.2.1.25.2.3.1.6" },
+            "where": { "type": ["1.3.6.1.2.1.25.2.1.2"] },
+            "value": { "percent": { "used": "used", "total": "size" } },
+            "agg": "first"
+          },
+          "unverified": true
+        },
+        { "percent": { "free": "1.3.6.1.4.1.2021.4.6.0", "total": "1.3.6.1.4.1.2021.4.5.0" }, "unverified": true }
+      ]
+    },
+    "disk": null,
+    "toner": null,
+    "drum": null,
+    "page_count": null
+  }
+}
