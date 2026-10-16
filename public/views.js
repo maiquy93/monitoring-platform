@@ -223,17 +223,121 @@
       <div class="legend">${series.map((s) => `<span style="--lc:${s.color}">${s.label}</span>`).join('')}</div>`;
   };
 
+  M.renderAiReportCard = (r, showHeader = true) => {
+    if (!r) return '';
+    const isEn = M.S.lang === 'en';
+    const isDaily = r.kind === 'daily';
+    const tokTotal = (r.prompt_tokens || 0) + (r.completion_tokens || 0);
+    const srcBadge = r.cached
+      ? `<span class="sev-badge low" title="${isEn ? 'Reused from deduplication cache (0 tokens spent)' : 'Tái sử dụng từ bộ nhớ đệm chống trùng lặp (0 token)'}">⚡ ${isEn ? 'Cached (0 tokens)' : 'Cache (0 token)'}</span>`
+      : r.source === 'ai'
+        ? `<span class="sev-badge ok">🤖 AI API (${tokTotal} tokens)</span>`
+        : `<span class="sev-badge medium" title="${isEn ? 'Zero-token local expert analysis' : 'Phân tích từ bộ quy tắc chuyên gia nội bộ (0 token)'}">🧠 ${isEn ? 'Smart Engine (0 tokens)' : 'Chuyên gia nội bộ (0 token)'}</span>`;
+    const kindBadge = isDaily
+      ? `<span class="sev-badge low">📊 ${isEn ? 'Daily Digest (24h)' : 'Tổng hợp cuối ngày (24h)'}</span>`
+      : `<span class="sev-badge ${r.severity || 'high'}">🚨 ${isEn ? 'Incident Diagnosis' : 'Chẩn đoán sự cố'}</span>`;
+    const devLink = r.device_id
+      ? `<a href="#/device/${r.device_id}"><b>${esc(r.device_name)}</b></a>`
+      : `<b>${esc(tr(r.device_name || (isEn ? 'System' : 'Hệ thống')))}</b>`;
+
+    return `<div class="ai-card ${isDaily ? 'daily' : ''}">
+      ${showHeader ? `<div class="ai-card-head">
+        ${kindBadge} ${devLink}
+        <span class="muted">· ${M.fmtTime(r.ts)}</span>
+        <span class="spacer"></span>
+        ${srcBadge}
+      </div>` : `<div class="ai-card-head" style="margin-bottom:6px">
+        <b>🤖 ${isEn ? 'AI Diagnosis & Remediation' : 'AI Chẩn đoán & Đề xuất xử lý'}</b>
+        <span class="muted">· ${M.fmtTime(r.ts)}</span>
+        <span class="spacer"></span>
+        ${srcBadge}
+      </div>`}
+      <div class="ai-grid">
+        <div class="ai-box">
+          <div class="ai-box-title">🔴 ${isEn ? 'Issue / Problem' : 'Vấn đề (Issue)'}</div>
+          <div>${esc(r.issue || '—')}</div>
+        </div>
+        <div class="ai-box">
+          <div class="ai-box-title">🔍 ${isEn ? 'Root Cause' : 'Nguyên nhân (Cause)'}</div>
+          <div>${esc(r.cause || '—')}</div>
+        </div>
+        <div class="ai-box">
+          <div class="ai-box-title">🛠️ ${isEn ? 'Recommended Solution' : 'Giải pháp đề xuất (Solution)'}</div>
+          <div>${esc(r.solution || '—')}</div>
+        </div>
+        <div class="ai-box">
+          <div class="ai-box-title">📈 ${isEn ? 'Predictive Risk / Trend' : 'Dự đoán xu hướng (Prediction)'}</div>
+          <div>${esc(r.prediction || '—')}</div>
+        </div>
+      </div>
+    </div>`;
+  };
+
   M.eventsTable = (events, showDevice) => {
     if (!events.length) return `<div class="muted">${esc(t('Chưa có sự kiện'))}</div>`;
+    const isEn = M.S.lang === 'en';
+    const canOp = M.S.user && M.S.user.role !== 'viewer';
     const badge = (e) => (e.kind === 'audit' ? 'ok' : e.severity);
     const label = {
       down: t('Mất kết nối'), up: t('Phục hồi'), warning: t('Cảnh báo'), audit: t('Hệ thống'),
       dos: t('Tấn công DoS'), smart: t('Lỗi đĩa cứng'), thermal: t('Quá nhiệt'), power: t('Mất điện lưới'),
     };
-    return `<table class="tbl"><thead><tr><th>${esc(t('Thời gian'))}</th>${showDevice ? `<th>${esc(t('Thiết bị'))}</th>` : ''}<th>${esc(t('Loại'))}</th><th>${esc(t('Nội dung'))}</th></tr></thead><tbody>
-      ${events.map((e) => `<tr><td>${M.fmtTime(e.ts)}</td>${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
-      <td><span class="sev-badge ${badge(e)}">${esc(label[e.kind] || e.kind)}</span></td><td>${esc(tr(e.message))}</td></tr>`).join('')}</tbody></table>`;
+    const colSpan = showDevice ? 4 : 3;
+    const rowsHtml = events.map((e) => {
+      const isIncident = ['down', 'warning', 'dos', 'smart', 'thermal', 'power'].includes(e.kind);
+      const hasAi = !!e.ai_report;
+      const aiBtns = [];
+      if (hasAi) {
+        aiBtns.push(`<button type="button" class="ai-badge" data-ai-toggle="${e.id}" title="${isEn ? 'Click to view/hide AI diagnosis' : 'Bấm để xem/ẩn chẩn đoán AI'}">🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}</button>`);
+      } else if (isIncident && canOp) {
+        aiBtns.push(`<button type="button" class="ai-badge" data-ai-analyze="${e.id}" title="${isEn ? 'Analyze this incident with AI' : 'Phân tích sự cố này bằng AI'}">✨ ${isEn ? 'AI Analyze' : 'Phân tích AI'}</button>`);
+      }
+      return `<tr>
+        <td>${M.fmtTime(e.ts)}</td>
+        ${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
+        <td><span class="sev-badge ${badge(e)}">${esc(label[e.kind] || e.kind)}</span></td>
+        <td>${esc(tr(e.message))} ${aiBtns.join('')}</td>
+      </tr>
+      <tr id="ai-ev-row-${e.id}" class="${hasAi ? '' : 'hidden'}">
+        <td colspan="${colSpan}" style="padding-top:0;border-top:none">${hasAi ? M.renderAiReportCard(e.ai_report, false) : ''}</td>
+      </tr>`;
+    }).join('');
+    return `<table class="tbl" data-events-tbl="1"><thead><tr><th>${esc(t('Thời gian'))}</th>${showDevice ? `<th>${esc(t('Thiết bị'))}</th>` : ''}<th>${esc(t('Loại'))}</th><th>${esc(t('Nội dung'))}</th></tr></thead><tbody>${rowsHtml}</tbody></table>`;
   };
+
+  document.addEventListener('click', async (ev) => {
+    const toggleBtn = ev.target.closest('[data-ai-toggle]');
+    if (toggleBtn) {
+      const id = toggleBtn.dataset.aiToggle;
+      const row = document.getElementById(`ai-ev-row-${id}`);
+      if (row) row.classList.toggle('hidden');
+      return;
+    }
+    const analyzeBtn = ev.target.closest('[data-ai-analyze]');
+    if (analyzeBtn) {
+      const id = Number(analyzeBtn.dataset.aiAnalyze);
+      const isEn = M.S.lang === 'en';
+      const origText = analyzeBtn.textContent;
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = isEn ? '⏳ Analyzing...' : '⏳ Đang phân tích...';
+      try {
+        const res = await M.api('POST', '/api/ai/analyze', { event_id: id, lang: M.S.lang });
+        const row = document.getElementById(`ai-ev-row-${id}`);
+        if (row && res.report) {
+          row.firstElementChild.innerHTML = M.renderAiReportCard(res.report, false);
+          row.classList.remove('hidden');
+        }
+        analyzeBtn.removeAttribute('data-ai-analyze');
+        analyzeBtn.setAttribute('data-ai-toggle', String(id));
+        analyzeBtn.textContent = `🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}`;
+      } catch (err) {
+        M.toast(M.trData(err.message));
+        analyzeBtn.textContent = origText;
+      } finally {
+        analyzeBtn.disabled = false;
+      }
+    }
+  });
 
   // ---------- dashboard ----------
   const F = { q: '', status: '', type: '' };
@@ -1367,18 +1471,95 @@
     },
   };
 
-  // ---------- events ----------
+  // ---------- events & integrated AI reports ----------
   M.views.events = {
+    subTab: 'events', // 'events' | 'ai'
+    aiKind: '',
     async render(el) {
-      el.innerHTML = `<div class="row"><h1>${esc(t('Nhật ký sự kiện'))}</h1><span class="spacer"></span>
-        <select class="sel" id="ev-kind"><option value="">${esc(t('Tất cả'))}</option><option value="down">${esc(t('Mất kết nối'))}</option><option value="warning">${esc(t('Cảnh báo'))}</option><option value="dos">${esc(t('Tấn công DoS'))}</option><option value="power">${esc(t('Mất điện lưới'))}</option><option value="smart">${esc(t('Lỗi đĩa cứng'))}</option><option value="thermal">${esc(t('Quá nhiệt'))}</option><option value="up">${esc(t('Phục hồi'))}</option><option value="audit">${esc(t('Hệ thống'))}</option></select></div>
-        <div class="panel" id="ev-body"></div>`;
-      $('#ev-kind').onchange = () => this.load();
+      const isEn = M.S.lang === 'en';
+      const canOp = M.S.user && M.S.user.role !== 'viewer';
+      el.innerHTML = `<div class="row" style="margin-bottom:12px">
+        <h1 style="margin:0">${esc(t('Nhật ký sự kiện'))}</h1>
+        <div class="ai-subtabs">
+          <button type="button" id="ev-tab-list" class="${this.subTab === 'events' ? 'active' : ''}">📋 ${isEn ? 'Event Log' : 'Nhật ký sự kiện'}</button>
+          <button type="button" id="ev-tab-ai" class="${this.subTab === 'ai' ? 'active' : ''}">🤖 ${isEn ? 'AI Reports & Daily Digest' : 'Báo cáo & Dự đoán AI'}</button>
+        </div>
+        <span class="spacer"></span>
+        <div id="ev-filters" class="${this.subTab === 'events' ? '' : 'hidden'}">
+          <select class="sel" id="ev-kind"><option value="">${esc(t('Tất cả'))}</option><option value="down">${esc(t('Mất kết nối'))}</option><option value="warning">${esc(t('Cảnh báo'))}</option><option value="dos">${esc(t('Tấn công DoS'))}</option><option value="power">${esc(t('Mất điện lưới'))}</option><option value="smart">${esc(t('Lỗi đĩa cứng'))}</option><option value="thermal">${esc(t('Quá nhiệt'))}</option><option value="up">${esc(t('Phục hồi'))}</option><option value="audit">${esc(t('Hệ thống'))}</option></select>
+        </div>
+        <div id="ai-filters" class="row ${this.subTab === 'ai' ? '' : 'hidden'}">
+          <select class="sel" id="ai-kind-sel">
+            <option value="" ${this.aiKind === '' ? 'selected' : ''}>${isEn ? 'All AI Reports' : 'Tất cả báo cáo AI'}</option>
+            <option value="daily" ${this.aiKind === 'daily' ? 'selected' : ''}>📊 ${isEn ? 'End-of-Day Digests (24h)' : 'Báo cáo cuối ngày (24h)'}</option>
+            <option value="incident" ${this.aiKind === 'incident' ? 'selected' : ''}>🚨 ${isEn ? 'Incident Diagnoses' : 'Chẩn đoán sự cố'}</option>
+          </select>
+          ${canOp ? `<button type="button" class="btn primary" id="btn-run-digest">📊 ${isEn ? 'Collect Logs & Run Daily Digest' : 'Thu thập Log & Phân tích Cuối ngày'}</button>` : ''}
+        </div>
+      </div>
+      <div id="ai-stats-wrap" class="${this.subTab === 'ai' ? '' : 'hidden'}"></div>
+      <div class="panel" id="ev-body"></div>`;
+
+      $('#ev-tab-list').onclick = () => { this.subTab = 'events'; this.render(el); };
+      $('#ev-tab-ai').onclick = () => { this.subTab = 'ai'; this.render(el); };
+      const evKind = $('#ev-kind');
+      if (evKind) evKind.onchange = () => this.load();
+      const aiKindSel = $('#ai-kind-sel');
+      if (aiKindSel) aiKindSel.onchange = (e) => { this.aiKind = e.target.value; this.load(); };
+      const runDigestBtn = $('#btn-run-digest');
+      if (runDigestBtn) {
+        runDigestBtn.onclick = async () => {
+          runDigestBtn.disabled = true;
+          const orig = runDigestBtn.textContent;
+          runDigestBtn.textContent = isEn ? '⏳ Analyzing 24h logs...' : '⏳ Đang tổng hợp log 24h...';
+          try {
+            await M.api('POST', '/api/ai/daily-digest', { lang: M.S.lang });
+            M.toast(isEn ? 'Generated End-of-Day AI Digest' : 'Đã tạo báo cáo phân tích cuối ngày');
+            await this.load();
+          } catch (err) {
+            M.toast(M.trData(err.message));
+          } finally {
+            runDigestBtn.disabled = false;
+            runDigestBtn.textContent = orig;
+          }
+        };
+      }
       await this.load();
       this.t = setInterval(() => this.load(), 10000);
     },
     destroy() { clearInterval(this.t); },
     async load() {
+      const isEn = M.S.lang === 'en';
+      if (this.subTab === 'ai') {
+        const q = this.aiKind ? `?kind=${encodeURIComponent(this.aiKind)}&limit=100` : '?limit=100';
+        const { reports, stats, ai } = await M.api('GET', `/api/ai/reports${q}`);
+        const statsWrap = $('#ai-stats-wrap');
+        if (statsWrap && stats && ai) {
+          const stBadge = ai.enabled
+            ? `<span class="sev-badge ok">● ${isEn ? 'AI API Enabled' : 'API AI Đang bật'}</span>`
+            : `<span class="sev-badge medium">○ ${isEn ? 'AI API Disabled (Smart Fallback Active)' : 'Đã tắt gọi API AI (Đang dùng Chuyên gia nội bộ 0 token)'}</span>`;
+          const dailyBadge = ai.daily_digest_enabled
+            ? `<span class="sev-badge low">🕒 ${isEn ? `Auto Daily Digest: ${ai.daily_digest_time}` : `Tự động tổng hợp cuối ngày: ${ai.daily_digest_time}`}</span>`
+            : `<span class="muted">🕒 ${isEn ? 'Auto Daily Digest: Off' : 'Tự động báo cáo cuối ngày: Tắt'}</span>`;
+          statsWrap.innerHTML = `<div class="ai-stats-bar">
+            ${stBadge}
+            ${dailyBadge}
+            <span><b>${isEn ? 'API Calls Today:' : 'Lượt gọi API hôm nay:'}</b> ${stats.calls_today} / ${ai.daily_call_limit}</span>
+            <span><b>${isEn ? 'Tokens Used Today:' : 'Token dùng hôm nay:'}</b> ${Number(stats.tokens_today || 0).toLocaleString()}</span>
+            <span><b>${isEn ? 'Cache Hits (0 tokens):' : 'Lượt Cache tiết kiệm (0 token):'}</b> ${stats.cached_today || 0}</span>
+            <span class="spacer"></span>
+            ${M.S.user && M.S.user.role === 'admin' ? `<a href="#/settings" class="btn sm">⚙️ ${isEn ? 'Configure AI' : 'Cài đặt AI'}</a>` : ''}
+          </div>`;
+        }
+        if ($('#ev-body')) {
+          $('#ev-body').innerHTML = reports.length
+            ? reports.map((r) => M.renderAiReportCard(r, true)).join('')
+            : `<div class="muted" style="padding:18px;text-align:center">${isEn
+              ? 'No AI reports yet. High/Critical incidents are analyzed automatically, or click "Collect Logs & Run Daily Digest" above.'
+              : 'Chưa có báo cáo AI nào. Các sự cố mức Cao & Nghiêm trọng sẽ tự động được phân tích, hoặc bạn có thể bấm nút "Thu thập Log & Phân tích Cuối ngày" ở trên.'}</div>`;
+        }
+        return;
+      }
       const { events } = await M.api('GET', '/api/events?limit=300');
       const k = $('#ev-kind') && $('#ev-kind').value;
       if ($('#ev-body')) $('#ev-body').innerHTML = M.eventsTable(k ? events.filter((e) => e.kind === k) : events, true);

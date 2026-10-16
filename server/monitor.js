@@ -127,6 +127,8 @@ class Monitor extends EventEmitter {
       snmpFn: require('./snmp-engine').pollDevice,
       ...opts,
     };
+    const { AiService } = require('./ai');
+    this.ai = new AiService(db, { fetchFn: opts.aiFetchFn });
     this.devices = new Map();   // id -> row (+ groups)
     this.state = new Map();     // id -> runtime state
     this.settings = getSettings(db);
@@ -135,6 +137,7 @@ class Monitor extends EventEmitter {
     this.timer = null;
     this.lastPurge = 0;
     this.lastDiskCheck = 0;
+    this.lastAiCheck = 0;
     this.diskLow = false;
     this.reload();
   }
@@ -246,6 +249,10 @@ class Monitor extends EventEmitter {
       if (d.snmp_enabled && d.address && !st.snmp.busy && now >= st.snmp.nextAt) this._dispatch(() => this._snmp(d, st, now));
     }
     this.evaluate(now);
+    if (now - this.lastAiCheck >= 30000) {
+      this.lastAiCheck = now;
+      this.ai.checkScheduledDailyDigest(this, this.settings, now);
+    }
     if (now - this.lastPurge > 3600e3) { this.lastPurge = now; this.purge(); }
     if (now - this.lastDiskCheck > 300e3) { this.lastDiskCheck = now; this.guardDisk(); }
   }
@@ -475,10 +482,50 @@ class Monitor extends EventEmitter {
   }
 
   _event(d, kind, severity, message) {
-    if (this.severityOf(d) === 'none' && kind !== 'audit') return;
-    this.db.prepare('INSERT INTO events(ts,device_id,device_name,kind,severity,message) VALUES(?,?,?,?,?,?)')
-      .run(Date.now(), d.id, d.name, kind, severity, message);
-    this.emit('event', { device_id: d.id, kind, severity, message });
+    const devSev = d && d.id ? this.severityOf(d) : severity;
+    if (devSev === 'none' && kind !== 'audit') return null;
+    const now = Date.now();
+    const info = this.db.prepare('INSERT INTO events(ts,device_id,device_name,kind,severity,message) VALUES(?,?,?,?,?,?)')
+      .run(now, d.id, d.name, kind, severity, message);
+    const eventId = Number(info.lastInsertRowid);
+    this.emit('event', { id: eventId, device_id: d.id, kind, severity, message });
+    const aiSev = (severity === 'critical' || severity === 'high') ? severity : devSev;
+    if (d && d.id && (aiSev === 'critical' || aiSev === 'high') && ['down', 'warning', 'dos', 'smart', 'thermal', 'power'].includes(kind)) {
+      this._triggerAiIncident(d, kind, aiSev, message, eventId, now);
+    }
+    return eventId;
+  }
+
+  _triggerAiIncident(d, kind, aiSev, message, eventId, now = Date.now()) {
+    if (!this.settings.ai || !this.settings.ai.enabled || this.settings.ai.auto_incident === false) return;
+    const st = this.state.get(d.id);
+    const agentFresh = st && st.agent.lastAt != null && now - st.agent.lastAt <= this.o.agentTimeoutMs;
+    const res = st ? this._resources(st, agentFresh) : null;
+    const temp = (agentFresh && st.agent.data && st.agent.data.temperature != null)
+      ? st.agent.data.temperature
+      : (st && st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null);
+    const ctx = {
+      device_id: d.id,
+      device_name: d.name,
+      device_type: d.type,
+      address: d.address,
+      severity: aiSev,
+      status: st ? st.status : kind,
+      kind,
+      reason: message,
+      event_id: eventId,
+      cpu: res ? res.cpu : null,
+      ram: res ? res.ram : null,
+      disk: res ? res.disk : null,
+      temp,
+      rtt: st && st.icmp ? st.icmp.rtt : null,
+      pkt_rate: st && st.snmp ? st.snmp.pktRate : null,
+      smart: agentFresh && st.agent.data ? st.agent.data.smart : null,
+      power: agentFresh && st.agent.data ? st.agent.data.power : null,
+    };
+    this.ai.analyzeIncident(ctx, this.settings, { now }).then((rep) => {
+      if (rep) this.emit('change');
+    }).catch(() => {});
   }
 
   // Agent data wins; SNMP (HOST-RESOURCES-MIB) is the fallback for routers/switches.
@@ -530,6 +577,7 @@ class Monitor extends EventEmitter {
     const now = Date.now();
     this.db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - this.o.retentionDays * 86400e3);
     this.db.prepare('DELETE FROM events WHERE ts < ?').run(now - 90 * 86400e3);
+    this.db.prepare('DELETE FROM ai_reports WHERE ts < ?').run(now - 90 * 86400e3);
     // hard cap so a flapping device can never grow the events table without limit
     this.db.prepare('DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?').run(this.o.maxEvents);
     this.checkpoint();

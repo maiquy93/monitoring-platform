@@ -1105,4 +1105,231 @@ test('dos: router power-cycle / reboot recovery does not trigger false Flood/DoS
   } finally { t.close(); }
 });
 
+test('ai: unified VI/EN templates, JSON parser, and 24h trend pre-calculation', () => {
+  const {
+    buildIncidentPrompt,
+    buildDailyDigestPrompt,
+    parseAiJsonResponse,
+    computeDeviceTrendSummary,
+  } = require('../server/ai');
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+
+  // 1. Unified Vietnamese & English Incident Prompts
+  const ctx = {
+    device_name: 'DB-Server-01',
+    device_type: 'server',
+    address: '10.0.0.10',
+    severity: 'critical',
+    kind: 'smart',
+    reason: 'Lỗi ổ đĩa SMART (Bad Sector / Sắp hỏng)',
+    metrics: 'CPU:92%,RAM:85%,Disk:94%,Temp:82C,SMART:BAD_SECTOR',
+    trend: 'CPU(avg:70%,max:95%);Disk(now:94%,+3.5%/d,full~1.7d)',
+  };
+
+  const pVi = buildIncidentPrompt(ctx, 'vi');
+  assert.match(pVi.system, /chuyên gia AI quản trị hạ tầng mạng/);
+  assert.match(pVi.user, /\[TEMPLATE_SU_CO_V1\]/);
+  assert.match(pVi.user, /Thiet_bi: DB-Server-01 \(Loai: server \| IP: 10\.0\.0\.10\)/);
+  assert.ok(pVi.user.length < 300, 'Outbound prompt must remain ultra-compact to save tokens');
+
+  const pEn = buildIncidentPrompt(ctx, 'en');
+  assert.match(pEn.system, /You are a senior NOC\/SRE AI assistant/);
+  assert.match(pEn.user, /\[INCIDENT_TEMPLATE_V1\]/);
+  assert.match(pEn.user, /Device: DB-Server-01 \(Type: server \| IP: 10\.0\.0\.10\)/);
+
+  // 2. Daily Digest Prompts (VI & EN)
+  const digestSample = {
+    total_events: 14, down_events: 2, warning_events: 9, dos_events: 1, smart_events: 1, thermal_events: 1,
+    top_devices: 'DB-Server-01:6(crit/high:5)',
+    resource_risks: 'DB-Server-01[Disk:94%(+3.5%/d,full~1.7d),CPUmax:95%]',
+  };
+  assert.match(buildDailyDigestPrompt(digestSample, 'vi').system, /chuyên gia AI phân tích vận hành/);
+  assert.match(buildDailyDigestPrompt(digestSample, 'en').system, /senior NOC\/SRE AI analyst/);
+
+  // 3. Robust JSON response parser (handles markdown code fences and VI/EN keys)
+  const parsedEn = parseAiJsonResponse('```json\n{"issue":"Disk SMART failure & 94% usage","cause":"Physical bad sectors on primary volume","solution":"Replace disk and restore RAID","prediction":"Imminent failure within 48h"}\n```');
+  assert.equal(parsedEn.issue, 'Disk SMART failure & 94% usage');
+  assert.equal(parsedEn.cause, 'Physical bad sectors on primary volume');
+  assert.equal(parsedEn.solution, 'Replace disk and restore RAID');
+  assert.equal(parsedEn.prediction, 'Imminent failure within 48h');
+
+  const parsedViKeys = parseAiJsonResponse('{"van_de":"Ổ đĩa báo lỗi Bad Sector","nguyen_nhan":"Lão hóa phần cứng","giai_phap":"Thay ổ đĩa mới ngay","du_doan":"Đầy ổ sau 1.7 ngày"}');
+  assert.equal(parsedViKeys.issue, 'Ổ đĩa báo lỗi Bad Sector');
+  assert.equal(parsedViKeys.prediction, 'Đầy ổ sau 1.7 ngày');
+
+  // 4. Server-side 24h linear trend calculation (saves sending raw metric arrays)
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mon-ai-'));
+  const db = open(path.join(dir, 'm.db'));
+  try {
+    const now = Date.now();
+    db.prepare("INSERT INTO devices(id,name,agent_token,created_at) VALUES(1,'srv','tok',?)").run(now);
+    for (let i = 0; i <= 10; i++) {
+      const ts = now - (10 - i) * 3600 * 1000; // 10 hours span
+      db.prepare('INSERT INTO metrics(device_id,ts,cpu,ram,disk,temp) VALUES(1,?,?,?,?,?)').run(ts, 50 + i * 4, 70, 80 + i * 1.0, 65 + i);
+    }
+    const trend = computeDeviceTrendSummary(db, 1, now);
+    assert.match(trend, /CPU_avg=70%\/max=90%/);
+    assert.match(trend, /Disk=90%\(slope=\+24%\/d,full_in~0\.4d\)/);
+  } finally {
+    db.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('ai: end-to-end incident diagnosis, token-saving cache, settings toggle, and 24h daily log digest', async () => {
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+
+    // Mock external LLM API fetch to verify exact outbound payloads & token counting
+    const llmCalls = [];
+    t.monitor.ai.fetchFn = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      llmCalls.push({ url, headers: opts.headers, body });
+      const sys = body.messages[0].content;
+      const isEn = sys.includes('You are a senior');
+      const reply = isEn
+        ? {
+          issue: 'Critical server incident: Disk > 90% and SMART Bad Sector detected.',
+          cause: 'Log rotation failure combined with physical disk surface degradation.',
+          solution: '1. Run smartctl -a /dev/sda. 2. Clean /var/log and swap faulty drive.',
+          prediction: 'Disk will reach 100% within 24h if not cleaned.',
+        }
+        : {
+          issue: 'Sự cố máy chủ nghiêm trọng: Ổ đĩa > 90% kèm lỗi Bad Sector SMART.',
+          cause: 'Tràn log hệ thống kết hợp xuống cấp bề mặt vật lý ổ cứng.',
+          solution: '1. Kiểm tra smartctl -a /dev/sda. 2. Dọn /var/log và thay thế ổ đĩa lỗi.',
+          prediction: 'Ổ đĩa sẽ đầy 100% trong 24h tới nếu không xử lý.',
+        };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify(reply) } }],
+          usage: { prompt_tokens: 95, completion_tokens: 65 },
+        }),
+      };
+    };
+
+    // 1. Configure AI settings via PUT /api/settings
+    const putAi = await t.api('PUT', '/api/settings', {
+      default_lang: 'vi',
+      ai: {
+        enabled: true,
+        provider: 'openai',
+        api_url: 'https://api.openai.com/v1/chat/completions',
+        api_key: 'sk-test-secret-token-12345',
+        model: 'gpt-4o-mini',
+        auto_incident: true,
+        daily_digest_enabled: true,
+        daily_digest_time: '23:50',
+        cooldown_minutes: 60,
+        daily_call_limit: 50,
+        max_tokens: 300,
+      },
+    });
+    assert.equal(putAi.status, 200);
+
+    const getSt = (await t.api('GET', '/api/settings')).body;
+    assert.equal(getSt.ai.enabled, true);
+    assert.equal(getSt.ai.has_api_key, true);
+    assert.equal(getSt.ai.api_key, '', 'Raw API token must never be leaked back to client');
+
+    // 2. Test AI Connection & Template Preview in Vietnamese and English
+    const testVi = await t.api('POST', '/api/ai/test', { lang: 'vi' });
+    assert.equal(testVi.status, 200);
+    assert.equal(testVi.body.live_api_called, true);
+    assert.match(testVi.body.parsed.issue, /Sự cố máy chủ nghiêm trọng/);
+    assert.equal(llmCalls.length, 1);
+    assert.equal(llmCalls[0].headers.Authorization, 'Bearer sk-test-secret-token-12345');
+
+    const testEn = await t.api('POST', '/api/ai/test', { lang: 'en' });
+    assert.equal(testEn.status, 200);
+    assert.equal(testEn.body.live_api_called, true);
+    assert.match(testEn.body.parsed.issue, /Critical server incident/);
+    assert.equal(llmCalls.length, 2);
+
+    // 3. Create a Critical Server & a Low-severity Workstation
+    const srvRes = await t.api('POST', '/api/devices', {
+      name: 'Prod-DB-01', type: 'server', address: '10.0.0.50', check_icmp: false, check_agent: true, severity: 'critical',
+    });
+    const srvId = srvRes.body.id;
+
+    const lowRes = await t.api('POST', '/api/devices', {
+      name: 'Office-PC', type: 'workstation', address: '10.0.0.51', check_icmp: false, check_agent: true, severity: 'low',
+    });
+    const lowId = lowRes.body.id;
+
+    // 4. Low-severity device has high CPU -> must NOT call AI API (saves tokens!)
+    const callsBeforeLow = llmCalls.length;
+    const tLow = Date.now();
+    t.monitor.ingestAgent(lowId, { cpu: { percent: 96 }, memory: { percent: 40 }, disks: [{ mount: '/', percent: 50 }] }, tLow - 20000);
+    t.monitor.evaluate(tLow - 20000);
+    t.monitor.ingestAgent(lowId, { cpu: { percent: 96 }, memory: { percent: 40 }, disks: [{ mount: '/', percent: 50 }] }, tLow);
+    t.monitor.evaluate(tLow);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(llmCalls.length, callsBeforeLow, 'Low severity device must not trigger automatic AI API calls');
+
+    // 5. Critical server reports Disk > 90% and SMART Bad Sector -> automatically triggers AI analysis!
+    const callsBeforeCrit = llmCalls.length;
+    const tNow = Date.now();
+    t.monitor.ingestAgent(srvId, {
+      cpu: { percent: 93 }, memory: { percent: 88 }, disks: [{ mount: '/', percent: 95 }],
+      smart: { ok: false, details: 'Bad sector on /dev/sda' },
+    }, tNow - 20000);
+    t.monitor.evaluate(tNow - 20000);
+    t.monitor.ingestAgent(srvId, {
+      cpu: { percent: 94 }, memory: { percent: 88 }, disks: [{ mount: '/', percent: 95 }],
+      smart: { ok: false, details: 'Bad sector on /dev/sda' },
+    }, tNow);
+    t.monitor.evaluate(tNow);
+    await new Promise((r) => setTimeout(r, 40));
+    assert.ok(llmCalls.length > callsBeforeCrit, 'Critical server incident must automatically trigger AI API');
+
+    // Verify GET /api/events attaches ai_report directly to the event
+    const evList = (await t.api('GET', `/api/events?device=${srvId}`)).body.events;
+    const smartEv = evList.find((e) => e.kind === 'smart');
+    assert.ok(smartEv && smartEv.ai_report, 'Event must include attached AI diagnosis');
+    assert.match(smartEv.ai_report.issue, /Sự cố máy chủ nghiêm trọng/);
+
+    // 6. Fingerprint Deduplication Cache: same incident within 60-min cooldown costs 0 extra API calls!
+    const callsBeforeDup = llmCalls.length;
+    const dupReport = await t.monitor.ai.analyzeIncident({
+      device_id: srvId,
+      device_name: 'Prod-DB-01',
+      device_type: 'server',
+      severity: 'critical',
+      kind: 'smart',
+      reason: smartEv.message,
+    }, t.monitor.settings, { now: tNow + 60000 });
+    assert.equal(dupReport.cached, 1, 'Duplicate incident within cooldown must hit cache');
+    assert.equal(dupReport.prompt_tokens, 0);
+    assert.equal(dupReport.completion_tokens, 0);
+    assert.equal(llmCalls.length, callsBeforeDup, 'Cache hit must make 0 external API calls');
+
+    // 7. Switch language to English ("en") -> manual analyze returns English template & response
+    await t.api('PUT', '/api/settings', { default_lang: 'en' });
+    const analyzeEn = await t.api('POST', '/api/ai/analyze', { event_id: smartEv.id, lang: 'en' });
+    assert.equal(analyzeEn.status, 200);
+    assert.equal(analyzeEn.body.report.lang, 'en');
+    assert.match(analyzeEn.body.report.issue, /Critical server incident/);
+
+    // 8. End-of-Day 24h Log Collection & Digest (Zero agent changes required)
+    const digestRes = await t.api('POST', '/api/ai/daily-digest', { lang: 'en' });
+    assert.equal(digestRes.status, 200);
+    assert.equal(digestRes.body.report.kind, 'daily');
+    assert.equal(digestRes.body.report.device_name, 'End-of-Day System Digest (24h)');
+
+    // 9. Turn OFF AI API calls (enabled: false) -> stops all external LLM calls immediately
+    await t.api('PUT', '/api/settings', { ai: { enabled: false } });
+    const callsWhenDisabled = llmCalls.length;
+    const localDigest = await t.api('POST', '/api/ai/daily-digest', { lang: 'vi' });
+    assert.equal(localDigest.status, 200);
+    assert.equal(localDigest.body.report.source, 'heuristic');
+    assert.equal(llmCalls.length, callsWhenDisabled, 'When AI is disabled, 0 external API calls are made');
+  } finally { t.close(); }
+});
+
 

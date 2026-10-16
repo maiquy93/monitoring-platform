@@ -432,14 +432,156 @@ function createApp(db, monitor, opts = {}) {
     send(ctx.res, 200, { ok: true });
   });
 
-  // ---------- events ----------
+  // ---------- events & AI reports ----------
+  const { PROVIDER_PRESETS, buildIncidentPrompt } = require('./ai');
+
   route('GET', '/api/events', 'any', (ctx) => {
     const limit = Math.min(500, Math.max(1, Number(ctx.query.get('limit')) || 100));
     const dev = ctx.query.get('device');
     const rows = dev
       ? db.prepare('SELECT * FROM events WHERE device_id = ? ORDER BY ts DESC LIMIT ?').all(idOf(dev), limit)
       : db.prepare('SELECT * FROM events ORDER BY ts DESC LIMIT ?').all(limit);
+    if (rows.length) {
+      const evIds = rows.map((r) => r.id);
+      const placeholders = evIds.map(() => '?').join(',');
+      const aiRows = db.prepare(`SELECT * FROM ai_reports WHERE event_id IN (${placeholders}) ORDER BY ts DESC`).all(...evIds);
+      const byEvId = new Map();
+      for (const a of aiRows) {
+        if (!byEvId.has(a.event_id)) byEvId.set(a.event_id, a);
+      }
+      for (const r of rows) {
+        r.ai_report = byEvId.get(r.id) || null;
+      }
+    }
     send(ctx.res, 200, { events: rows });
+  });
+
+  route('GET', '/api/ai/reports', 'any', (ctx) => {
+    const s = getSettings(db);
+    const kind = ctx.query.get('kind') || '';
+    const dev = ctx.query.get('device');
+    const limit = Math.min(300, Math.max(1, Number(ctx.query.get('limit')) || 100));
+    const reports = monitor.ai.listReports({
+      kind: ['incident', 'daily'].includes(kind) ? kind : undefined,
+      deviceId: dev ? idOf(dev) : undefined,
+      limit,
+    });
+    send(ctx.res, 200, {
+      reports,
+      stats: monitor.ai.callsToday(),
+      ai: {
+        enabled: !!(s.ai && s.ai.enabled),
+        auto_incident: !!(s.ai && s.ai.auto_incident !== false),
+        daily_digest_enabled: !!(s.ai && s.ai.daily_digest_enabled),
+        daily_digest_time: (s.ai && s.ai.daily_digest_time) || '23:55',
+        cooldown_minutes: (s.ai && s.ai.cooldown_minutes) || 60,
+        daily_call_limit: (s.ai && s.ai.daily_call_limit) || 50,
+      },
+    });
+  });
+
+  route('POST', '/api/ai/analyze', 'operator', async (ctx) => {
+    const b = await readBody(ctx.req, 4096);
+    const s = getSettings(db);
+    const lang = LANGS.includes(b.lang) ? b.lang : (ctx.user.lang || s.default_lang || 'vi');
+    let ev = null;
+    if (b.event_id) {
+      ev = db.prepare('SELECT * FROM events WHERE id = ?').get(idOf(b.event_id));
+      if (!ev) throw new HttpError(404, 'Không tìm thấy sự kiện');
+    }
+    const devId = ev ? ev.device_id : (b.device_id ? idOf(b.device_id) : null);
+    const d = devId ? monitor.devices.get(devId) : null;
+    const v = d ? monitor.view(d, true) : null;
+    const incCtx = {
+      device_id: devId,
+      device_name: (d && d.name) || (ev && ev.device_name) || 'System',
+      device_type: (d && d.type) || 'server',
+      address: (d && d.address) || '',
+      severity: (ev && (ev.severity === 'critical' || ev.severity === 'high')) ? ev.severity : ((v && v.severity) || 'high'),
+      status: (v && v.status) || (ev && ev.kind) || 'warning',
+      kind: (ev && ev.kind) || (v && v.status) || 'warning',
+      reason: (ev && ev.message) || (v && v.reasons && v.reasons.join('; ')) || 'Kiểm tra sức khỏe thiết bị',
+      event_id: ev ? ev.id : null,
+      cpu: v ? v.cpu : null,
+      ram: v ? v.ram : null,
+      disk: v ? v.disk : null,
+      temp: v ? v.temperature : null,
+      rtt: v ? v.rtt : null,
+      pkt_rate: v ? v.pkt_rate : null,
+      smart: v ? v.smart : null,
+      power: v ? v.power : null,
+    };
+    const report = await monitor.ai.analyzeIncident(incCtx, s, { lang, force: true });
+    monitor.emit('change');
+    send(ctx.res, 200, { ok: true, report });
+  });
+
+  route('POST', '/api/ai/daily-digest', 'operator', async (ctx) => {
+    const b = await readBody(ctx.req, 2048);
+    const s = getSettings(db);
+    const lang = LANGS.includes(b.lang) ? b.lang : (ctx.user.lang || s.default_lang || 'vi');
+    const report = await monitor.ai.generateDailyDigest(monitor, s, { lang });
+    monitor.emit('change');
+    send(ctx.res, 200, { ok: true, report });
+  });
+
+  route('POST', '/api/ai/test', 'admin', async (ctx) => {
+    const b = await readBody(ctx.req, 4096);
+    const s = getSettings(db);
+    const lang = LANGS.includes(b.lang) ? b.lang : (ctx.user.lang || s.default_lang || 'vi');
+    const inAi = (b.ai && typeof b.ai === 'object') ? b.ai : b;
+    const provider = inAi.provider || s.ai.provider || 'openai';
+    const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.openai;
+    const testCfg = {
+      ...s.ai,
+      enabled: inAi.enabled !== undefined ? !!inAi.enabled : true,
+      provider,
+      api_url: inAi.api_url !== undefined ? String(inAi.api_url).trim() : (s.ai.api_url || preset.api_url),
+      api_key: inAi.api_key !== undefined && inAi.api_key !== '' ? String(inAi.api_key).trim() : s.ai.api_key,
+      model: inAi.model !== undefined ? String(inAi.model).trim() : (s.ai.model || preset.model),
+      max_tokens: Number(inAi.max_tokens || s.ai.max_tokens || 280),
+    };
+    const sampleCtx = {
+      device_id: 0,
+      device_name: 'srv-db-prod-01',
+      device_type: 'server',
+      address: '10.0.10.25',
+      severity: 'critical',
+      status: 'warning',
+      kind: 'warning',
+      reason: lang === 'en' ? 'High Disk: 94% (threshold 90%); High CPU: 92%' : 'Ổ đĩa cao: 94% (ngưỡng 90%); CPU cao: 92%',
+      cpu: 92, ram: 84, disk: 94, temp: 76, rtt: 1.8,
+      trend: 'CPU_avg=78%/max=92%, Disk=94%(slope=+4.2%/d,full_in~1.4d), Down24h=0',
+    };
+    const prompt = buildIncidentPrompt(sampleCtx, lang);
+    let report;
+    let source = 'heuristic';
+    if (testCfg.enabled && (testCfg.api_key || testCfg.provider === 'ollama' || (testCfg.provider === 'custom' && testCfg.api_url))) {
+      try {
+        report = await monitor.ai._callLlm(testCfg, prompt, testCfg.max_tokens || 280);
+        source = 'ai';
+      } catch (err) {
+        const { generateLocalExpertFallback } = require('./ai');
+        report = { ...generateLocalExpertFallback(sampleCtx, lang), api_error: err.message };
+      }
+    } else {
+      const { generateLocalExpertFallback } = require('./ai');
+      report = generateLocalExpertFallback(sampleCtx, lang);
+    }
+    const tokensUsed = (report.prompt_tokens || 0) + (report.completion_tokens || 0);
+    send(ctx.res, 200, {
+      ok: true,
+      source,
+      live_api_called: source === 'ai',
+      lang,
+      model: testCfg.model,
+      tokens_used: tokensUsed,
+      api_error: report.api_error || null,
+      prompt,
+      prompt_preview: prompt,
+      report,
+      parsed: report,
+    });
   });
 
   // ---------- settings ----------
@@ -447,9 +589,23 @@ function createApp(db, monitor, opts = {}) {
     const s = getSettings(db);
     const out = { type_severity: s.type_severity, thresholds: s.thresholds, org_name: s.org_name, default_theme: s.default_theme,
       default_lang: s.default_lang || 'vi',
+      ai_enabled: !!(s.ai && s.ai.enabled),
       types: TYPES, timing: { ping_interval_ms: monitor.o.pingIntervalMs, ping_fail_limit: monitor.o.pingFailLimit,
         agent_timeout_ms: monitor.o.agentTimeoutMs }, version: versionInfo };
-    if (ctx.user.role === 'admin') { out.enroll_key = s.enroll_key; out.system = monitor.systemInfo(); }
+    if (ctx.user.role === 'admin') {
+      out.enroll_key = s.enroll_key;
+      out.system = monitor.systemInfo();
+      const stats = monitor.ai.callsToday();
+      out.ai_presets = PROVIDER_PRESETS;
+      out.ai_stats = stats;
+      out.ai = {
+        ...s.ai,
+        has_api_key: Boolean(s.ai && s.ai.api_key),
+        api_key: '',
+        presets: PROVIDER_PRESETS,
+        stats,
+      };
+    }
     send(ctx.res, 200, out);
   });
   route('PUT', '/api/settings', 'admin', async (ctx) => {
@@ -496,6 +652,26 @@ function createApp(db, monitor, opts = {}) {
       const k = String(b.enroll_key);
       if (k && k.length < 16) throw bad('Enroll key phải có ít nhất 16 ký tự (hoặc để trống để tắt)');
       setSetting(db, 'enroll_key', k.slice(0, 128));
+    }
+    if (b.ai && typeof b.ai === 'object') {
+      const curAi = getSettings(db).ai || {};
+      const provider = PROVIDER_PRESETS[b.ai.provider] ? b.ai.provider : (curAi.provider || 'openai');
+      const preset = PROVIDER_PRESETS[provider] || PROVIDER_PRESETS.openai;
+      const dailyTime = /^\d{2}:\d{2}$/.test(String(b.ai.daily_digest_time || '')) ? String(b.ai.daily_digest_time) : (curAi.daily_digest_time || '23:55');
+      const nextAi = {
+        enabled: b.ai.enabled !== undefined ? !!b.ai.enabled : !!curAi.enabled,
+        provider,
+        api_url: b.ai.api_url !== undefined ? String(b.ai.api_url).trim().slice(0, 300) : (curAi.api_url || preset.api_url),
+        api_key: b.ai.api_key !== undefined ? String(b.ai.api_key).trim().slice(0, 300) : (curAi.api_key || ''),
+        model: b.ai.model !== undefined ? String(b.ai.model).trim().slice(0, 100) : (curAi.model || preset.model),
+        auto_incident: b.ai.auto_incident !== undefined ? !!b.ai.auto_incident : (curAi.auto_incident !== false),
+        daily_digest_enabled: b.ai.daily_digest_enabled !== undefined ? !!b.ai.daily_digest_enabled : !!curAi.daily_digest_enabled,
+        daily_digest_time: dailyTime,
+        cooldown_minutes: Math.min(1440, Math.max(1, Number(b.ai.cooldown_minutes ?? curAi.cooldown_minutes ?? 60))),
+        daily_call_limit: Math.min(5000, Math.max(1, Number(b.ai.daily_call_limit ?? curAi.daily_call_limit ?? 50))),
+        max_tokens: Math.min(800, Math.max(100, Number(b.ai.max_tokens ?? curAi.max_tokens ?? 280))),
+      };
+      setSetting(db, 'ai', nextAi);
     }
     monitor.reload();
     monitor.emit('change');

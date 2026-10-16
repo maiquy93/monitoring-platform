@@ -8,6 +8,20 @@ const DEFAULT_TYPE_SEVERITY = {
   switch: 'high', ups: 'high', ap: 'medium', other: 'medium', printer: 'low', pc: 'low',
 };
 
+const DEFAULT_AI_SETTINGS = {
+  enabled: false,
+  provider: 'openai',
+  api_url: 'https://api.openai.com/v1/chat/completions',
+  api_key: '',
+  model: 'gpt-4o-mini',
+  auto_incident: true,
+  daily_digest_enabled: false,
+  daily_digest_time: '23:55',
+  cooldown_minutes: 60,
+  daily_call_limit: 50,
+  max_tokens: 280,
+};
+
 const DEFAULT_SETTINGS = {
   type_severity: DEFAULT_TYPE_SEVERITY,
   thresholds: { cpu: 90, ram: 90, disk: 90, temp: 85, dos_packet_rate: 10000 },
@@ -15,6 +29,7 @@ const DEFAULT_SETTINGS = {
   org_name: 'Monitoring',
   default_theme: 'neon',
   default_lang: 'vi',
+  ai: DEFAULT_AI_SETTINGS,
 };
 
 function open(file) {
@@ -55,6 +70,18 @@ function open(file) {
     CREATE TABLE IF NOT EXISTS maps(
       id INTEGER PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{"nodes":[],"links":[]}');
     CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS ai_reports(
+      id INTEGER PRIMARY KEY, ts INTEGER NOT NULL, kind TEXT NOT NULL,
+      device_id INTEGER, device_name TEXT NOT NULL DEFAULT '', event_id INTEGER,
+      severity TEXT NOT NULL DEFAULT 'high', lang TEXT NOT NULL DEFAULT 'vi',
+      fingerprint TEXT NOT NULL DEFAULT '', issue TEXT NOT NULL DEFAULT '',
+      cause TEXT NOT NULL DEFAULT '', solution TEXT NOT NULL DEFAULT '',
+      prediction TEXT NOT NULL DEFAULT '', prompt_tokens INTEGER NOT NULL DEFAULT 0,
+      completion_tokens INTEGER NOT NULL DEFAULT 0, cached INTEGER NOT NULL DEFAULT 0,
+      source TEXT NOT NULL DEFAULT 'ai');
+    CREATE INDEX IF NOT EXISTS idx_ai_reports_ts ON ai_reports(ts);
+    CREATE INDEX IF NOT EXISTS idx_ai_reports_event ON ai_reports(event_id);
+    CREATE INDEX IF NOT EXISTS idx_ai_reports_fp ON ai_reports(fingerprint, ts);
   `);
   const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!ucols.includes('lang')) db.exec('ALTER TABLE users ADD COLUMN lang TEXT');
@@ -78,6 +105,7 @@ function getSettings(db) {
   }
   out.type_severity = { ...DEFAULT_TYPE_SEVERITY, ...out.type_severity };
   out.thresholds = { ...DEFAULT_SETTINGS.thresholds, ...out.thresholds };
+  out.ai = { ...DEFAULT_AI_SETTINGS, ...(out.ai || {}) };
   if (!['vi', 'en'].includes(out.default_lang)) out.default_lang = 'vi';
   return out;
 }
@@ -87,4 +115,4 @@ function setSetting(db, key, value) {
     .run(key, JSON.stringify(value));
 }
 
-module.exports = { open, getSettings, setSetting, DEFAULT_TYPE_SEVERITY };
+module.exports = { open, getSettings, setSetting, DEFAULT_TYPE_SEVERITY, DEFAULT_AI_SETTINGS };

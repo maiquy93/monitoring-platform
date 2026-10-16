@@ -177,6 +177,8 @@
         <form id="st-enroll" class="row"><input class="inp" name="key" style="flex:1" value="${esc(s.enroll_key || '')}" placeholder="${t('(đang tắt)')}">
           <button type="button" class="btn" id="st-gen">${t('Tạo ngẫu nhiên')}</button><button class="btn primary">${t('Lưu')}</button></form></div>
 
+      ${this.aiPanel(s)}
+
       <div class="panel" style="margin-top:14px"><h2 style="margin-top:0">${t('Hệ thống')}</h2>${this.systemPanel(s)}</div>
 
       <div class="panel" style="margin-top:14px"><div class="row"><h2 style="margin:0">${t('Người dùng')}</h2><span class="spacer"></span><button class="btn primary" id="us-add">${t('+ Thêm')}</button></div>
@@ -199,6 +201,7 @@
       $('#st-th').onsubmit = guard((f) => save({ thresholds: Object.fromEntries([...f].map(([k, v]) => [k, Number(v)])) }, t('Đã lưu ngưỡng')));
       $('#st-enroll').onsubmit = guard((f) => save({ enroll_key: f.get('key') }, t('Đã lưu enroll key')));
       $('#st-gen').onclick = () => { $('#st-enroll input').value = randKey(); };
+      this.bindAiPanel(el, s, save, guard);
       $('#us-add').onclick = () => this.userForm();
       $('#us-body').onclick = (e) => {
         const b = e.target.closest('[data-act]');
@@ -208,6 +211,274 @@
         else M.confirm(M.S.lang === 'en' ? `Delete user "${u.username}"?` : `Xóa người dùng "${u.username}"?`, async () => { await M.api('DELETE', `/api/users/${u.id}`); this.loadUsers(); });
       };
       this.loadUsers();
+    },
+    aiPanel(s) {
+      const ai = s.ai || {};
+      const presets = s.ai_presets || {};
+      const st = s.ai_stats || {};
+      const isEn = M.S.lang === 'en';
+      const providerOpts = Object.entries(presets).map(([k, v]) => `<option value="${esc(k)}" ${ai.provider === k ? 'selected' : ''}>${esc(v.name)}</option>`).join('');
+      const keyPlaceholder = ai.has_api_key
+        ? (isEn ? '•••••••• (Configured – leave blank to keep current token)' : '•••••••• (Đã lưu Token – để trống nếu giữ nguyên)')
+        : (isEn ? 'sk-... / AIza... (leave blank if using local Ollama)' : 'sk-... / AIza... (để trống nếu dùng Ollama nội bộ)');
+      return `<div class="panel" style="margin-top:14px">
+        <div class="row">
+          <h2 style="margin:0">🤖 ${isEn ? 'AI Incident Diagnosis & Predictive Analytics (Ultra Token-Saver)' : 'Tích hợp AI Chẩn đoán Sự cố & Dự đoán Xu hướng (Siêu tiết kiệm Token)'}</h2>
+          <span class="spacer"></span>
+          <span class="ai-badge ${ai.enabled ? '' : 'cached'}">${ai.enabled ? (isEn ? '🟢 AI API Active' : '🟢 Đang bật gọi API AI') : (isEn ? '⚪ AI API Disabled (Local Fallback)' : '⚪ Đang tắt gọi API AI (Dùng Chuyên gia Nội bộ 0-token)')}</span>
+        </div>
+        <p class="muted" style="margin:6px 0 10px">${isEn
+    ? 'Automatically analyzes Critical & High severity incidents (Server down, Disk Bad Sector/SMART error, Disk > 90%, CPU/RAM > 90%, CPU Overheating, UPS Power Loss, Flood/DoS) and collects 24h logs at end-of-day using a compact unified JSON template synced to your display language (VI/EN).'
+    : 'Tự động phân tích sự cố mức Nghiêm trọng (Critical) & Cao (High) (Máy chủ sập, Disk Bad Sector/SMART, Disk > 90%, CPU/RAM > 90%, Quá nhiệt, Mất điện UPS, DoS/Flood) và thu thập log cuối ngày theo bộ Template JSON thống nhất, tự động đồng bộ theo ngôn ngữ hiển thị (Tiếng Việt / English).'}</p>
+
+        <div class="ai-stats-bar" style="margin-bottom:12px">
+          <div class="stat">${isEn ? 'API Calls Today' : 'Lượt gọi API hôm nay'}: <b>${st.calls_today || 0} / ${ai.daily_call_limit || 50}</b></div>
+          <div class="stat">${isEn ? 'Tokens Today' : 'Token tiêu thụ hôm nay'}: <b>${st.tokens_today || 0}</b></div>
+          <div class="stat">${isEn ? 'Total Reports' : 'Tổng báo cáo AI'}: <b>${st.total_reports || 0}</b></div>
+          <div class="stat">${isEn ? 'Zero-Token Cache Hits' : 'Tái sử dụng Cache (0 Token)'}: <b>${st.cached_hits || 0}</b></div>
+        </div>
+
+        <form id="st-ai">
+          <div class="row" style="gap:18px;margin-bottom:10px;flex-wrap:wrap">
+            ${chk('ai_enabled', isEn ? '<b>Enable AI API Calls</b> (Uncheck to disable all external AI API requests)' : '<b>Bật gọi API AI</b> (Bỏ chọn để tắt hoàn toàn việc gọi API AI ra ngoài)', ai.enabled)}
+            ${chk('ai_auto_incident', isEn ? 'Auto-analyze High & Critical Incidents' : 'Tự động phân tích khi có sự cố Cao & Nghiêm trọng', ai.auto_incident !== false)}
+            ${chk('ai_daily_digest', isEn ? 'Enable End-of-Day Log Collection & AI Digest (Zero agent changes)' : 'Bật thu thập Log cuối ngày & gửi AI phân tích (Không cần sửa Agent)', ai.daily_digest_enabled)}
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label>${isEn ? 'AI Server / Provider Preset' : 'Nhà cung cấp Server AI (Preset)'}</label>
+              <select class="sel inp" name="provider" id="ai-provider">${providerOpts}</select>
+            </div>
+            <div class="field">
+              <label>${isEn ? 'AI API Endpoint URL (Chat Completions)' : 'Địa chỉ API Server AI (Endpoint URL)'}</label>
+              <input class="inp" name="api_url" id="ai-url" required value="${esc(ai.api_url || '')}" placeholder="https://api.openai.com/v1/chat/completions">
+            </div>
+            <div class="field">
+              <label>${isEn ? 'AI Model Name' : 'Tên Model AI'}</label>
+              <input class="inp" name="model" id="ai-model" required value="${esc(ai.model || '')}" placeholder="gpt-4o-mini">
+            </div>
+            <div class="field">
+              <label>${isEn ? 'API Token (Bearer Key)' : 'API Token (Khóa xác thực)'} ${ai.has_api_key ? `<span class="ai-badge" style="margin-left:4px">${isEn ? 'Saved' : 'Đã lưu'}</span>` : ''}</label>
+              <div class="row" style="gap:6px">
+                <input class="inp" type="password" name="api_key" id="ai-key" style="flex:1" autocomplete="new-password" placeholder="${esc(keyPlaceholder)}">
+                ${ai.has_api_key ? `<label class="muted" style="font-size:11px;white-space:nowrap;display:flex;align-items:center;gap:4px"><input type="checkbox" name="clear_key" id="ai-clear-key"> ${isEn ? 'Clear key' : 'Xóa khóa'}</label>` : ''}
+              </div>
+            </div>
+            <div class="field">
+              <label>${isEn ? 'End-of-Day Digest Time (HH:MM)' : 'Giờ thu thập Log & báo cáo cuối ngày (HH:MM)'}</label>
+              <input class="inp" name="daily_digest_time" pattern="^([01]\\d|2[0-3]):([0-5]\\d)$" value="${esc(ai.daily_digest_time || '23:50')}" placeholder="23:50">
+            </div>
+            <div class="field">
+              <label>${isEn ? 'Duplicate Incident Cooldown (minutes, 0-token cache)' : 'Chu kỳ chống trùng lặp sự cố (phút, Cache 0-token)'}</label>
+              <input class="inp" type="number" min="1" max="1440" name="cooldown_minutes" value="${ai.cooldown_minutes || 60}">
+            </div>
+            <div class="field">
+              <label>${isEn ? 'Max AI API Calls / Day (Hard Cap)' : 'Giới hạn số lượt gọi API AI tối đa / ngày'}</label>
+              <input class="inp" type="number" min="1" max="5000" name="daily_call_limit" value="${ai.daily_call_limit || 50}">
+            </div>
+            <div class="field">
+              <label>${isEn ? 'Max Response Tokens / Call (max_tokens)' : 'Giới hạn Token phản hồi tối đa / lần gọi'}</label>
+              <input class="inp" type="number" min="100" max="2000" name="max_tokens" value="${ai.max_tokens || 320}">
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" type="submit">${isEn ? '💾 Save AI Settings' : '💾 Lưu cấu hình AI'}</button>
+            <button class="btn" type="button" id="btn-ai-test">${isEn ? '🧪 Test Connection & View Unified Template' : '🧪 Kiểm tra kết nối & Xem Template mẫu'}</button>
+            <button class="btn" type="button" id="btn-ai-digest-now">${isEn ? '📊 Collect 24h Logs & Run Digest Now' : '📊 Thu thập Log 24h & Phân tích ngay'}</button>
+          </div>
+        </form>
+
+        <details class="ai-doc-box">
+          <summary>📖 ${isEn ? 'Documentation: AI Token Setup, Unified JSON Template & Token-Saving Architecture (Click to expand)' : 'Tài liệu hướng dẫn cấu hình AI, Chuẩn Template JSON & Cơ chế Siêu Tiết Kiệm Token (Nhấn để xem)'}</summary>
+          ${isEn ? `
+          <div style="margin-top:10px">
+            <h4>1. Quick Provider & API Token Setup</h4>
+            <ul>
+              <li><b>OpenAI:</b> Create an API Key at <code>platform.openai.com/api-keys</code> → Choose preset <b>OpenAI</b> (Endpoint: <code>https://api.openai.com/v1/chat/completions</code>, Recommended ultra-cheap model: <code>gpt-4o-mini</code>).</li>
+              <li><b>Google Gemini (OpenAI-Compatible):</b> Create a key at <code>aistudio.google.com</code> → Choose preset <b>Google Gemini</b> (Model: <code>gemini-2.0-flash</code> — fast & generous free tier).</li>
+              <li><b>DeepSeek / Groq:</b> Choose preset <b>DeepSeek</b> (<code>deepseek-chat</code>) or <b>Groq</b> (<code>llama-3.3-70b-versatile</code>) and paste your API key.</li>
+              <li><b>Local Ollama (100% Free, Offline):</b> Install Ollama locally, run <code>ollama run qwen2.5:7b</code>, choose preset <b>Ollama (Local)</b>. No API token required!</li>
+              <li><b>Disable AI Calls Anytime:</b> Uncheck <b>"Enable AI API Calls"</b> to immediately stop all external API requests. The platform still provides instant 0-token diagnostics via the built-in Local Expert Engine.</li>
+            </ul>
+
+            <h4>2. Unified Request & Response Template (Auto Language Sync: EN / VI)</h4>
+            <p>When display language is set to <b>English</b>, the server sends an ultra-compact English prompt (~90–130 tokens) and enforces an English JSON response. When set to <b>Tiếng Việt</b>, both prompt and response are in Vietnamese:</p>
+            <pre>// Compact Incident Payload sent to AI Server:
+DEV:Core-DB(server,10.0.0.12)|SEV:critical|TYPE:disk|ISSUE:Disk 93% >= 90%|METRICS:CPU:42%,RAM:78%,Disk:93%|TREND_24H:CPU(avg:38%,max:75%);Disk(now:93%,+4.2%/d,full~1.7d)
+
+// Mandatory Structured JSON returned by AI Server (parsed by Monitoring Server):
+{
+  "issue": "Summary of the core failure or bottleneck (1-2 sentences)",
+  "cause": "Most likely root cause based on metrics & 24h trend",
+  "solution": "Concrete step-by-step remediation commands/actions",
+  "prediction": "Capacity & reliability forecast over the next 24-72h"
+}</pre>
+
+            <h4>3. End-of-Day Log Collection (Zero Agent Changes Required)</h4>
+            <ul>
+              <li><b>No OS Agent Modification:</b> The Monitoring Server already collects and stores all device events, SNMP traps, and 30-second resource metrics in its central SQLite database.</li>
+              <li>At the configured time (e.g., <code>23:50</code>) or when clicking <b>"Collect 24h Logs & Run Digest Now"</b>, the server mathematically pre-aggregates 24h incident counts and computes linear regression disk/CPU trends on the server before sending a single ~180-token summary to the AI.</li>
+            </ul>
+
+            <h4>4. 5-Layer Token Saving Architecture (Saves 95%–98% Tokens)</h4>
+            <ul>
+              <li><b>Severity Gate:</b> Only triggers automatically for <b>Critical</b> & <b>High</b> incidents (Server down, Disk SMART/Bad Sector, Disk &gt; 90%, CPU/RAM &gt; 90%, Overheating, Power Loss, Flood/DoS). Minor/Low fluctuations are ignored.</li>
+              <li><b>Fingerprint Deduplication Cache:</b> Identical incidents on the same device within the Cooldown window (default 60m) reuse the cached AI diagnosis for <b>0 tokens</b>.</li>
+              <li><b>Server-Side Trend Math:</b> Instead of sending thousands of raw metric rows, the server calculates slope (<code>+%/day</code>, estimated days to 100% full) in ~15 tokens.</li>
+              <li><b>Strict JSON Schema & <code>max_tokens</code> Cap:</b> Forces concise JSON output with <code>temperature: 0.1</code> and hard token ceiling.</li>
+              <li><b>Daily Hard Quota:</b> Guarantees zero unexpected billing spikes during network storms.</li>
+            </ul>
+          </div>` : `
+          <div style="margin-top:10px">
+            <h4>1. Hướng dẫn lấy API Token & Cấu hình nhanh</h4>
+            <ul>
+              <li><b>OpenAI:</b> Tạo khóa tại <code>platform.openai.com/api-keys</code> → Chọn preset <b>OpenAI</b> (Endpoint: <code>https://api.openai.com/v1/chat/completions</code>, Model tiết kiệm khuyến nghị: <code>gpt-4o-mini</code>).</li>
+              <li><b>Google Gemini:</b> Tạo khóa tại <code>aistudio.google.com</code> → Chọn preset <b>Google Gemini</b> (Model: <code>gemini-2.0-flash</code> — tốc độ cao, có gói miễn phí hào phóng).</li>
+              <li><b>DeepSeek / Groq:</b> Chọn preset <b>DeepSeek</b> (<code>deepseek-chat</code>) hoặc <b>Groq</b> (<code>llama-3.3-70b-versatile</code>) và dán API Token tương ứng.</li>
+              <li><b>Ollama Nội bộ (Miễn phí 100%, Offline):</b> Cài Ollama trên máy chủ nội bộ, chạy <code>ollama run qwen2.5:7b</code>, chọn preset <b>Ollama (Local)</b> — không cần API Token.</li>
+              <li><b>Tắt gọi API AI bất cứ lúc nào:</b> Bỏ tích <b>"Bật gọi API AI"</b> để ngắt hoàn toàn kết nối ra ngoài. Hệ thống sẽ tự động chuyển sang <b>Chuyên gia Nội bộ (0 Token)</b> để vẫn hiển thị nguyên nhân & hướng xử lý.</li>
+            </ul>
+
+            <h4>2. Chuẩn Template JSON Thống Nhất (Tự động đồng bộ Tiếng Việt / English)</h4>
+            <p>Khi ngôn ngữ ứng dụng đang chọn <b>Tiếng Việt</b>, Server gửi ngữ cảnh nén gọn bằng yêu cầu Tiếng Việt (~90–130 tokens) và bắt buộc AI trả về JSON Tiếng Việt. Khi chuyển sang <b>English</b>, cả chiều gửi và chiều nhận tự động chuyển sang Tiếng Anh:</p>
+            <pre>// Dữ liệu ngữ cảnh siêu nén Server gửi lên AI:
+DEV:Core-DB(server,10.0.0.12)|SEV:critical|TYPE:disk|ISSUE:Ổ đĩa 93% >= 90%|METRICS:CPU:42%,RAM:78%,Disk:93%|TREND_24H:CPU(avg:38%,max:75%);Disk(now:93%,+4.2%/d,full~1.7d)
+
+// Định dạng JSON chuẩn AI trả về để Server đọc và hiển thị:
+{
+  "issue": "Tóm tắt vấn đề cốt lõi (1-2 câu)",
+  "cause": "Nguyên nhân gốc rễ khả dĩ nhất dựa trên số liệu & xu hướng 24h",
+  "solution": "Các bước khắc phục cụ thể, lệnh kiểm tra đề xuất",
+  "prediction": "Dự đoán rủi ro và dung lượng trong 24-72h tới"
+}</pre>
+
+            <h4>3. Tính năng Thu thập Log cuối ngày (Không cần sửa Agent hay cài thêm thư viện)</h4>
+            <ul>
+              <li><b>Không can thiệp OS Agent:</b> Toàn bộ log sự kiện, cảnh báo SNMP/DoS và chuỗi chỉ số CPU/RAM/Disk/Nhiệt độ/SMART đã được Server lưu sẵn trong cơ sở dữ liệu SQLite trung tâm.</li>
+              <li>Vào đúng giờ cài đặt (mặc định <code>23:50</code>) hoặc khi bấm nút <b>"📊 Thu thập Log 24h & Phân tích ngay"</b>, Server tự động gom nhóm thống kê 24h và tính toán tốc độ tăng trưởng ổ đĩa/tài nguyên trước khi gửi bản tóm tắt siêu gọn (~180 tokens) cho AI phân tích toàn cảnh.</li>
+            </ul>
+
+            <h4>4. 5 Cơ chế Siêu Tiết Kiệm Token (Giảm 95%–98% chi phí Token)</h4>
+            <ul>
+              <li><b>Bộ lọc Mức cảnh báo (Severity Gate):</b> Chỉ tự động gọi AI với sự cố mức <b>Nghiêm trọng (Critical)</b> và <b>Cao (High)</b> (Máy chủ mất kết nối, Disk Bad Sector/SMART, Disk &gt; 90%, CPU/RAM &gt; 90%, Quá nhiệt CPU, Mất điện UPS, Tấn công DoS/Flood).</li>
+              <li><b>Chống trùng lặp bằng Fingerprint Cache:</b> Sự cố lặp lại trên cùng thiết bị trong khung thời gian Cooldown (mặc định 60 phút) được lấy ngay từ Cache với <b>0 Token</b>.</li>
+              <li><b>Tính toán Dự đoán Tuyến tính tại Server:</b> Server tự tính độ dốc tăng ổ đĩa (<code>+%/ngày</code>, dự kiến bao nhiêu ngày nữa đầy ổ) thành chuỗi 15 token thay vì gửi hàng ngàn dòng log thô.</li>
+              <li><b>Ép chuẩn JSON ngắn gọn & trần <code>max_tokens</code>:</b> Không tốn token cho lời chào hỏi rườm rà.</li>
+              <li><b>Giới hạn cứng số lượt gọi mỗi ngày (Daily Cap):</b> Bảo vệ tuyệt đối ngân sách API ngay cả khi mạng bị bão cảnh báo.</li>
+            </ul>
+          </div>`}
+        </details>
+      </div>`;
+    },
+    bindAiPanel(el, s, save, guard) {
+      const presets = s.ai_presets || {};
+      const provSel = $('#ai-provider', el);
+      if (provSel) {
+        provSel.onchange = () => {
+          const p = presets[provSel.value];
+          if (p && provSel.value !== 'custom') {
+            if (p.api_url) $('#ai-url', el).value = p.api_url;
+            if (p.model) $('#ai-model', el).value = p.model;
+          }
+        };
+      }
+      const form = $('#st-ai', el);
+      if (form) {
+        form.onsubmit = guard(async (fd) => {
+          const isEn = M.S.lang === 'en';
+          const clearKey = $('#ai-clear-key', form) && $('#ai-clear-key', form).checked;
+          const typedKey = (fd.get('api_key') || '').trim();
+          const aiBody = {
+            enabled: $('#f-ai_enabled', form).checked,
+            auto_incident: $('#f-ai_auto_incident', form).checked,
+            daily_digest_enabled: $('#f-ai_daily_digest', form).checked,
+            provider: fd.get('provider'),
+            api_url: fd.get('api_url'),
+            model: fd.get('model'),
+            daily_digest_time: fd.get('daily_digest_time') || '23:50',
+            cooldown_minutes: Number(fd.get('cooldown_minutes')) || 60,
+            daily_call_limit: Number(fd.get('daily_call_limit')) || 50,
+            max_tokens: Number(fd.get('max_tokens')) || 320,
+          };
+          if (clearKey) aiBody.api_key = '';
+          else if (typedKey) aiBody.api_key = typedKey;
+          await save({ ai: aiBody }, isEn ? 'AI settings saved' : 'Đã lưu cấu hình AI');
+          this.render(el);
+        });
+      }
+      const btnTest = $('#btn-ai-test', el);
+      if (btnTest) {
+        btnTest.onclick = async () => {
+          const isEn = M.S.lang === 'en';
+          const orig = btnTest.textContent;
+          btnTest.disabled = true;
+          btnTest.textContent = isEn ? '⏳ Testing...' : '⏳ Đang kiểm tra...';
+          try {
+            const fd = new FormData(form);
+            const typedKey = (fd.get('api_key') || '').trim();
+            const res = await M.api('POST', '/api/ai/test', {
+              lang: M.S.lang || 'vi',
+              ai: {
+                enabled: $('#f-ai_enabled', form).checked,
+                provider: fd.get('provider'),
+                api_url: fd.get('api_url'),
+                model: fd.get('model'),
+                max_tokens: Number(fd.get('max_tokens')) || 320,
+                ...(typedKey ? { api_key: typedKey } : {}),
+              },
+            });
+            const p = res.parsed || {};
+            M.modal(
+              isEn ? '🧪 AI Connection & Unified Template Preview' : '🧪 Kết quả kiểm tra AI & Xem trước Template thống nhất',
+              `<div class="row" style="margin-bottom:8px;gap:8px">
+                <span class="ai-badge">${res.live_api_called ? (isEn ? '✅ Live AI Server Response' : '✅ Phản hồi trực tiếp từ Server AI') : (isEn ? '⚡ Local Expert Preview (AI API Disabled or No Key)' : '⚡ Chế độ Chuyên gia Nội bộ (Đang tắt API hoặc chưa nhập Token)')}</span>
+                <span class="muted">${isEn ? 'Model' : 'Mô hình'}: <b>${esc(res.model)}</b> · Tokens: <b>${res.tokens_used || 0}</b> · Lang: <b>${esc((res.lang || '').toUpperCase())}</b></span>
+              </div>
+              ${res.api_error ? `<div class="panel" style="border-color:var(--down);margin-bottom:8px;color:var(--down)">⚠️ API Error: ${esc(res.api_error)}</div>` : ''}
+              <div class="ai-card" style="margin-bottom:10px">
+                <div class="ai-grid">
+                  <div class="ai-box"><h5>⚠️ ${isEn ? 'Issue (Vấn đề)' : 'Vấn đề (Issue)'}</h5><p>${esc(p.issue || '—')}</p></div>
+                  <div class="ai-box"><h5>🔍 ${isEn ? 'Root Cause (Nguyên nhân)' : 'Nguyên nhân (Cause)'}</h5><p>${esc(p.cause || '—')}</p></div>
+                  <div class="ai-box"><h5>🛠️ ${isEn ? 'Solution (Đề xuất giải pháp)' : 'Đề xuất giải pháp (Solution)'}</h5><p>${esc(p.solution || '—')}</p></div>
+                  <div class="ai-box"><h5>📈 ${isEn ? 'Prediction (Dự đoán)' : 'Dự đoán (Prediction)'}</h5><p>${esc(p.prediction || '—')}</p></div>
+                </div>
+              </div>
+              <div class="field"><label>${isEn ? 'Unified Outbound Prompt Template (System + Compact User Context)' : 'Template gửi lên Server AI (System + Ngữ cảnh nén gọn)'}</label>
+                <pre style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border);font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto"><b>[SYSTEM]</b> ${esc(res.prompt_preview && res.prompt_preview.system)}\n\n<b>[USER]</b> ${esc(res.prompt_preview && res.prompt_preview.user)}</pre>
+              </div>`,
+              async () => {},
+              { submit: t('Đóng') },
+            );
+          } catch (err) {
+            M.toast(err.message);
+          } finally {
+            btnTest.disabled = false;
+            btnTest.textContent = orig;
+          }
+        };
+      }
+      const btnDigest = $('#btn-ai-digest-now', el);
+      if (btnDigest) {
+        btnDigest.onclick = async () => {
+          const isEn = M.S.lang === 'en';
+          const orig = btnDigest.textContent;
+          btnDigest.disabled = true;
+          btnDigest.textContent = isEn ? '⏳ Analyzing 24h logs...' : '⏳ Đang phân tích log 24h...';
+          try {
+            await M.api('POST', '/api/ai/daily-digest', { lang: M.S.lang || 'vi' });
+            M.toast(isEn ? 'End-of-day AI digest completed! Redirecting to AI Reports...' : 'Đã tạo báo cáo AI cuối ngày! Đang mở tab Báo cáo AI...');
+            if (M.views.events) M.views.events.subTab = 'ai';
+            location.hash = '#/events';
+          } catch (err) {
+            M.toast(err.message);
+          } finally {
+            btnDigest.disabled = false;
+            btnDigest.textContent = orig;
+          }
+        };
+      }
     },
     systemPanel(s) {
       const v = s.version || {};
