@@ -470,7 +470,7 @@ DEV:Core-DB(server,10.0.0.12)|SEV:critical|TYPE:disk|ISSUE:Ổ đĩa 93% >= 90%|
             await M.api('POST', '/api/ai/daily-digest', { lang: M.S.lang || 'vi' });
             M.toast(isEn ? 'End-of-day AI digest completed! Redirecting to AI Reports...' : 'Đã tạo báo cáo AI cuối ngày! Đang mở tab Báo cáo AI...');
             if (M.views.events) M.views.events.subTab = 'ai';
-            location.hash = '#/events';
+            location.hash = '#/events/ai';
           } catch (err) {
             M.toast(err.message);
           } finally {

@@ -1625,7 +1625,11 @@
   M.views.events = {
     subTab: 'events', // 'events' | 'ai'
     aiKind: '',
-    async render(el) {
+    async render(el, sub) {
+      if (sub === 'ai') this.subTab = 'ai';
+      else if (sub === 'events' || !sub) this.subTab = 'events';
+      clearInterval(this.t);
+      this.t = null;
       const isEn = M.S.lang === 'en';
       const canOp = M.S.user && M.S.user.role !== 'viewer';
       el.innerHTML = `<div class="row" style="margin-bottom:12px">
@@ -1650,8 +1654,16 @@
       <div id="ai-stats-wrap" class="${this.subTab === 'ai' ? '' : 'hidden'}"></div>
       <div class="panel" id="ev-body"></div>`;
 
-      $('#ev-tab-list').onclick = () => { this.subTab = 'events'; this.render(el); };
-      $('#ev-tab-ai').onclick = () => { this.subTab = 'ai'; this.render(el); };
+      $('#ev-tab-list').onclick = () => {
+        this.subTab = 'events';
+        if (location.hash !== '#/events') location.hash = '#/events';
+        else this.render(el, 'events');
+      };
+      $('#ev-tab-ai').onclick = () => {
+        this.subTab = 'ai';
+        if (location.hash !== '#/events/ai') location.hash = '#/events/ai';
+        else this.render(el, 'ai');
+      };
       const evKind = $('#ev-kind');
       if (evKind) evKind.onchange = () => this.load();
       const aiKindSel = $('#ai-kind-sel');
@@ -1677,42 +1689,57 @@
       await this.load();
       this.t = setInterval(() => this.load(), 10000);
     },
-    destroy() { clearInterval(this.t); },
+    destroy() {
+      clearInterval(this.t);
+      this.t = null;
+    },
     async load() {
       const isEn = M.S.lang === 'en';
       if (this.subTab === 'ai') {
-        const q = this.aiKind ? `?kind=${encodeURIComponent(this.aiKind)}&limit=100` : '?limit=100';
-        const { reports, stats, ai } = await M.api('GET', `/api/ai/reports${q}`);
-        const statsWrap = $('#ai-stats-wrap');
-        if (statsWrap && stats && ai) {
-          const stBadge = ai.enabled
-            ? `<span class="sev-badge ok">● ${isEn ? 'AI API Enabled' : 'API AI Đang bật'}</span>`
-            : `<span class="sev-badge medium">○ ${isEn ? 'AI API Disabled (Smart Fallback Active)' : 'Đã tắt gọi API AI (Đang dùng Chuyên gia nội bộ 0 token)'}</span>`;
-          const dailyBadge = ai.daily_digest_enabled
-            ? `<span class="sev-badge low">🕒 ${isEn ? `Auto Daily Digest: ${ai.daily_digest_time}` : `Tự động tổng hợp cuối ngày: ${ai.daily_digest_time}`}</span>`
-            : `<span class="muted">🕒 ${isEn ? 'Auto Daily Digest: Off' : 'Tự động báo cáo cuối ngày: Tắt'}</span>`;
-          statsWrap.innerHTML = `<div class="ai-stats-bar">
-            ${stBadge}
-            ${dailyBadge}
-            <span><b>${isEn ? 'API Calls Today:' : 'Lượt gọi API hôm nay:'}</b> ${stats.calls_today} / ${ai.daily_call_limit}</span>
-            <span><b>${isEn ? 'Tokens Used Today:' : 'Token dùng hôm nay:'}</b> ${Number(stats.tokens_today || 0).toLocaleString()}</span>
-            <span><b>${isEn ? 'Cache Hits (0 tokens):' : 'Lượt Cache tiết kiệm (0 token):'}</b> ${stats.cached_today || 0}</span>
-            <span class="spacer"></span>
-            ${M.S.user && M.S.user.role === 'admin' ? `<a href="#/settings" class="btn sm">⚙️ ${isEn ? 'Configure AI' : 'Cài đặt AI'}</a>` : ''}
-          </div>`;
-        }
-        if ($('#ev-body')) {
-          $('#ev-body').innerHTML = reports.length
-            ? reports.map((r) => M.renderAiReportCard(r, true)).join('')
-            : `<div class="muted" style="padding:18px;text-align:center">${isEn
-              ? 'No AI reports yet. High/Critical incidents are analyzed automatically, or click "Collect Logs & Run Daily Digest" above.'
-              : 'Chưa có báo cáo AI nào. Các sự cố mức Cao & Nghiêm trọng sẽ tự động được phân tích, hoặc bạn có thể bấm nút "Thu thập Log & Phân tích Cuối ngày" ở trên.'}</div>`;
+        try {
+          const q = this.aiKind ? `?kind=${encodeURIComponent(this.aiKind)}&limit=100` : '?limit=100';
+          const { reports, stats, ai } = await M.api('GET', `/api/ai/reports${q}`);
+          const statsWrap = $('#ai-stats-wrap');
+          if (statsWrap && stats && ai) {
+            const stBadge = ai.enabled
+              ? `<span class="sev-badge ok">● ${isEn ? 'AI API Enabled' : 'API AI Đang bật'}</span>`
+              : `<span class="sev-badge medium">○ ${isEn ? 'AI API Disabled (Smart Fallback Active)' : 'Đã tắt gọi API AI (Đang dùng Chuyên gia nội bộ 0 token)'}</span>`;
+            const dailyBadge = ai.daily_digest_enabled
+              ? `<span class="sev-badge low">🕒 ${isEn ? `Auto Daily Digest: ${ai.daily_digest_time}` : `Tự động tổng hợp cuối ngày: ${ai.daily_digest_time}`}</span>`
+              : `<span class="muted">🕒 ${isEn ? 'Auto Daily Digest: Off' : 'Tự động báo cáo cuối ngày: Tắt'}</span>`;
+            statsWrap.innerHTML = `<div class="ai-stats-bar">
+              ${stBadge}
+              ${dailyBadge}
+              <span><b>${isEn ? 'API Calls Today:' : 'Lượt gọi API hôm nay:'}</b> ${stats.calls_today} / ${ai.daily_call_limit}</span>
+              <span><b>${isEn ? 'Tokens Used Today:' : 'Token dùng hôm nay:'}</b> ${Number(stats.tokens_today || 0).toLocaleString()}</span>
+              <span><b>${isEn ? 'Cache Hits (0 tokens):' : 'Lượt Cache tiết kiệm (0 token):'}</b> ${stats.cached_today || 0}</span>
+              <span class="spacer"></span>
+              ${M.S.user && M.S.user.role === 'admin' ? `<a href="#/settings" class="btn sm">⚙️ ${isEn ? 'Configure AI' : 'Cài đặt AI'}</a>` : ''}
+            </div>`;
+          }
+          if ($('#ev-body')) {
+            $('#ev-body').innerHTML = reports && reports.length
+              ? reports.map((r) => M.renderAiReportCard(r, true)).join('')
+              : `<div class="muted" style="padding:18px;text-align:center">${isEn
+                ? 'No AI reports yet. High/Critical incidents are analyzed automatically, or click "Collect Logs & Run Daily Digest" above.'
+                : 'Chưa có báo cáo AI nào. Các sự cố mức Cao & Nghiêm trọng sẽ tự động được phân tích, hoặc bạn có thể bấm nút "Thu thập Log & Phân tích Cuối ngày" ở trên.'}</div>`;
+          }
+        } catch (err) {
+          if ($('#ev-body')) {
+            $('#ev-body').innerHTML = `<div class="panel err" style="margin:12px 0">${esc(M.trData(err.message))}</div>`;
+          }
         }
         return;
       }
-      const { events } = await M.api('GET', '/api/events?limit=300');
-      const k = $('#ev-kind') && $('#ev-kind').value;
-      if ($('#ev-body')) $('#ev-body').innerHTML = M.eventsTable(k ? events.filter((e) => e.kind === k) : events, true);
+      try {
+        const { events } = await M.api('GET', '/api/events?limit=300');
+        const k = $('#ev-kind') && $('#ev-kind').value;
+        if ($('#ev-body')) $('#ev-body').innerHTML = M.eventsTable(k ? events.filter((e) => e.kind === k) : events, true);
+      } catch (err) {
+        if ($('#ev-body')) {
+          $('#ev-body').innerHTML = `<div class="panel err" style="margin:12px 0">${esc(M.trData(err.message))}</div>`;
+        }
+      }
     },
   };
 

@@ -1518,4 +1518,35 @@ test('ai: smart incident filter excludes ping/down/printers, deep technical tele
   } finally { t.close(); }
 });
 
+test('events & ai tab navigation: router supports #/events and #/events/ai, views.js isolates errors to #ev-body', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  const coreJs = fs.readFileSync(path.join(__dirname, '../public/core.js'), 'utf8');
+  const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
+  const adminJs = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
+
+  // Verify regex routes in core.js
+  assert.match(coreJs, /\[\/\^#\\\/events\(\?:\\\/\(ai\|events\)\)\?\$\/,\s*'events'\]/);
+
+  // Test regex directly
+  const evRouteRe = /^#\/events(?:\/(ai|events))?$/;
+  assert.ok(evRouteRe.test('#/events'));
+  assert.equal(evRouteRe.exec('#/events')[1], undefined);
+  assert.ok(evRouteRe.test('#/events/ai'));
+  assert.equal(evRouteRe.exec('#/events/ai')[1], 'ai');
+  assert.ok(evRouteRe.test('#/events/events'));
+  assert.equal(evRouteRe.exec('#/events/events')[1], 'events');
+  assert.equal(evRouteRe.test('#/events/other'), false);
+
+  // Verify admin.js redirects to #/events/ai
+  assert.match(adminJs, /location\.hash = '#\/events\/ai'/);
+
+  // Verify views.js has error handling in load() so failures stay within #ev-body
+  assert.match(viewsJs, /if \(\$\('#ev-body'\)\) \{\s*\$\('#ev-body'\)\.innerHTML = `<div class="panel err"/);
+
+  // Verify views.js clears interval before re-scheduling to prevent timer leaks
+  assert.match(viewsJs, /clearInterval\(this\.t\);/);
+});
+
 

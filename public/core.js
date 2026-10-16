@@ -944,7 +944,7 @@ M.connect = () => {
 // ---------- router ----------
 const ROUTES = [
   [/^#\/?$/, 'dashboard'], [/^#\/secondary$/, 'secondary'], [/^#\/groups$/, 'groups'], [/^#\/group\/(\d+)$/, 'group'], [/^#\/device\/(\d+)$/, 'device'],
-  [/^#\/maps$/, 'maps'], [/^#\/map\/(\d+)$/, 'map'], [/^#\/events$/, 'events'], [/^#\/devices$/, 'devices'], [/^#\/settings$/, 'settings'],
+  [/^#\/maps$/, 'maps'], [/^#\/map\/(\d+)$/, 'map'], [/^#\/events(?:\/(ai|events))?$/, 'events'], [/^#\/devices$/, 'devices'], [/^#\/settings$/, 'settings'],
 ];
 
 M.route = async () => {
