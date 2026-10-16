@@ -228,8 +228,9 @@ class Monitor extends EventEmitter {
       lastAt: now,
       data: {
         hostname: str(p.hostname, 128), os: str(p.os, 128), ip: str(p.ip, 64), version: str(p.agent_version, 32),
-        cpu: num(p.cpu && p.cpu.percent, 0, 100), cores: num(p.cpu && p.cpu.cores, 0, 4096),
-        load1: num(p.cpu && p.cpu.load1, 0, 1e6),
+        cpu: num(p.cpu && p.cpu.percent, 0, 100),
+        cores: num(p.cores ?? (p.cpu && p.cpu.cores), 0, 4096),
+        load1: num(p.load1 ?? (p.cpu && p.cpu.load1), 0, 1e6),
         ram: { total: num(mem.total, 0, 1e18), used: num(mem.used, 0, 1e18), percent: num(mem.percent, 0, 100) },
         disks, uptime: num(p.uptime, 0, 1e10),
         net: rx !== null && tx !== null ? { rx_bytes: rx, tx_bytes: tx } : null,
@@ -489,8 +490,19 @@ class Monitor extends EventEmitter {
       .run(now, d.id, d.name, kind, severity, message);
     const eventId = Number(info.lastInsertRowid);
     this.emit('event', { id: eventId, device_id: d.id, kind, severity, message });
-    const aiSev = (severity === 'critical' || severity === 'high') ? severity : devSev;
-    if (d && d.id && (aiSev === 'critical' || aiSev === 'high') && ['down', 'warning', 'dos', 'smart', 'thermal', 'power'].includes(kind)) {
+
+    // Smart Incident Filter: never trigger AI on disconnect/ping, printer, or recovery/audit
+    const { isAiAnalyzableIncident } = require('./ai');
+    if (d && d.id && isAiAnalyzableIncident({
+      device_id: d.id,
+      device_type: d.type,
+      device_severity: devSev,
+      event_severity: severity,
+      kind,
+      reason: message,
+      status: kind,
+    })) {
+      const aiSev = (severity === 'critical' || severity === 'high') ? severity : devSev;
       this._triggerAiIncident(d, kind, aiSev, message, eventId, now);
     }
     return eventId;
@@ -498,6 +510,13 @@ class Monitor extends EventEmitter {
 
   _triggerAiIncident(d, kind, aiSev, message, eventId, now = Date.now()) {
     if (!this.settings.ai || !this.settings.ai.enabled || this.settings.ai.auto_incident === false) return;
+    const { collectDeviceTechnicalLogs } = require('./ai');
+    const techLogs = collectDeviceTechnicalLogs(this, {
+      eventId,
+      deviceId: d.id,
+      lang: this.settings.default_lang || 'vi',
+      now,
+    });
     const st = this.state.get(d.id);
     const agentFresh = st && st.agent.lastAt != null && now - st.agent.lastAt <= this.o.agentTimeoutMs;
     const res = st ? this._resources(st, agentFresh) : null;
@@ -508,12 +527,14 @@ class Monitor extends EventEmitter {
       device_id: d.id,
       device_name: d.name,
       device_type: d.type,
+      device_severity: this.severityOf(d),
       address: d.address,
       severity: aiSev,
       status: st ? st.status : kind,
       kind,
       reason: message,
       event_id: eventId,
+      tech_summary: techLogs ? techLogs.tech_summary : null,
       cpu: res ? res.cpu : null,
       ram: res ? res.ram : null,
       disk: res ? res.disk : null,

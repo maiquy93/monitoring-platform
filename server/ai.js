@@ -45,6 +45,89 @@ function buildFingerprint(deviceId, kind, reasons, lang = 'vi') {
   return `${deviceId || 0}:${kind}:${norm}:${lang}`;
 }
 
+// Smart Incident Filter (BA & Dev specification):
+// Strictly filters which incidents genuinely require AI root-cause & predictive analysis.
+// EXCLUDES:
+// 1. Disconnection / Ping failure / ICMP / Agent / SNMP reachability loss ('down' or ping/timeout warnings)
+// 2. Printer devices & printer consumables/mechanical events (toner, drum, paper jam, cover open)
+// 3. Recovery ('up' / severity 'ok') and system audit ('audit') events
+// 4. Low / Medium severity devices (for automatic background triggers)
+// INCLUDES only complex technical anomalies (CPU/RAM/Disk > threshold, SMART Bad Sector, Thermal, UPS Power, Flood/DoS).
+function isAiAnalyzableIncident(ctx, opts = {}) {
+  if (!ctx || typeof ctx !== 'object') return false;
+  const force = !!opts.force;
+  const allowLiveDevice = !!opts.allowLiveDevice;
+  const kind = String(ctx.kind || '').toLowerCase();
+  const devType = String(ctx.device_type || '').toLowerCase();
+  const reason = String(ctx.reason || ctx.message || '');
+  const evSev = String(ctx.event_severity || '').toLowerCase();
+  const devSev = String(ctx.device_severity || ctx.severity || '').toLowerCase();
+
+  // 1. Never analyze recovery or audit events
+  if (kind === 'up' || kind === 'audit') return false;
+  if (evSev === 'ok' || devSev === 'ok' || devSev === 'none') return false;
+  if (/trở lại bình thường|hoạt động bình thường|mức an toàn|có điện lưới trở lại|hoạt động trở lại|recovered|returned to normal/i.test(reason)) {
+    return false;
+  }
+
+  // 2. Never analyze Printer devices or printer consumable/mechanical alerts (toner, drum, paper jam)
+  if (devType === 'printer') return false;
+  if (/hết mực|mực còn|no toner|low toner|drum|trống hình|kẹt giấy|paper jam|cửa máy in|cover open|fuser|waste toner|sự cố máy in/i.test(reason)) {
+    return false;
+  }
+
+  // 3. Never analyze Disconnection ('down') or pure Ping/ICMP/Agent/SNMP reachability loss
+  if (kind === 'down' || String(ctx.status || '').toLowerCase() === 'down') return false;
+  if (/mất kết nối|không ping được|không phản hồi icmp|icmp.*fail|ping.*timeout|agent không gửi dữ liệu|agent mất kết nối|mất tín hiệu agent|snmp không phản hồi|snmp lỗi/i.test(reason)) {
+    const hasTechAlso = /cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|flood|dos|mất điện lưới|on battery/i.test(reason);
+    if (!hasTechAlso) return false;
+  }
+
+  // 4. For automatic triggers, require the device's configured severity to be 'critical' or 'high'
+  if (!force && devSev !== 'critical' && devSev !== 'high') return false;
+
+  // 5. Positive Technical Whitelist: must be a complex hardware, capacity, thermal, power, or security anomaly
+  if (['smart', 'dos', 'thermal', 'power'].includes(kind)) return true;
+  if (/cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|thermal|overheat|flood|dos|tấn công|mất điện lưới|on battery|chạy pin ups/i.test(reason)) {
+    return true;
+  }
+  if ((force || allowLiveDevice) && (
+    (ctx.cpu != null && ctx.cpu >= 80) ||
+    (ctx.ram != null && ctx.ram >= 80) ||
+    (ctx.disk != null && ctx.disk >= 80) ||
+    (ctx.temp != null && ctx.temp >= 75) ||
+    (ctx.pkt_rate != null && ctx.pkt_rate >= 5000) ||
+    (ctx.smart && ctx.smart.ok === false) ||
+    (ctx.power && ctx.power.on_battery) ||
+    allowLiveDevice
+  )) {
+    return true;
+  }
+
+  return false;
+}
+
+function fmtBytesHuman(bytes) {
+  if (bytes == null || !Number.isFinite(Number(bytes))) return 'N/A';
+  const b = Number(bytes);
+  if (b >= 1024 ** 4) return `${(b / (1024 ** 4)).toFixed(2)} TB`;
+  if (b >= 1024 ** 3) return `${(b / (1024 ** 3)).toFixed(2)} GB`;
+  if (b >= 1024 ** 2) return `${(b / (1024 ** 2)).toFixed(1)} MB`;
+  if (b >= 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${Math.round(b)} B`;
+}
+
+function fmtDurHuman(sec) {
+  if (sec == null || !Number.isFinite(Number(sec))) return 'N/A';
+  const s = Math.max(0, Math.floor(Number(sec)));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m ${s % 60}s`;
+}
+
 // Compute 24h predictive trend summary from SQLite metrics & events in ~15 tokens
 // instead of sending raw time-series arrays.
 function computeDeviceTrendSummary(db, deviceId, now = Date.now()) {
@@ -93,6 +176,197 @@ function computeDeviceTrendSummary(db, deviceId, now = Date.now()) {
   return parts.join(', ');
 }
 
+// Collect deep technical telemetry & time-series metric logs for a device/incident.
+// Used BOTH when fetching AI analysis (compact technical context) AND when user clicks
+// "Copy Technical Logs" to paste into external AI chatboxes (ChatGPT, Claude, Gemini, DeepSeek).
+function collectDeviceTechnicalLogs(monitor, { eventId, deviceId, lang = 'vi', now = Date.now() } = {}) {
+  const db = monitor.db;
+  const isEn = lang === 'en';
+  let ev = null;
+  if (eventId) {
+    ev = db.prepare('SELECT * FROM events WHERE id = ?').get(Number(eventId));
+  }
+  const targetDevId = Number(deviceId || (ev && ev.device_id) || 0);
+  const d = targetDevId ? monitor.devices.get(targetDevId) : null;
+  const v = d ? monitor.view(d, true) : null;
+  const a = (v && v.agent) || {};
+  const snmp = (v && v.snmp) || {};
+  const th = (monitor.settings && monitor.settings.thresholds) || { cpu: 90, ram: 90, disk: 90, temp: 85, dos_packet_rate: 10000 };
+
+  const devName = (v && v.name) || (ev && ev.device_name) || 'Unknown-Device';
+  const devType = (v && v.type) || (d && d.type) || 'server';
+  const address = (v && v.address) || (d && d.address) || 'N/A';
+  const devSev = (v && v.severity) || (ev && ev.severity) || 'high';
+  const hostname = a.hostname || snmp.sysName || devName;
+  const osInfo = a.os || snmp.sysDescr || 'N/A';
+  const uptimeSec = v ? v.uptime : null;
+  const cores = a.cores || (a.cpu && a.cpu.cores) || null;
+  const load1 = a.load1 != null ? Number(a.load1).toFixed(2) : (a.cpu && a.cpu.load1 != null ? Number(a.cpu.load1).toFixed(2) : null);
+  const loadRatio = (load1 != null && cores > 0) ? `${Math.round((Number(load1) / cores) * 100)}%` : null;
+  const snmpProfile = (snmp.profile && snmp.profile.id) || (v && v.snmp_profile) || null;
+
+  // Storage partitions breakdown
+  const disks = Array.isArray(a.disks) ? a.disks : [];
+  const diskLines = disks.map((dk) => {
+    const flag = dk.percent >= th.disk ? ' [CRITICAL >= THRESHOLD]' : (dk.percent >= 80 ? ' [HIGH]' : '');
+    return `  * ${dk.mount || '/'} : ${dk.percent ?? '?'}% (Used: ${fmtBytesHuman(dk.used)} / Total: ${fmtBytesHuman(dk.total)})${flag}`;
+  });
+  const compactMounts = disks.slice(0, 4).map((dk) => `${dk.mount}:${Math.round(dk.percent || 0)}%`).join(',');
+
+  // Network & packet forensics
+  const netIn = v ? v.net_in : null;
+  const netOut = v ? v.net_out : null;
+  const pktRate = v ? v.pkt_rate : null;
+  const avgPktBytes = (pktRate && pktRate > 0 && ((netIn || 0) + (netOut || 0)) > 0)
+    ? Math.round(((netIn || 0) + (netOut || 0)) / pktRate)
+    : null;
+
+  // Recent time-series metric samples from SQLite
+  const rawSamples = targetDevId
+    ? db.prepare('SELECT ts, cpu, ram, disk, temp, rtt, net_in, net_out FROM metrics WHERE device_id = ? ORDER BY ts DESC LIMIT 12').all(targetDevId)
+    : [];
+
+  const sampleTrajectoryCompact = rawSamples.length
+    ? rawSamples.slice(0, 5).map((r) => {
+      const p = [];
+      if (r.cpu != null) p.push(`C:${Math.round(r.cpu)}%`);
+      if (r.ram != null) p.push(`R:${Math.round(r.ram)}%`);
+      if (r.disk != null) p.push(`D:${Math.round(r.disk)}%`);
+      if (r.temp != null) p.push(`T:${Math.round(r.temp)}C`);
+      return p.join('/');
+    }).join(' -> ')
+    : 'N/A';
+
+  const trend24h = targetDevId ? computeDeviceTrendSummary(db, targetDevId, now) : 'N/A';
+
+  // Compact technical telemetry string (~25-35 tokens) injected into AI API prompt
+  const techSummaryParts = [
+    osInfo !== 'N/A' ? `OS="${String(osInfo).slice(0, 48)}"` : null,
+    cores ? `Cores=${cores}` : null,
+    load1 ? `Load1=${load1}${loadRatio ? `(${loadRatio})` : ''}` : null,
+    a.ram && a.ram.total ? `RAM_Used=${fmtBytesHuman(a.ram.used)}/${fmtBytesHuman(a.ram.total)}` : null,
+    compactMounts ? `Mounts=[${compactMounts}]` : null,
+    netIn != null || netOut != null ? `Net_IO=RX:${fmtBytesHuman(netIn)}/s,TX:${fmtBytesHuman(netOut)}/s` : null,
+    avgPktBytes != null ? `AvgPktSize=${avgPktBytes}B` : null,
+    uptimeSec != null ? `Uptime=${fmtDurHuman(uptimeSec)}` : null,
+    rawSamples.length > 1 ? `Recent5Polls=[${sampleTrajectoryCompact}]` : null,
+  ].filter(Boolean).join(' | ');
+
+  // Full tabular time-series rows for engineer/AI chatbox inspection
+  const sampleTableRows = rawSamples.length
+    ? rawSamples.map((r) => {
+      const iso = new Date(r.ts).toISOString();
+      const cpuS = r.cpu != null ? `${Number(r.cpu).toFixed(1)}%`.padEnd(6) : 'N/A   ';
+      const ramS = r.ram != null ? `${Number(r.ram).toFixed(1)}%`.padEnd(6) : 'N/A   ';
+      const dskS = r.disk != null ? `${Number(r.disk).toFixed(1)}%`.padEnd(6) : 'N/A   ';
+      const tmpS = r.temp != null ? `${Number(r.temp).toFixed(1)}°C`.padEnd(7) : 'N/A    ';
+      const rttS = r.rtt != null ? `${Number(r.rtt).toFixed(1)}ms`.padEnd(8) : 'N/A     ';
+      const rxS = r.net_in != null ? `${fmtBytesHuman(r.net_in)}/s`.padEnd(11) : 'N/A        ';
+      const txS = r.net_out != null ? `${fmtBytesHuman(r.net_out)}/s` : 'N/A';
+      return `${iso} | ${cpuS} | ${ramS} | ${dskS} | ${tmpS} | ${rttS} | ${rxS} | ${txS}`;
+    }).join('\n')
+    : (isEn ? '(No time-series samples recorded in metrics table yet)' : '(Chưa có mẫu chuỗi thời gian trong bảng metrics)');
+
+  const incidentReason = (ev && ev.message) || (v && v.reasons && v.reasons.join('; ')) || (isEn ? 'On-demand technical inspection' : 'Kiểm tra kỹ thuật chuyên sâu');
+  const incidentKind = (ev && ev.kind) || (v && v.status) || 'warning';
+  const incidentTs = ev ? new Date(ev.ts).toISOString() : new Date(now).toISOString();
+
+  const smartStr = v && v.smart
+    ? (v.smart.ok === false ? `FAIL (Status: ${v.smart.status || 'BAD_SECTOR'} | Details: ${v.smart.details || 'Hardware error'})` : `OK (${v.smart.status || 'HEALTHY'})`)
+    : 'N/A';
+  const upsStr = v && v.power
+    ? (v.power.on_battery ? `ON_BATTERY (Battery: ${v.power.battery_percent ?? '?'}% | Status: ${v.power.status || 'DISCHARGING'})` : `AC_ONLINE (Battery: ${v.power.battery_percent ?? 100}%)`)
+    : 'N/A';
+
+  const logText = isEn
+    ? `=== TECHNICAL DIAGNOSTIC TELEMETRY & LOGS FOR AI ANALYSIS ===
+[1. DEVICE & SYSTEM ENVIRONMENT]
+- Device Name   : ${devName} (Type: ${devType} | Configured Severity: ${devSev.toUpperCase()})
+- IP / Hostname : ${address} (Hostname: ${hostname})
+- OS / Firmware : ${osInfo}
+- Uptime        : ${fmtDurHuman(uptimeSec)}${snmpProfile ? ` | SNMP Profile: ${snmpProfile}` : ''}${a.version ? ` | Agent: v${a.version}` : ''}
+- CPU Hardware  : ${cores ? `${cores} Cores` : 'N/A'} | LoadAvg(1m): ${load1 || 'N/A'}${loadRatio ? ` (Core Saturation: ${loadRatio})` : ''}
+
+[2. TRIGGERING TECHNICAL INCIDENT & ACTIVE HARDWARE FLAGS]
+- Timestamp     : ${incidentTs}
+- Incident Kind : ${incidentKind.toUpperCase()}
+- Alert Detail  : ${incidentReason}
+- Active Flags  : SMART_ERR=${Boolean(v && v.alerts && v.alerts.smart)} | THERMAL_ERR=${Boolean(v && v.alerts && v.alerts.thermal)} | DOS_FLOOD=${Boolean(v && v.alerts && v.alerts.dos)} | UPS_BATTERY=${Boolean(v && v.alerts && v.alerts.power)}
+
+[3. REAL-TIME RESOURCE, STORAGE PARTITIONS & NETWORK TELEMETRY]
+- CPU & Thermal : CPU=${v && v.cpu != null ? `${Math.round(v.cpu)}%` : 'N/A'} (Threshold: ${th.cpu}%) | Temp=${v && v.temperature != null ? `${Math.round(v.temperature)}°C` : 'N/A'} (Threshold: ${th.temp}°C)
+- Memory (RAM)  : ${v && v.ram != null ? `${Math.round(v.ram)}%` : 'N/A'} (Threshold: ${th.ram}%)${a.ram && a.ram.total ? ` — Used: ${fmtBytesHuman(a.ram.used)} / Total: ${fmtBytesHuman(a.ram.total)} (Free: ${fmtBytesHuman(Math.max(0, a.ram.total - (a.ram.used || 0)))})` : ''}
+- Disk Usage    : Max Partition=${v && v.disk != null ? `${Math.round(v.disk)}%` : 'N/A'} (Threshold: ${th.disk}%)
+${diskLines.length ? diskLines.join('\n') : '  * (Single volume / SNMP storage metric)'}
+- SMART Health  : ${smartStr}
+- Power / UPS   : ${upsStr}
+- Network & PPS : Ping RTT=${v && v.rtt != null ? `${v.rtt} ms` : 'N/A'} | RX=${netIn != null ? `${fmtBytesHuman(netIn)}/s` : 'N/A'} | TX=${netOut != null ? `${fmtBytesHuman(netOut)}/s` : 'N/A'} | Packet Rate=${pktRate != null ? `${pktRate} pkt/s` : 'N/A'} (DoS Threshold: ${th.dos_packet_rate} pkt/s)${avgPktBytes != null ? ` | Avg Packet Size: ~${avgPktBytes} B/pkt` : ''}${v && v.dos_details ? ` | Attack Signature: ${v.dos_details}` : ''}
+
+[4. 24-HOUR STATISTICAL BASELINE & LINEAR REGRESSION FORECAST]
+- 24h Telemetry : ${trend24h}
+
+[5. RECENT RAW TIME-SERIES METRIC SAMPLES (NEWEST FIRST)]
+TIMESTAMP (ISO)          | CPU%   | RAM%   | DISK%  | TEMP°C  | RTT(ms)  | RX_RATE     | TX_RATE
+${sampleTableRows}
+
+[6. AI DIAGNOSTIC PROMPT]
+Act as a Senior SRE / Network & Systems Architect. Based on the technical telemetry, partition metrics, hardware flags, and time-series progression above, provide a rigorous technical analysis:
+1. Issue Summary & Immediate Operational Risk.
+2. Root Cause Analysis (correlating CPU/Load1, RAM headroom, Disk partition growth, SMART status, Thermal, or Packet Size/PPS).
+3. Step-by-step Diagnostic & Remediation CLI Commands (Linux/Windows/RouterOS/Cisco/Firewall as applicable).
+4. Capacity & Reliability Prediction for the next 24–72 hours.`
+    : `=== LOGS KỸ THUẬT CHẨN ĐOÁN HỆ THỐNG & MẠNG (TECHNICAL TELEMETRY DUMP) ===
+[1. THÔNG SỐ MÔI TRƯỜNG, PHẦN CỨNG & HỆ ĐIỀU HÀNH]
+- Thiết bị       : ${devName} (Loại: ${devType} | Mức ưu tiên: ${devSev.toUpperCase()})
+- IP / Hostname  : ${address} (Hostname: ${hostname})
+- Hệ điều hành   : ${osInfo}
+- Uptime         : ${fmtDurHuman(uptimeSec)}${snmpProfile ? ` | Hồ sơ SNMP: ${snmpProfile}` : ''}${a.version ? ` | Agent: v${a.version}` : ''}
+- Cấu hình CPU   : ${cores ? `${cores} nhân (Cores)` : 'N/A'} | LoadAvg(1m): ${load1 || 'N/A'}${loadRatio ? ` (Độ bão hòa tải/nhân: ${loadRatio})` : ''}
+
+[2. SỰ CỐ KỸ THUẬT KÍCH HOẠT & CỜ TRẠNG THÁI PHẦN CỨNG]
+- Thời điểm      : ${incidentTs}
+- Phân loại lỗi  : ${incidentKind.toUpperCase()}
+- Chi tiết kỹ thuật: ${incidentReason}
+- Cờ phần cứng   : SMART_DISK_ERR=${Boolean(v && v.alerts && v.alerts.smart)} | THERMAL_THROTTLE=${Boolean(v && v.alerts && v.alerts.thermal)} | DOS_FLOOD=${Boolean(v && v.alerts && v.alerts.dos)} | UPS_ON_BATTERY=${Boolean(v && v.alerts && v.alerts.power)}
+
+[3. SỐ LIỆU TELEMETRY TÀI NGUYÊN, PHÂN VÙNG Ổ ĐĨA & LƯU LƯỢNG MẠNG THỰC TẾ]
+- CPU & Nhiệt độ : CPU=${v && v.cpu != null ? `${Math.round(v.cpu)}%` : 'N/A'} (Ngưỡng: ${th.cpu}%) | Nhiệt độ=${v && v.temperature != null ? `${Math.round(v.temperature)}°C` : 'N/A'} (Ngưỡng: ${th.temp}°C)
+- Bộ nhớ RAM     : ${v && v.ram != null ? `${Math.round(v.ram)}%` : 'N/A'} (Ngưỡng: ${th.ram}%)${a.ram && a.ram.total ? ` — Đã dùng: ${fmtBytesHuman(a.ram.used)} / Tổng: ${fmtBytesHuman(a.ram.total)} (Còn trống: ${fmtBytesHuman(Math.max(0, a.ram.total - (a.ram.used || 0)))})` : ''}
+- Phân vùng Đĩa  : Cao nhất=${v && v.disk != null ? `${Math.round(v.disk)}%` : 'N/A'} (Ngưỡng: ${th.disk}%)
+${diskLines.length ? diskLines.join('\n') : '  * (Đo qua SNMP hoặc 1 phân vùng mặc định)'}
+- Đĩa cứng SMART : ${smartStr}
+- Nguồn / UPS    : ${upsStr}
+- Mạng & Gói tin : Ping RTT=${v && v.rtt != null ? `${v.rtt} ms` : 'N/A'} | Tải xuống (RX)=${netIn != null ? `${fmtBytesHuman(netIn)}/s` : 'N/A'} | Tải lên (TX)=${netOut != null ? `${fmtBytesHuman(netOut)}/s` : 'N/A'} | Tốc độ gói (PPS)=${pktRate != null ? `${pktRate} gói/s` : 'N/A'} (Ngưỡng DoS: ${th.dos_packet_rate} gói/s)${avgPktBytes != null ? ` | Kích thước gói TB: ~${avgPktBytes} B/gói` : ''}${v && v.dos_details ? ` | Dấu hiệu tấn công: ${v.dos_details}` : ''}
+
+[4. THỐNG KÊ CƠ SỞ 24H & HỒI QUY TUYẾN TÍNH DỰ ĐOÁN DUNG LƯỢNG]
+- Xu hướng 24h   : ${trend24h}
+
+[5. CHUỖI MẪU METRIC KỸ THUẬT GẦN NHẤT (TỪ MỚI ĐẾN CŨ)]
+THỜI GIAN (ISO)          | CPU%   | RAM%   | DISK%  | NHIỆT   | RTT(ms)  | BĂNG THÔNG RX | BĂNG THÔNG TX
+${sampleTableRows}
+
+[6. YÊU CẦU CHẨN ĐOÁN DÀNH CHO AI CHATBOX]
+Hãy đóng vai Chuyên gia Quản trị Hạ tầng Hệ thống & Mạng (Senior SRE / NOC Architect). Dựa trên toàn bộ Logs Kỹ thuật, Bảng phân vùng, Cờ phần cứng và Chuỗi mẫu Metric ở trên, hãy phân tích chuyên sâu:
+1. Tóm tắt vấn đề kỹ thuật cốt lõi & mức độ nguy cấp hiện tại.
+2. Phân tích nguyên nhân gốc rễ (Root Cause Analysis) dựa trên mối tương quan giữa các thông số (CPU/LoadAvg, RAM còn trống, tốc độ tăng phân vùng Disk, mã lỗi SMART, nhiệt độ hoặc kích thước gói tin/PPS).
+3. Đề xuất các câu lệnh kiểm tra chuyên sâu (CLI trên Linux/Windows/Router/Switch/Firewall) và hướng khắc phục từng bước.
+4. Dự báo xu hướng tài nguyên & rủi ro ngừng dịch vụ trong 24–72 giờ tới.`;
+
+  return {
+    device_id: targetDevId || null,
+    device_name: devName,
+    device_type: devType,
+    address,
+    severity: devSev,
+    event_id: ev ? ev.id : null,
+    kind: incidentKind,
+    reason: incidentReason,
+    tech_summary: techSummaryParts,
+    trend_24h: trend24h,
+    log_text: logText,
+  };
+}
+
 // Unified ultra-compact incident prompt template (Vietnamese & English)
 function buildIncidentPrompt(ctx, lang = 'vi') {
   const isEn = lang === 'en';
@@ -107,29 +381,31 @@ function buildIncidentPrompt(ctx, lang = 'vi') {
     ctx.power && ctx.power.on_battery ? `UPS=ON_BATTERY(${ctx.power.battery_percent ?? '?'}%)` : null,
   ].filter(Boolean).join(' ') || 'N/A';
 
+  const techLine = ctx.tech_summary ? `\nTech_Logs: ${ctx.tech_summary}` : '';
+
   if (isEn) {
     return {
-      system: 'You are a senior NOC/SRE AI assistant. Analyze the infrastructure incident and respond with ONLY a single valid JSON object (no markdown fences) matching this exact schema: {"issue":"Concise problem description","cause":"Most likely root cause","solution":"Step-by-step remediation","prediction":"Predictive impact/trend if left unresolved"}. Keep total output under 110 words.',
+      system: 'You are a senior NOC/SRE AI assistant. Analyze the infrastructure technical telemetry and respond with ONLY a single valid JSON object (no markdown fences) matching this exact schema: {"issue":"Concise problem description","cause":"Most likely technical root cause","solution":"Step-by-step CLI/remediation actions","prediction":"Predictive impact/trend if left unresolved"}. Keep total output under 120 words.',
       user: `[INCIDENT_TEMPLATE_V1]
 Lang: en
 Device: ${ctx.device_name} (Type: ${ctx.device_type} | IP: ${ctx.address || 'N/A'})
 Severity: ${ctx.severity} | Status: ${ctx.status}
 Incident_Kind: ${ctx.kind}
 Reason: ${ctx.reason}
-Metrics: ${m}
+Metrics: ${m}${techLine}
 Trend_24h: ${ctx.trend || 'N/A'}`,
     };
   }
 
   return {
-    system: 'Bạn là chuyên gia AI quản trị hạ tầng mạng & máy chủ (NOC/SRE). Hãy phân tích sự cố và trả về DUY NHẤT 1 chuỗi JSON hợp lệ (không bọc markdown) theo đúng mẫu: {"issue":"Tóm tắt vấn đề","cause":"Nguyên nhân gốc rễ khả dĩ","solution":"Đề xuất các bước xử lý cụ thể","prediction":"Dự đoán rủi ro/xu hướng nếu không xử lý"}. Ngắn gọn, chính xác, tổng cộng dưới 120 từ.',
+    system: 'Bạn là chuyên gia AI quản trị hạ tầng mạng & máy chủ (NOC/SRE). Hãy phân tích log kỹ thuật của sự cố và trả về DUY NHẤT 1 chuỗi JSON hợp lệ (không bọc markdown) theo đúng mẫu: {"issue":"Tóm tắt vấn đề kỹ thuật","cause":"Nguyên nhân gốc rễ khả dĩ","solution":"Đề xuất lệnh kiểm tra & bước xử lý cụ thể","prediction":"Dự đoán rủi ro/xu hướng nếu không xử lý"}. Ngắn gọn, chính xác, tổng cộng dưới 130 từ.',
     user: `[TEMPLATE_SU_CO_V1]
 Lang: vi
 Thiet_bi: ${ctx.device_name} (Loai: ${ctx.device_type} | IP: ${ctx.address || 'N/A'})
 Muc_canh_bao: ${ctx.severity} | Trang_thai: ${ctx.status}
 Loai_su_co: ${ctx.kind}
 Chi_tiet: ${ctx.reason}
-Chi_so: ${m}
+Chi_so: ${m}${techLine}
 Xu_huong_24h: ${ctx.trend || 'N/A'}`,
   };
 }
@@ -331,6 +607,27 @@ class AiService {
     this.db = db;
     this.fetchFn = opts.fetchFn || globalThis.fetch;
     this.lastDailyDate = null;
+    this.inFlight = new Map();
+    this.purgeUnworthyAiReports();
+  }
+
+  // Purge any legacy unworthy AI reports (disconnection/ping down, printer toner/drum)
+  purgeUnworthyAiReports() {
+    try {
+      this.db.prepare(`
+        DELETE FROM ai_reports
+        WHERE kind = 'down'
+           OR fingerprint LIKE '%:down:%'
+           OR device_id IN (SELECT id FROM devices WHERE type = 'printer')
+           OR issue LIKE '%mất kết nối%'
+           OR issue LIKE '%không phản hồi icmp%'
+           OR issue LIKE '%không ping được%'
+           OR issue LIKE '%máy in%'
+           OR issue LIKE '%mực%'
+           OR issue LIKE '%drum%'
+           OR issue LIKE '%printer%'
+      `).run();
+    } catch { /* ignore */ }
   }
 
   // Count how many real external AI API calls were made today (UTC/local day)
@@ -407,67 +704,82 @@ class AiService {
     if (!force && !aiCfg.enabled) return null;
     if (!force && aiCfg.auto_incident === false) return null;
 
-    // Only High & Critical incidents (unless manually forced by user clicking "Analyze with AI")
-    if (!force && ctx.severity !== 'critical' && ctx.severity !== 'high') return null;
+    // Smart Filter: strictly reject down/ping, printer, and non-technical reachability alerts
+    if (!isAiAnalyzableIncident(ctx, opts)) return null;
 
     const now = opts.now || Date.now();
     const fp = buildFingerprint(ctx.device_id, ctx.kind, ctx.reason, lang);
     const cooldownMs = Math.max(1, Number(aiCfg.cooldown_minutes ?? 60)) * 60 * 1000;
 
-    // 1. Check deduplication cache within cooldown window -> 0 tokens spent!
-    if (!force) {
-      const cached = this.db.prepare(
-        'SELECT * FROM ai_reports WHERE fingerprint = ? AND lang = ? AND ts >= ? ORDER BY ts DESC LIMIT 1',
-      ).get(fp, lang, now - cooldownMs);
-      if (cached) {
-        const info = this.db.prepare(`
-          INSERT INTO ai_reports(ts,kind,device_id,device_name,event_id,severity,lang,fingerprint,issue,cause,solution,prediction,prompt_tokens,completion_tokens,cached,source)
-          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,0,1,?)
-        `).run(
-          now, 'incident', ctx.device_id || null, ctx.device_name || '', ctx.event_id || null,
-          ctx.severity || 'high', lang, fp, cached.issue, cached.cause, cached.solution, cached.prediction, cached.source,
-        );
-        return this.getReport(Number(info.lastInsertRowid));
+    // Deduplicate in-flight parallel calls for identical event in the same tick
+    const inFlightKey = `${fp}:${force ? '1' : '0'}`;
+    if (this.inFlight.has(inFlightKey)) {
+      return await this.inFlight.get(inFlightKey);
+    }
+
+    const task = (async () => {
+      // 1. Check deduplication cache within cooldown window -> 0 tokens spent!
+      if (!force) {
+        const cached = this.db.prepare(
+          'SELECT * FROM ai_reports WHERE fingerprint = ? AND lang = ? AND ts >= ? ORDER BY ts DESC LIMIT 1',
+        ).get(fp, lang, now - cooldownMs);
+        if (cached) {
+          const info = this.db.prepare(`
+            INSERT INTO ai_reports(ts,kind,device_id,device_name,event_id,severity,lang,fingerprint,issue,cause,solution,prediction,prompt_tokens,completion_tokens,cached,source)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,0,0,1,?)
+          `).run(
+            now, 'incident', ctx.device_id || null, ctx.device_name || '', ctx.event_id || null,
+            ctx.severity || 'high', lang, fp, cached.issue, cached.cause, cached.solution, cached.prediction, cached.source,
+          );
+          return this.getReport(Number(info.lastInsertRowid));
+        }
       }
-    }
 
-    const trend = computeDeviceTrendSummary(this.db, ctx.device_id, now);
-    const fullCtx = { ...ctx, trend };
-    const prompt = buildIncidentPrompt(fullCtx, lang);
+      const trend = computeDeviceTrendSummary(this.db, ctx.device_id, now);
+      const fullCtx = { ...ctx, trend };
+      const prompt = buildIncidentPrompt(fullCtx, lang);
 
-    // 2. Check daily budget cap and whether an external API key/endpoint is configured
-    const stats = this.callsToday(now);
-    const limit = Number(aiCfg.daily_call_limit || 50);
-    const hasEndpoint = Boolean(aiCfg.api_key || aiCfg.provider === 'ollama' || (aiCfg.provider === 'custom' && aiCfg.api_url));
+      // 2. Check daily budget cap and whether an external API key/endpoint is configured
+      const stats = this.callsToday(now);
+      const limit = Number(aiCfg.daily_call_limit || 50);
+      const hasEndpoint = Boolean(aiCfg.api_key || aiCfg.provider === 'ollama' || (aiCfg.provider === 'custom' && aiCfg.api_url));
 
-    let result = null;
-    let source = 'heuristic';
-    if (aiCfg.enabled && hasEndpoint && stats.calls_today < limit) {
-      try {
-        result = await this._callLlm(aiCfg, prompt, aiCfg.max_tokens);
-        source = 'ai';
-      } catch {
-        result = null;
+      let result = null;
+      let source = 'heuristic';
+      if (aiCfg.enabled && hasEndpoint && stats.calls_today < limit) {
+        try {
+          result = await this._callLlm(aiCfg, prompt, aiCfg.max_tokens);
+          source = 'ai';
+        } catch {
+          result = null;
+        }
       }
+
+      if (!result) {
+        const fb = generateLocalExpertFallback(fullCtx, lang);
+        result = { ...fb, prompt_tokens: 0, completion_tokens: 0 };
+        source = 'heuristic';
+      }
+
+      const info = this.db.prepare(`
+        INSERT INTO ai_reports(ts,kind,device_id,device_name,event_id,severity,lang,fingerprint,issue,cause,solution,prediction,prompt_tokens,completion_tokens,cached,source)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)
+      `).run(
+        now, 'incident', ctx.device_id || null, ctx.device_name || '', ctx.event_id || null,
+        ctx.severity || 'high', lang, fp,
+        result.issue, result.cause, result.solution, result.prediction,
+        result.prompt_tokens || 0, result.completion_tokens || 0, source,
+      );
+
+      return this.getReport(Number(info.lastInsertRowid));
+    })();
+
+    this.inFlight.set(inFlightKey, task);
+    try {
+      return await task;
+    } finally {
+      this.inFlight.delete(inFlightKey);
     }
-
-    if (!result) {
-      const fb = generateLocalExpertFallback(fullCtx, lang);
-      result = { ...fb, prompt_tokens: 0, completion_tokens: 0 };
-      source = 'heuristic';
-    }
-
-    const info = this.db.prepare(`
-      INSERT INTO ai_reports(ts,kind,device_id,device_name,event_id,severity,lang,fingerprint,issue,cause,solution,prediction,prompt_tokens,completion_tokens,cached,source)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)
-    `).run(
-      now, 'incident', ctx.device_id || null, ctx.device_name || '', ctx.event_id || null,
-      ctx.severity || 'high', lang, fp,
-      result.issue, result.cause, result.solution, result.prediction,
-      result.prompt_tokens || 0, result.completion_tokens || 0, source,
-    );
-
-    return this.getReport(Number(info.lastInsertRowid));
   }
 
   // Collect 24h logs & metrics from server SQLite (ZERO agent changes needed!) and generate Daily AI Digest
@@ -497,7 +809,7 @@ class AiService {
 
     const risks = [];
     for (const d of snap.devices) {
-      if (d.maintenance) continue;
+      if (d.maintenance || d.type === 'printer') continue;
       if (d.disk != null && d.disk >= 80) risks.push(`${d.name}:Disk=${Math.round(d.disk)}%`);
       if (d.cpu != null && d.cpu >= 85) risks.push(`${d.name}:CPU=${Math.round(d.cpu)}%`);
       if (d.temperature != null && d.temperature >= 80) risks.push(`${d.name}:Temp=${Math.round(d.temperature)}C`);
@@ -601,6 +913,10 @@ module.exports = {
   AiService,
   PROVIDER_PRESETS,
   buildFingerprint,
+  isAiAnalyzableIncident,
+  collectDeviceTechnicalLogs,
+  fmtBytesHuman,
+  fmtDurHuman,
   computeDeviceTrendSummary,
   buildIncidentPrompt,
   buildDailyDigestPrompt,

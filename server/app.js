@@ -480,6 +480,27 @@ function createApp(db, monitor, opts = {}) {
     });
   });
 
+  route('GET', '/api/ai/technical-logs', 'any', (ctx) => {
+    const u = new URL(ctx.req.url, 'http://localhost');
+    const eventId = u.searchParams.get('event_id') ? idOf(u.searchParams.get('event_id')) : null;
+    const deviceId = u.searchParams.get('device_id') ? idOf(u.searchParams.get('device_id')) : null;
+    if (!eventId && !deviceId) {
+      send(ctx.res, 400, { error: 'Missing event_id or device_id' });
+      return;
+    }
+    const dev = deviceId ? monitor.devices.get(deviceId) : null;
+    const ev = eventId ? db.prepare('SELECT id, device_id FROM events WHERE id = ?').get(eventId) : null;
+    if (!dev && !ev) {
+      send(ctx.res, 404, { error: 'Device or event not found' });
+      return;
+    }
+    const s = getSettings(db);
+    const lang = LANGS.includes(u.searchParams.get('lang')) ? u.searchParams.get('lang') : (ctx.user && ctx.user.lang ? ctx.user.lang : (s.default_lang || 'vi'));
+    const { collectDeviceTechnicalLogs } = require('./ai');
+    const tech = collectDeviceTechnicalLogs(monitor, { eventId, deviceId, lang });
+    send(ctx.res, 200, { ok: true, ...tech });
+  });
+
   route('POST', '/api/ai/analyze', 'operator', async (ctx) => {
     const b = await readBody(ctx.req, 4096);
     const s = getSettings(db);
@@ -492,16 +513,21 @@ function createApp(db, monitor, opts = {}) {
     const devId = ev ? ev.device_id : (b.device_id ? idOf(b.device_id) : null);
     const d = devId ? monitor.devices.get(devId) : null;
     const v = d ? monitor.view(d, true) : null;
+    const { collectDeviceTechnicalLogs } = require('./ai');
+    const tech = collectDeviceTechnicalLogs(monitor, { eventId: ev ? ev.id : null, deviceId: devId, lang });
     const incCtx = {
       device_id: devId,
       device_name: (d && d.name) || (ev && ev.device_name) || 'System',
       device_type: (d && d.type) || 'server',
+      device_severity: d ? monitor.severityOf(d) : ((ev && ev.severity) || 'high'),
       address: (d && d.address) || '',
       severity: (ev && (ev.severity === 'critical' || ev.severity === 'high')) ? ev.severity : ((v && v.severity) || 'high'),
+      event_severity: ev ? ev.severity : null,
       status: (v && v.status) || (ev && ev.kind) || 'warning',
       kind: (ev && ev.kind) || (v && v.status) || 'warning',
       reason: (ev && ev.message) || (v && v.reasons && v.reasons.join('; ')) || 'Kiểm tra sức khỏe thiết bị',
       event_id: ev ? ev.id : null,
+      tech_summary: tech ? tech.tech_summary : null,
       cpu: v ? v.cpu : null,
       ram: v ? v.ram : null,
       disk: v ? v.disk : null,
@@ -511,7 +537,7 @@ function createApp(db, monitor, opts = {}) {
       smart: v ? v.smart : null,
       power: v ? v.power : null,
     };
-    const report = await monitor.ai.analyzeIncident(incCtx, s, { lang, force: true });
+    const report = await monitor.ai.analyzeIncident(incCtx, s, { lang, force: true, allowLiveDevice: true });
     monitor.emit('change');
     send(ctx.res, 200, { ok: true, report });
   });

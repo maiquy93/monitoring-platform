@@ -392,6 +392,11 @@ const I18N_EN = {
   'Admin: toàn quyền · Operator: xác nhận cảnh báo, chỉnh sơ đồ · Viewer: chỉ xem.': 'Admin: full access · Operator: acknowledge alerts & edit maps · Viewer: read-only.',
   'Sửa / đặt lại mật khẩu': 'Edit / Reset Password',
   'Thêm người dùng': 'Add User',
+  'Copy Logs Kỹ thuật': 'Copy Tech Logs',
+  'Chẩn đoán AI': 'AI Diagnosis',
+  'Sao chép Logs Kỹ thuật': 'Copy Technical Logs',
+  'Gửi AI Phân tích ngay': 'Run AI Analysis Now',
+  'Logs Kỹ thuật Chẩn đoán': 'Technical Diagnostic Logs',
 };
 
 M.t = (s) => {

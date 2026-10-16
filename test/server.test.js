@@ -1332,4 +1332,190 @@ test('ai: end-to-end incident diagnosis, token-saving cache, settings toggle, an
   } finally { t.close(); }
 });
 
+test('ai: smart incident filter excludes ping/down/printers, deep technical telemetry logs and GET /api/ai/technical-logs', async () => {
+  const { isAiAnalyzableIncident, fmtBytesHuman, fmtDurHuman } = require('../server/ai');
+
+  // 1. Formatters
+  assert.equal(fmtBytesHuman(1024), '1.0 KB');
+  assert.equal(fmtBytesHuman(1048576 * 50), '50.0 MB');
+  assert.equal(fmtBytesHuman(1073741824 * 2.5), '2.50 GB');
+  assert.equal(fmtDurHuman(90), '1m 30s');
+  assert.equal(fmtDurHuman(3665), '1h 1m');
+  assert.equal(fmtDurHuman(90000), '1d 1h 0m');
+
+  // 2. Unit Tests for isAiAnalyzableIncident
+  // Rejection cases:
+  // a) Disconnection / ICMP ping / Agent silence
+  assert.equal(isAiAnalyzableIncident({ kind: 'down', device_type: 'server', device_severity: 'critical', reason: 'Không phản hồi ICMP' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'down', device_type: 'router', device_severity: 'critical', reason: 'Agent không gửi dữ liệu (21s)' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'critical', reason: 'Agent không gửi dữ liệu (21s)' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'router', device_severity: 'critical', reason: 'Không phản hồi ICMP sau 2 lần thử' }), false);
+
+  // b) Printer devices & consumable issues
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'printer', device_severity: 'high', reason: 'Hộp mực sắp hết (Black Toner: 5%)' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'printer_toner', device_type: 'printer', device_severity: 'critical', reason: 'Hết mực in hoàn toàn' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'printer', device_severity: 'high', reason: 'Kẹt giấy khay 1 (Paper Jam)' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'high', reason: 'Sự cố máy in / drum' }), false);
+
+  // c) Recovery & Audit events
+  assert.equal(isAiAnalyzableIncident({ kind: 'up', device_type: 'server', device_severity: 'critical', reason: 'Server recovered after 45s' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', event_severity: 'ok', reason: 'Đã hoạt động bình thường trở lại' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'audit', device_type: 'server', device_severity: 'critical', reason: 'User logged in' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'none', reason: 'CPU cao: 95%' }), false);
+
+  // d) Low or Medium severity devices in normal mode
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'low', reason: 'CPU cao: 95%' }), false);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'medium', reason: 'CPU cao: 95%' }), false);
+
+  // Acceptance cases (Positive whitelist):
+  // e) SMART Bad Sector, Flood/DoS, Thermal, UPS on High/Critical devices
+  assert.equal(isAiAnalyzableIncident({ kind: 'smart', device_type: 'server', device_severity: 'critical', reason: 'Lỗi ổ đĩa SMART (Bad Sector)' }), true);
+  assert.equal(isAiAnalyzableIncident({ kind: 'dos', device_type: 'router', device_severity: 'critical', reason: 'Nghi vấn tấn công Flood/DoS (25.000 pkt/s)' }), true);
+  assert.equal(isAiAnalyzableIncident({ kind: 'thermal', device_type: 'server', device_severity: 'high', reason: 'Nhiệt độ CPU vượt ngưỡng: 92°C (Thermal Throttling)' }), true);
+  assert.equal(isAiAnalyzableIncident({ kind: 'power', device_type: 'server', device_severity: 'critical', reason: 'Mất điện lưới, UPS đang chạy pin (Pin: 42%)' }), true);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'high', reason: 'CPU cao: 94% (> 90%)' }), true);
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'critical', reason: 'Ổ đĩa cao: 96% (/var/log đầy)' }), true);
+
+  // f) Force / Manual inspection overrides device severity
+  assert.equal(isAiAnalyzableIncident({ kind: 'warning', device_type: 'server', device_severity: 'low', cpu: 95 }, { force: true }), true);
+
+  // 3. Integration & End-to-End Verification with Live Monitor & API
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+
+    const llmCalls = [];
+    t.monitor.ai.fetchFn = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      llmCalls.push({ url, headers: opts.headers, body });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify({ issue: 'Mock issue', cause: 'Mock cause', solution: 'Mock solution', prediction: 'Mock prediction' }) } }],
+          usage: { prompt_tokens: 50, completion_tokens: 40 },
+        }),
+      };
+    };
+
+    await t.api('PUT', '/api/settings', {
+      default_lang: 'vi',
+      ai: { enabled: true, provider: 'openai', api_key: 'sk-test-token-telemetry', auto_incident: true },
+    });
+
+    // Create a Critical Router (ICMP + Agent) and a Critical Printer
+    const rtr = (await t.api('POST', '/api/devices', {
+      name: 'Core-Router-01', type: 'router', address: '10.0.0.1', check_icmp: true, severity: 'critical',
+    })).body;
+    t.alive.add('10.0.0.1');
+
+    const prt = (await t.api('POST', '/api/devices', {
+      name: 'Office-HP-Laser', type: 'printer', address: '10.0.0.2', check_icmp: false, severity: 'critical',
+    })).body;
+
+    const srv = (await t.api('POST', '/api/devices', {
+      name: 'Storage-Server-01', type: 'server', address: '10.0.0.3', check_icmp: false, check_agent: true, severity: 'critical',
+    })).body;
+
+    // A) Critical router goes DOWN via ICMP failure
+    t.monitor.tick(Date.now());
+    await new Promise((r) => setTimeout(r, 20));
+    t.alive.delete('10.0.0.1');
+    t.monitor.tick(Date.now() + 5000);
+    await new Promise((r) => setTimeout(r, 20));
+    t.monitor.tick(Date.now() + 10000);
+    await new Promise((r) => setTimeout(r, 20));
+
+    const rtrDev = t.monitor.snapshot().devices.find((d) => d.id === rtr.id);
+    assert.equal(rtrDev.status, 'down');
+    assert.equal(llmCalls.length, 0, 'Ping failure / down status must NEVER trigger AI analysis');
+
+    // B) Printer triggers toner / paper jam alert
+    t.monitor._event(t.monitor.devices.get(prt.id), 'warning', 'high', 'Hộp mực sắp hết (Black 0%)');
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(llmCalls.length, 0, 'Printer consumables must NEVER trigger AI analysis');
+
+    // C) Storage server reports SMART bad sector & CPU 94% -> Genuine technical incident triggers AI
+    const now = Date.now();
+    t.monitor.ingestAgent(srv.id, {
+      hostname: 'srv-storage-prod',
+      os: 'Linux 6.8.0-45-generic #45-Ubuntu SMP',
+      cores: 8,
+      load1: 7.85,
+      uptime: 86400 * 15,
+      cpu: { percent: 94 },
+      memory: { total: 34359738368, used: 28991029248, percent: 84 },
+      disks: [
+        { mount: '/', total: 107374182400, used: 42949672960, percent: 40 },
+        { mount: '/data', total: 4398046511104, used: 4178144185548, percent: 95 },
+      ],
+      smart: { ok: false, status: 'BAD_SECTOR', details: 'Raw Read Error Rate exceeded threshold on /dev/sdb' },
+      net: { in_bytes: 52428800, out_bytes: 83886080 },
+    }, now - 20000);
+    t.monitor.evaluate(now - 20000);
+
+    t.monitor.ingestAgent(srv.id, {
+      hostname: 'srv-storage-prod',
+      os: 'Linux 6.8.0-45-generic #45-Ubuntu SMP',
+      cores: 8,
+      load1: 7.92,
+      uptime: 86400 * 15 + 20,
+      cpu: { percent: 94 },
+      memory: { total: 34359738368, used: 28991029248, percent: 84 },
+      disks: [
+        { mount: '/', total: 107374182400, used: 42949672960, percent: 40 },
+        { mount: '/data', total: 4398046511104, used: 4178144185548, percent: 95 },
+      ],
+      smart: { ok: false, status: 'BAD_SECTOR', details: 'Raw Read Error Rate exceeded threshold on /dev/sdb' },
+      net: { in_bytes: 52428800 + 10485760, out_bytes: 83886080 + 20971520 },
+    }, now);
+    t.monitor.evaluate(now);
+    await new Promise((r) => setTimeout(r, 40));
+
+    assert.ok(llmCalls.length >= 1, 'Genuine hardware SMART incident must trigger AI analysis');
+    assert.match(llmCalls[0].body.messages[1].content, /Tech_Logs:/, 'LLM prompt must include compact tech_summary');
+
+    // D) Test GET /api/ai/technical-logs endpoint
+    // 1. Unauthenticated request gets 401
+    const unauthClient = t.createClient();
+    const unauthRes = await unauthClient('GET', '/api/ai/technical-logs?device_id=' + srv.id);
+    assert.equal(unauthRes.status, 401);
+
+    // 2. Missing parameters gets 400
+    const missingRes = await t.api('GET', '/api/ai/technical-logs');
+    assert.equal(missingRes.status, 400);
+
+    // 3. Non-existent device/event gets 404
+    const notFoundRes = await t.api('GET', '/api/ai/technical-logs?device_id=999999');
+    assert.equal(notFoundRes.status, 404);
+
+    // 4. Query by device_id in Vietnamese
+    const techVi = await t.api('GET', `/api/ai/technical-logs?device_id=${srv.id}&lang=vi`);
+    assert.equal(techVi.status, 200);
+    assert.equal(techVi.body.ok, true);
+    assert.equal(techVi.body.device_id, srv.id);
+    assert.equal(techVi.body.device_name, 'Storage-Server-01');
+    assert.match(techVi.body.log_text, /LOGS KỸ THUẬT CHẨN ĐOÁN HỆ THỐNG & MẠNG/);
+    assert.match(techVi.body.log_text, /Linux 6\.8\.0-45-generic/);
+    assert.match(techVi.body.log_text, /Cấu hình CPU   : 8 nhân/);
+    assert.match(techVi.body.log_text, /\/data : 95%/);
+    assert.match(techVi.body.log_text, /SMART_DISK_ERR=true/);
+    assert.match(techVi.body.log_text, /YÊU CẦU CHẨN ĐOÁN DÀNH CHO AI CHATBOX/);
+    assert.ok(techVi.body.tech_summary.includes('Cores=8'));
+    assert.ok(techVi.body.tech_summary.includes('Mounts=['));
+
+    // 5. Query by event_id in English
+    const evList = (await t.api('GET', `/api/events?device=${srv.id}`)).body.events;
+    const smartEv = evList.find((e) => e.kind === 'smart');
+    assert.ok(smartEv, 'Smart event must be recorded in events table');
+
+    const techEn = await t.api('GET', `/api/ai/technical-logs?event_id=${smartEv.id}&lang=en`);
+    assert.equal(techEn.status, 200);
+    assert.equal(techEn.body.ok, true);
+    assert.match(techEn.body.log_text, /TECHNICAL DIAGNOSTIC TELEMETRY & LOGS FOR AI ANALYSIS/);
+    assert.match(techEn.body.log_text, /SMART_ERR=true/);
+    assert.match(techEn.body.log_text, /\[6\. AI DIAGNOSTIC PROMPT\]/);
+  } finally { t.close(); }
+});
+
 

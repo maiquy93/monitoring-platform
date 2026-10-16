@@ -273,6 +273,85 @@
     </div>`;
   };
 
+  M.isAiEligibleEvent = (e) => {
+    if (!e || typeof e !== 'object') return false;
+    const k = String(e.kind || '').toLowerCase();
+    const msg = String(e.message || '');
+    const sev = String(e.severity || '').toLowerCase();
+    if (k === 'up' || k === 'audit' || k === 'down') return false;
+    if (sev === 'ok') return false;
+    if (/trở lại bình thường|mức an toàn|hoạt động bình thường|có điện lưới trở lại|hoạt động trở lại|recovered|returned to normal/i.test(msg)) return false;
+    if (/mực còn|hết mực|no toner|low toner|drum|kẹt giấy|paper jam|cửa máy in|sự cố máy in/i.test(msg)) return false;
+    if (/không ping được|không phản hồi icmp|icmp.*fail|agent không gửi dữ liệu|agent mất kết nối|mất tín hiệu agent/i.test(msg)) {
+      const hasTechAlso = /cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|flood|dos|mất điện lưới|on battery/i.test(msg);
+      if (!hasTechAlso) return false;
+    }
+    if (['smart', 'dos', 'thermal', 'power'].includes(k)) return true;
+    if (/cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|thermal|overheat|flood|dos|tấn công|mất điện lưới|on battery/i.test(msg)) return true;
+    return false;
+  };
+
+  M.showTechnicalLogsModal = (data) => {
+    const isEn = M.S.lang === 'en';
+    const logText = data.log_text || '';
+    const devId = data.device_id;
+    const canOp = M.S.user && M.S.user.role !== 'viewer';
+    const modalHtml = `
+      <p class="muted" style="margin:0 0 8px">${isEn
+        ? 'Technical diagnostic telemetry gathered directly from server SQLite database & live agent/SNMP metrics. Ready to paste (Ctrl+V) into ChatGPT, Claude, Gemini, or DeepSeek.'
+        : 'Logs kỹ thuật chuyên sâu được trích xuất trực tiếp từ DB SQLite của Server và dữ liệu telemetry Agent/SNMP. Sẵn sàng để dán (Ctrl+V) vào ChatGPT, Claude, Gemini hoặc DeepSeek.'}</p>
+      <div style="position:relative">
+        <textarea id="tech-log-area" readonly class="inp" style="width:100%;height:320px;font-family:monospace;font-size:12px;line-height:1.45;white-space:pre;resize:vertical;background:var(--bg);color:var(--text);border:1px solid var(--border)">${esc(logText)}</textarea>
+      </div>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <button type="button" class="btn primary" id="btn-copy-tech-modal">📋 ${isEn ? 'Copy Technical Logs' : 'Sao chép Logs Kỹ thuật'}</button>
+        ${canOp && devId ? `<button type="button" class="btn" id="btn-analyze-from-modal">✨ ${isEn ? 'Run AI Analysis Now' : 'Gửi AI Phân tích ngay'}</button>` : ''}
+      </div>
+    `;
+    const { form } = M.modal(
+      isEn ? `📋 Technical Telemetry & Logs: ${data.device_name}` : `📋 Logs Kỹ thuật Chẩn đoán: ${data.device_name}`,
+      modalHtml,
+      async () => {},
+      { submit: t('Đóng'), noCancel: true, wide: true }
+    );
+    const copyBtn = $('#btn-copy-tech-modal', form);
+    if (copyBtn) {
+      copyBtn.onclick = async () => {
+        const area = $('#tech-log-area', form);
+        if (area) {
+          area.select();
+          try {
+            await navigator.clipboard.writeText(area.value);
+          } catch {
+            document.execCommand('copy');
+          }
+          M.toast(isEn ? 'Copied to clipboard!' : 'Đã sao chép vào bộ nhớ tạm!');
+        }
+      };
+    }
+    const analyzeBtn = $('#btn-analyze-from-modal', form);
+    if (analyzeBtn) {
+      analyzeBtn.onclick = async () => {
+        analyzeBtn.disabled = true;
+        analyzeBtn.textContent = isEn ? '⏳ Analyzing...' : '⏳ Đang phân tích...';
+        try {
+          const res = await M.api('POST', '/api/ai/analyze', { event_id: data.event_id, device_id: devId, lang: M.S.lang });
+          M.closeModal();
+          M.modal(
+            isEn ? '🤖 AI Diagnosis Result' : '🤖 Kết quả Chẩn đoán AI',
+            M.renderAiReportCard(res.report, true),
+            async () => {},
+            { submit: t('Đóng'), noCancel: true, wide: true }
+          );
+        } catch (err) {
+          M.toast(M.trData(err.message));
+          analyzeBtn.disabled = false;
+          analyzeBtn.textContent = isEn ? 'Run AI Analysis Now' : 'Gửi AI Phân tích ngay';
+        }
+      };
+    }
+  };
+
   M.eventsTable = (events, showDevice) => {
     if (!events.length) return `<div class="muted">${esc(t('Chưa có sự kiện'))}</div>`;
     const isEn = M.S.lang === 'en';
@@ -284,13 +363,16 @@
     };
     const colSpan = showDevice ? 4 : 3;
     const rowsHtml = events.map((e) => {
-      const isIncident = ['down', 'warning', 'dos', 'smart', 'thermal', 'power'].includes(e.kind);
+      const isEligible = M.isAiEligibleEvent(e);
       const hasAi = !!e.ai_report;
       const aiBtns = [];
       if (hasAi) {
         aiBtns.push(`<button type="button" class="ai-badge" data-ai-toggle="${e.id}" title="${isEn ? 'Click to view/hide AI diagnosis' : 'Bấm để xem/ẩn chẩn đoán AI'}">🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}</button>`);
-      } else if (isIncident && canOp) {
-        aiBtns.push(`<button type="button" class="ai-badge" data-ai-analyze="${e.id}" title="${isEn ? 'Analyze this incident with AI' : 'Phân tích sự cố này bằng AI'}">✨ ${isEn ? 'AI Analyze' : 'Phân tích AI'}</button>`);
+      } else if (isEligible && canOp) {
+        aiBtns.push(`<button type="button" class="ai-badge" data-ai-analyze="${e.id}" data-dev-id="${e.device_id || ''}" title="${isEn ? 'Collect tech logs & analyze with AI' : 'Thu thập log kỹ thuật & gọi AI phân tích'}">✨ ${isEn ? 'AI Analyze' : 'Phân tích AI'}</button>`);
+      }
+      if (isEligible || hasAi) {
+        aiBtns.push(`<button type="button" class="ai-badge tech-copy" data-ai-copy-logs="${e.id}" data-dev-id="${e.device_id || ''}" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude / Gemini' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude / Gemini'}">📋 ${isEn ? 'Copy Tech Logs' : 'Copy Logs Kỹ thuật'}</button>`);
       }
       return `<tr>
         <td>${M.fmtTime(e.ts)}</td>
@@ -311,6 +393,37 @@
       const id = toggleBtn.dataset.aiToggle;
       const row = document.getElementById(`ai-ev-row-${id}`);
       if (row) row.classList.toggle('hidden');
+      return;
+    }
+    const copyLogBtn = ev.target.closest('[data-ai-copy-logs]');
+    if (copyLogBtn) {
+      const id = Number(copyLogBtn.dataset.aiCopyLogs);
+      const devId = copyLogBtn.dataset.devId;
+      const isEn = M.S.lang === 'en';
+      const origText = copyLogBtn.textContent;
+      copyLogBtn.disabled = true;
+      copyLogBtn.textContent = isEn ? '⏳ Copying...' : '⏳ Đang lấy logs...';
+      try {
+        const q = id ? `event_id=${id}&lang=${M.S.lang}` : `device_id=${devId}&lang=${M.S.lang}`;
+        const res = await M.api('GET', `/api/ai/technical-logs?${q}`);
+        try {
+          await navigator.clipboard.writeText(res.log_text);
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = res.log_text;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        }
+        M.toast(isEn ? 'Copied technical diagnostic logs! Paste into ChatGPT/Claude.' : 'Đã sao chép logs kỹ thuật! Dán (Ctrl+V) vào ChatGPT / Claude.');
+        M.showTechnicalLogsModal(res);
+      } catch (err) {
+        M.toast(M.trData(err.message));
+      } finally {
+        copyLogBtn.disabled = false;
+        copyLogBtn.textContent = origText;
+      }
       return;
     }
     const analyzeBtn = ev.target.closest('[data-ai-analyze]');
@@ -1110,16 +1223,53 @@
       const isEn = M.S.lang === 'en';
       const numLoc = isEn ? 'en-US' : 'vi-VN';
       const sinceWord = isEn ? 'since' : 'từ';
+      const isPrinter = d.type === 'printer';
       const canAck = (d.status === 'down' || d.status === 'warning') && !d.acked && role !== 'viewer';
       $('#d-hero').innerHTML = `<div class="hero ${M.statusClass(d)}"><div class="h-ico">${M.ICON[d.type] || ''}</div>
         <div style="flex:1;min-width:0"><h1>${esc(d.name)}</h1><div class="h-state">${M.STATE_NAME[d.status]}
         <span class="muted" style="font-size:14px;text-transform:none"> · ${sinceWord} ${M.fmtTime(d.since)} (${M.fmtDur((Date.now() - d.since) / 1000)})</span></div>
         ${d.reasons.map((r) => `<div class="reason">• ${esc(tr(r))}</div>`).join('')}</div>
         <div class="row">${canAck ? `<button class="btn" id="d-ack">${esc(t('Đã biết'))}</button>` : ''}
+        ${!isPrinter ? `<button class="btn" id="d-copy-tech" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude'}">📋 ${esc(t('Copy Logs Kỹ thuật'))}</button>${role !== 'viewer' ? `<button class="btn" id="d-ai-diag" title="${isEn ? 'Run AI technical diagnosis on this device' : 'Chạy chẩn đoán AI kỹ thuật cho thiết bị này'}">✨ ${esc(t('Chẩn đoán AI'))}</button>` : ''}` : ''}
         ${role === 'admin' ? `<button class="btn" id="d-maint">${esc(d.maintenance ? t('Kết thúc bảo trì') : t('Bảo trì'))}</button><button class="btn" id="d-edit">${esc(t('Sửa'))}</button>` : ''}
         <button class="btn" id="d-back">${esc(t('← Quay lại'))}</button></div></div>`;
       const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
       on('#d-back', () => history.back());
+      on('#d-copy-tech', async () => {
+        try {
+          const res = await M.api('GET', `/api/ai/technical-logs?device_id=${d.id}&lang=${M.S.lang}`);
+          try { await navigator.clipboard.writeText(res.log_text); } catch { /* ignore */ }
+          M.toast(isEn ? 'Copied technical diagnostic logs! Paste into ChatGPT/Claude.' : 'Đã sao chép logs kỹ thuật! Dán (Ctrl+V) vào ChatGPT / Claude.');
+          M.showTechnicalLogsModal(res);
+        } catch (err) {
+          M.toast(M.trData(err.message));
+        }
+      });
+      on('#d-ai-diag', async () => {
+        const btn = $('#d-ai-diag');
+        if (btn) {
+          btn.disabled = true;
+          btn.textContent = isEn ? '⏳ Analyzing...' : '⏳ Đang phân tích...';
+        }
+        try {
+          const res = await M.api('POST', '/api/ai/analyze', { device_id: d.id, lang: M.S.lang });
+          if (res.report) {
+            M.modal(
+              isEn ? '🤖 AI Health & Capacity Diagnosis' : '🤖 Kết quả Chẩn đoán AI & Dự báo Sức khỏe',
+              M.renderAiReportCard(res.report, true),
+              async () => {},
+              { submit: t('Đóng'), noCancel: true, wide: true }
+            );
+          }
+        } catch (err) {
+          M.toast(M.trData(err.message));
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.textContent = `✨ ${esc(t('Chẩn đoán AI'))}`;
+          }
+        }
+      });
       on('#d-ack', async () => {
         await M.api('POST', `/api/devices/${d.id}/ack`, {});
         d.acked = true;
