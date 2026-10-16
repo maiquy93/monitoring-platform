@@ -45,6 +45,20 @@ nav.main a.active { color: var(--accent); background: var(--panel2); font-weight
 .icon-btn { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
 .icon-btn:hover { border-color: var(--accent); }
 .icon-btn.on { border-color: var(--accent); color: var(--accent); }
+.icon-btn.ringing {
+  border-color: var(--c-critical);
+  color: var(--c-critical);
+  background: color-mix(in srgb, var(--c-critical) 18%, var(--panel2));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c-critical) 55%, transparent);
+  animation: bell-ring 0.9s ease-in-out infinite;
+}
+@keyframes bell-ring {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(14deg) scale(1.08); }
+  40% { transform: rotate(-12deg) scale(1.08); }
+  60% { transform: rotate(8deg) scale(1.05); }
+  80% { transform: rotate(-6deg) scale(1.02); }
+}
 select.sel, input.inp, textarea.inp { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; width: 100%; }
 select.sel { width: auto; }
 input.inp:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }

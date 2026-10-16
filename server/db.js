@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS = {
   enroll_key: '',
   org_name: 'Monitoring',
   default_theme: 'neon',
+  default_lang: 'vi',
 };
 
 function open(file) {
@@ -25,7 +26,7 @@ function open(file) {
     CREATE TABLE IF NOT EXISTS users(
       id INTEGER PRIMARY KEY, username TEXT UNIQUE NOT NULL, pass_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'viewer', must_change INTEGER NOT NULL DEFAULT 0,
-      theme TEXT, created_at INTEGER NOT NULL);
+      theme TEXT, lang TEXT, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions(
       token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       expires_at INTEGER NOT NULL);
@@ -55,6 +56,8 @@ function open(file) {
       id INTEGER PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL DEFAULT '{"nodes":[],"links":[]}');
     CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `);
+  const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!ucols.includes('lang')) db.exec('ALTER TABLE users ADD COLUMN lang TEXT');
   const cols = db.prepare('PRAGMA table_info(devices)').all().map((c) => c.name);
   if (!cols.includes('snmp_profile')) db.exec("ALTER TABLE devices ADD COLUMN snmp_profile TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('mute_local_alerts')) db.exec("ALTER TABLE devices ADD COLUMN mute_local_alerts INTEGER NOT NULL DEFAULT 0");
@@ -75,6 +78,7 @@ function getSettings(db) {
   }
   out.type_severity = { ...DEFAULT_TYPE_SEVERITY, ...out.type_severity };
   out.thresholds = { ...DEFAULT_SETTINGS.thresholds, ...out.thresholds };
+  if (!['vi', 'en'].includes(out.default_lang)) out.default_lang = 'vi';
   return out;
 }
 

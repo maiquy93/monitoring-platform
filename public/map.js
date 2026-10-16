@@ -1,7 +1,7 @@
 'use strict';
 // Topology maps: live status view + drag & drop editor.
 (() => {
-  const { esc, $ } = M;
+  const { esc, $, t } = M;
   const W = 1600, H = 900, NW = 176, NH = 60;
   const canEdit = () => M.S.user.role !== 'viewer';
   const COL = { critical: 'var(--c-critical)', high: 'var(--c-high)', medium: 'var(--c-medium)', low: 'var(--c-low)', up: 'var(--c-ok)', unknown: 'var(--c-unknown)', none: 'var(--muted)' };
@@ -10,16 +10,16 @@
   M.views.maps = {
     async render(el) {
       await M.loadMaps();
-      el.innerHTML = `<div class="row"><h1>Sơ đồ topology</h1><span class="spacer"></span>
-        ${canEdit() ? '<button class="btn primary" id="mp-add">+ Tạo sơ đồ</button>' : ''}</div>
+      el.innerHTML = `<div class="row"><h1>${t('Sơ đồ topology')}</h1><span class="spacer"></span>
+        ${canEdit() ? `<button class="btn primary" id="mp-add">${t('+ Tạo sơ đồ')}</button>` : ''}</div>
         <div class="grid">${M.S.maps.map((m) => `<a class="tile up" href="#/map/${m.id}"><div class="t-top"><span class="t-ico">🗺️</span><span class="t-name">${esc(m.name)}</span></div></a>`).join('')
-    || '<div class="muted">Chưa có sơ đồ nào.</div>'}</div>`;
+    || `<div class="muted">${t('Chưa có sơ đồ nào.')}</div>`}</div>`;
       const add = $('#mp-add');
-      if (add) add.onclick = () => M.modal('Tạo sơ đồ', '<div class="field"><label>Tên sơ đồ</label><input class="inp" name="name" maxlength="80" required></div>', async (f) => {
+      if (add) add.onclick = () => M.modal(t('Tạo sơ đồ'), `<div class="field"><label>${t('Tên sơ đồ')}</label><input class="inp" name="name" maxlength="80" required></div>`, async (f) => {
         const r = await M.api('POST', '/api/maps', { name: new FormData(f).get('name'), nodes: [], links: [] });
         M.S.mapEdit = true;
         location.hash = `#/map/${r.id}`;
-      }, { submit: 'Tạo' });
+      }, { submit: t('Tạo') });
     },
   };
 
@@ -44,10 +44,10 @@
     tools() {
       const m = this.m;
       $('#mp-title').textContent = `🗺️ ${m.name}`;
-      const t = $('#mp-tools');
-      if (!canEdit()) { t.innerHTML = ''; return; }
+      const tl = $('#mp-tools');
+      if (!canEdit()) { tl.innerHTML = ''; return; }
       if (!this.edit) {
-        t.innerHTML = '<button class="btn" id="mp-edit">✏️ Chỉnh sửa</button>';
+        tl.innerHTML = `<button class="btn" id="mp-edit">${t('✏️ Chỉnh sửa')}</button>`;
         $('#mp-edit').onclick = () => { this.edit = true; this.tools(); this.draw(); };
         return;
       }
@@ -55,26 +55,26 @@
       const gOn = new Set(m.nodes.filter((n) => n.kind === 'group').map((n) => n.ref));
       const devOpts = M.S.snap ? M.S.snap.devices.filter((d) => !onMap.has(d.id)).map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join('') : '';
       const grpOpts = M.S.groups.filter((g) => !gOn.has(g.id)).map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
-      t.innerHTML = `<select class="sel" id="mp-dev"><option value="">+ Thiết bị…</option>${devOpts}</select>
-        <select class="sel" id="mp-grp"><option value="">+ Nhóm…</option>${grpOpts}</select>
-        <button class="btn" id="mp-lbl">+ Nhãn</button>
-        <button class="btn ${this.linkMode ? 'primary' : ''}" id="mp-link">🔗 Nối dây</button>
-        <button class="btn" id="mp-ren">Đổi tên</button>
-        <button class="btn danger" id="mp-del">Xóa mục chọn</button>
-        <button class="btn primary" id="mp-save">💾 Lưu</button><button class="btn" id="mp-cancel">Đóng</button>
-        <button class="btn danger" id="mp-rm">Xóa sơ đồ</button>`;
+      tl.innerHTML = `<select class="sel" id="mp-dev"><option value="">${t('+ Thiết bị…')}</option>${devOpts}</select>
+        <select class="sel" id="mp-grp"><option value="">${t('+ Nhóm…')}</option>${grpOpts}</select>
+        <button class="btn" id="mp-lbl">${t('+ Nhãn')}</button>
+        <button class="btn ${this.linkMode ? 'primary' : ''}" id="mp-link">${t('🔗 Nối dây')}</button>
+        <button class="btn" id="mp-ren">${t('Đổi tên')}</button>
+        <button class="btn danger" id="mp-del">${t('Xóa mục chọn')}</button>
+        <button class="btn primary" id="mp-save">${t('💾 Lưu')}</button><button class="btn" id="mp-cancel">${t('Đóng')}</button>
+        <button class="btn danger" id="mp-rm">${t('Xóa sơ đồ')}</button>`;
       const add = (node) => { m.nodes.push({ id: uid(), x: 200 + (m.nodes.length % 8) * 40, y: 120 + (m.nodes.length % 8) * 40, ...node }); this.dirty = true; this.tools(); this.draw(); };
       $('#mp-dev').onchange = (e) => { if (e.target.value) add({ kind: 'device', ref: Number(e.target.value), label: '' }); };
       $('#mp-grp').onchange = (e) => { if (e.target.value) add({ kind: 'group', ref: Number(e.target.value), label: '' }); };
-      $('#mp-lbl').onclick = () => add({ kind: 'label', ref: null, label: 'Nhãn mới' });
-      $('#mp-link').onclick = () => { this.linkMode = !this.linkMode; this.linkFrom = null; this.tools(); this.draw(); if (this.linkMode) M.toast('Bấm lần lượt 2 thiết bị để nối dây'); };
+      $('#mp-lbl').onclick = () => add({ kind: 'label', ref: null, label: t('Nhãn mới') });
+      $('#mp-link').onclick = () => { this.linkMode = !this.linkMode; this.linkFrom = null; this.tools(); this.draw(); if (this.linkMode) M.toast(t('Bấm lần lượt 2 thiết bị để nối dây')); };
       $('#mp-ren').onclick = () => {
         const n = this.sel && this.sel.type === 'node' && m.nodes.find((x) => x.id === this.sel.id);
-        if (!n || n.kind !== 'label') return M.toast('Chọn một nhãn để đổi tên');
-        M.modal('Đổi tên nhãn', `<div class="field"><input class="inp" name="l" maxlength="80" value="${esc(n.label)}" required></div>`, (f) => { n.label = new FormData(f).get('l'); this.dirty = true; this.draw(); });
+        if (!n || n.kind !== 'label') return M.toast(t('Chọn một nhãn để đổi tên'));
+        M.modal(t('Đổi tên nhãn'), `<div class="field"><input class="inp" name="l" maxlength="80" value="${esc(n.label)}" required></div>`, (f) => { n.label = new FormData(f).get('l'); this.dirty = true; this.draw(); });
       };
       $('#mp-del').onclick = () => {
-        if (!this.sel) return M.toast('Chưa chọn mục nào');
+        if (!this.sel) return M.toast(t('Chưa chọn mục nào'));
         if (this.sel.type === 'node') {
           m.nodes = m.nodes.filter((n) => n.id !== this.sel.id);
           m.links = m.links.filter((l) => l.from !== this.sel.id && l.to !== this.sel.id);
@@ -83,13 +83,13 @@
       };
       $('#mp-save').onclick = async () => {
         await M.api('PUT', `/api/maps/${m.id}`, { name: m.name, nodes: m.nodes, links: m.links });
-        this.dirty = false; M.toast('Đã lưu sơ đồ');
+        this.dirty = false; M.toast(t('Đã lưu sơ đồ'));
       };
       $('#mp-cancel').onclick = async () => {
         const go = async () => { this.m = await M.api('GET', `/api/maps/${m.id}`); this.edit = false; this.sel = null; this.linkMode = false; this.tools(); this.draw(); };
-        if (this.dirty) M.confirm('Bỏ các thay đổi chưa lưu?', go); else go();
+        if (this.dirty) M.confirm(t('Bỏ các thay đổi chưa lưu?'), go); else go();
       };
-      $('#mp-rm').onclick = () => M.confirm(`Xóa sơ đồ "${m.name}"?`, async () => { await M.api('DELETE', `/api/maps/${m.id}`); location.hash = '#/maps'; });
+      $('#mp-rm').onclick = () => M.confirm(M.S.lang === 'en' ? `Delete map "${m.name}"?` : `Xóa sơ đồ "${m.name}"?`, async () => { await M.api('DELETE', `/api/maps/${m.id}`); location.hash = '#/maps'; });
     },
 
     // Resolve a node to display info + status class from live data
@@ -98,17 +98,17 @@
       if (n.kind === 'label') return { name: n.label, sub: '', cls: 'label', rank: 'unknown', icon: '' };
       if (n.kind === 'device') {
         const d = snap && snap.devices.find((x) => x.id === n.ref);
-        if (!d) return { name: '(đã xóa)', sub: '', cls: '', rank: 'unknown', icon: '❓' };
+        if (!d) return { name: t('(đã xóa)'), sub: '', cls: '', rank: 'unknown', icon: '❓' };
         return { name: d.name, sub: M.STATE_NAME[d.status], cls: M.statusClass(d), icon: M.ICON[d.type] || '', rank: d.status === 'down' ? d.severity : d.status === 'warning' ? 'medium' : d.status === 'up' ? 'up' : 'unknown', href: `#/device/${d.id}` };
       }
       const g = M.S.groups.find((x) => x.id === n.ref);
-      if (!g) return { name: '(đã xóa)', sub: '', cls: '', rank: 'unknown', icon: '❓' };
+      if (!g) return { name: t('(đã xóa)'), sub: '', cls: '', rank: 'unknown', icon: '❓' };
       const list = snap ? snap.devices.filter((d) => d.groups.includes(g.id)) : [];
       const s = M.summarize(list);
       const downs = list.filter((d) => d.status === 'down');
       const worst = downs.reduce((a, d) => (SEV_RANK[d.severity] > SEV_RANK[a] ? d.severity : a), 'low');
       const cls = downs.length ? `down sev-${worst}` : s.warning ? 'warning' : s.total && s.unknown < s.total ? 'up' : '';
-      return { name: g.name, sub: `${s.alive}/${s.total} hoạt động`, cls, icon: '🗂️', rank: downs.length ? worst : s.warning ? 'medium' : cls === 'up' ? 'up' : 'unknown', href: `#/group/${g.id}` };
+      return { name: g.name, sub: M.S.lang === 'en' ? `${s.alive}/${s.total} online` : `${s.alive}/${s.total} hoạt động`, cls, icon: '🗂️', rank: downs.length ? worst : s.warning ? 'medium' : cls === 'up' ? 'up' : 'unknown', href: `#/group/${g.id}` };
     },
 
     draw() {

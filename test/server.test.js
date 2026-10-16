@@ -937,3 +937,66 @@ test('ui: dual-screen layout pins KPI cards, provides independent scroll contain
   assert.ok(views.includes('id="dual-badge-groups"'));
   assert.ok(views.includes('id="dual-badge-problems"'));
 });
+
+test('i18n & language settings: API supports default_lang in settings and per-user language preference', async () => {
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+    // Default language is 'vi'
+    const s0 = await t.api('GET', '/api/settings');
+    assert.equal(s0.status, 200);
+    assert.equal(s0.body.default_lang, 'vi');
+
+    // Update default_lang to 'en'
+    const putSt = await t.api('PUT', '/api/settings', { default_lang: 'en' });
+    assert.equal(putSt.status, 200);
+    const s1 = await t.api('GET', '/api/settings');
+    assert.equal(s1.body.default_lang, 'en');
+
+    // Invalid language is rejected
+    const badSt = await t.api('PUT', '/api/settings', { default_lang: 'fr' });
+    assert.equal(badSt.status, 400);
+
+    // Per-user language preference via PUT /api/auth/lang
+    const putUserLang = await t.api('PUT', '/api/auth/lang', { lang: 'en' });
+    assert.equal(putUserLang.status, 200);
+    assert.equal(putUserLang.body.lang, 'en');
+
+    const me = await t.api('GET', '/api/auth/me');
+    assert.equal(me.body.user.lang, 'en');
+
+    const badUserLang = await t.api('PUT', '/api/auth/lang', { lang: 'invalid' });
+    assert.equal(badUserLang.status, 400);
+  } finally { t.close(); }
+});
+
+test('global continuous alarm & i18n pack: core.js, admin.js, style.css, and README.md include continuous alarm and English pack', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const core = fs.readFileSync(path.join(__dirname, '../public/core.js'), 'utf8');
+  const admin = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const readme = fs.readFileSync(path.join(__dirname, '../README.md'), 'utf8');
+
+  // 1. Continuous alarm for Critical & High unacknowledged incidents until Acknowledged
+  assert.ok(core.includes('M.hasUnackedHighOrCritical = (snap = M.S.snap) =>'));
+  assert.ok(core.includes('M.syncAlarmLoop = () =>'));
+  assert.match(core, /d\.severity === 'critical' \|\| d\.severity === 'high'/);
+  assert.match(core, /setInterval\(\(\) => \{/);
+  assert.match(css, /\.icon-btn\.ringing\s*\{/);
+
+  // 2. English language pack & Settings language selector
+  assert.ok(core.includes('const I18N_EN = {'));
+  assert.ok(core.includes('M.t = (s) =>'));
+  assert.ok(core.includes('M.trData = (str) =>'));
+  assert.ok(core.includes('M.applyLang = (lang, broadcast = true) =>'));
+  assert.ok(core.includes('id="lang-sel"'));
+  assert.ok(admin.includes('name="lang"'));
+  assert.ok(admin.includes('default_lang: chosenLang'));
+
+  // 3. Bilingual README documentation (Vietnamese + English)
+  assert.ok(readme.includes('# Monitoring Platform (English Documentation)'));
+  assert.ok(readme.includes('## 1. Server Installation & Startup'));
+  assert.ok(readme.includes('## 5. Global Continuous Alarm, Dual-Screen & TV Wallboard'));
+});
+

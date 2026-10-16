@@ -29,7 +29,7 @@ function createSession(db, userId) {
 function getSessionUser(db, token) {
   if (!token) return null;
   const row = db.prepare(
-    `SELECT u.id, u.username, u.role, u.must_change, u.theme, s.expires_at
+    `SELECT u.id, u.username, u.role, u.must_change, u.theme, u.lang, s.expires_at
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`).get(sha(token));
   if (!row) return null;
   if (row.expires_at < Date.now()) { destroySession(db, token); return null; }

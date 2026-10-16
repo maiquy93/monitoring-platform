@@ -12,6 +12,7 @@ const walkfile = require('./snmp-walkfile');
 
 const TYPES = ['server', 'vm', 'router', 'switch', 'firewall', 'ap', 'printer', 'ups', 'pc', 'other'];
 const THEMES = ['dark', 'light', 'neon'];
+const LANGS = ['vi', 'en'];
 const ROLES = ['admin', 'operator', 'viewer'];
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -147,7 +148,7 @@ function createApp(db, monitor, opts = {}) {
 
   const cookieFor = (token, maxAge) =>
     `sid=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${secureCookie ? '; Secure' : ''}`;
-  const publicUser = (u) => ({ id: u.id, username: u.username, role: u.role, must_change: !!u.must_change, theme: u.theme });
+  const publicUser = (u) => ({ id: u.id, username: u.username, role: u.role, must_change: !!u.must_change, theme: u.theme, lang: u.lang });
   const idOf = (v) => { const n = Number(v); if (!Number.isInteger(n) || n < 1) throw bad('ID không hợp lệ'); return n; };
   const audit = (ctx, msg) => monitor._event({ id: null, name: ctx.user ? ctx.user.username : 'system' }, 'audit', 'ok', msg);
 
@@ -189,6 +190,13 @@ function createApp(db, monitor, opts = {}) {
     if (!THEMES.includes(b.theme)) throw bad('Theme không hợp lệ');
     db.prepare('UPDATE users SET theme = ? WHERE id = ?').run(b.theme, ctx.user.id);
     send(ctx.res, 200, { ok: true });
+  });
+
+  route('PUT', '/api/auth/lang', 'any', async (ctx) => {
+    const b = await readBody(ctx.req, 1024);
+    if (!LANGS.includes(b.lang)) throw bad('Ngôn ngữ không hợp lệ');
+    db.prepare('UPDATE users SET lang = ? WHERE id = ?').run(b.lang, ctx.user.id);
+    send(ctx.res, 200, { ok: true, lang: b.lang });
   });
 
   // ---------- realtime ----------
@@ -438,6 +446,7 @@ function createApp(db, monitor, opts = {}) {
   route('GET', '/api/settings', 'any', (ctx) => {
     const s = getSettings(db);
     const out = { type_severity: s.type_severity, thresholds: s.thresholds, org_name: s.org_name, default_theme: s.default_theme,
+      default_lang: s.default_lang || 'vi',
       types: TYPES, timing: { ping_interval_ms: monitor.o.pingIntervalMs, ping_fail_limit: monitor.o.pingFailLimit,
         agent_timeout_ms: monitor.o.agentTimeoutMs }, version: versionInfo };
     if (ctx.user.role === 'admin') { out.enroll_key = s.enroll_key; out.system = monitor.systemInfo(); }
@@ -478,6 +487,10 @@ function createApp(db, monitor, opts = {}) {
     if (b.default_theme !== undefined) {
       if (!THEMES.includes(b.default_theme)) throw bad('Theme không hợp lệ');
       setSetting(db, 'default_theme', b.default_theme);
+    }
+    if (b.default_lang !== undefined) {
+      if (!LANGS.includes(b.default_lang)) throw bad('Ngôn ngữ không hợp lệ');
+      setSetting(db, 'default_lang', b.default_lang);
     }
     if (b.enroll_key !== undefined) {
       const k = String(b.enroll_key);

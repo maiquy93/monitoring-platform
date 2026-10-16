@@ -402,7 +402,249 @@ node tools\seed-demo.js http://localhost:8080 admin MatKhauMoi
 Demo tạo sẵn thiết bị, nhóm và topology. Agent thật dùng các lệnh ở mục 3;
 `tools\simulate-agent.js` chỉ là công cụ giả lập để thử nhanh.
 
-## 6. Màn hình lớn
+## 6. Màn hình lớn, Màn hình đôi, Cảnh báo liên tục & Đa ngôn ngữ
 
-Mở dashboard bằng Chrome/Edge, chọn theme Neon/Tối/Sáng, bấm nút `📺` hoặc phím
-`F`, rồi bật `🔁` nếu muốn tự luân phiên dashboard, nhóm và topology.
+- **Màn hình lớn (TV / Wallboard):** Mở dashboard bằng Chrome/Edge, chọn theme Neon/Tối/Sáng, bấm nút `📺` hoặc phím `F`, rồi bật `🔁` nếu muốn tự luân phiên dashboard, nhóm và topology.
+- **Màn hình đôi (Dual-Screen):** Bấm nút `🖥️` hoặc phím `D` để chia đôi màn hình hoặc mở cửa sổ phụ (`#/secondary`) sang màn hình thứ 2. Thẻ tổng quan được ghim cố định, danh sách thiết bị cuộn độc lập với thanh cuộn mảnh thẩm mỹ.
+- **Chuông cảnh báo toàn cục liên tục (Continuous Global Alarm):** Khi bật biểu tượng chuông `🔔` trên thanh công cụ, bất kỳ sự cố chưa xác nhận nào thuộc thiết bị có mức cảnh báo **Nghiêm trọng (Critical)** hoặc **Cao (High)** (hoặc cảnh báo khẩn cấp phần cứng/DoS/nhiệt độ/UPS) sẽ kích hoạt chuông báo động kêu liên tục mỗi 3.5 giây kèm hiệu ứng rung chuông đỏ cho đến khi người vận hành bấm nút **Đã biết (Acknowledge)**.
+- **Đa ngôn ngữ (Tiếng Việt / English):** Chọn nhanh ngôn ngữ `🇻🇳 VI` / `🇬🇧 EN` trên thanh header hoặc thiết lập ngôn ngữ mặc định cho toàn hệ thống trong **Cài đặt → Chung → Ngôn ngữ mặc định**.
+
+---
+
+# Monitoring Platform (English Documentation)
+
+A lightweight, self-hosted internal network monitoring platform for servers, virtual machines (VMs), network equipment (routers, switches, firewalls, wireless APs), and printers.
+Powered by Node.js, built-in SQLite (`node:sqlite`), and a zero-dependency real-time web interface.
+
+## 1. Server Installation & Startup
+
+### Windows
+
+1. Install Node.js 22 or newer.
+2. Open PowerShell in the source directory.
+3. Run:
+
+```powershell
+New-Item -ItemType Directory -Force C:\monitoring-data
+$env:ADMIN_PASSWORD = "InitialPassword-2026!"
+$env:HOST = "0.0.0.0"
+$env:PORT = "8080"
+$env:DB_FILE = "C:\monitoring-data\monitor.db"
+# Do not set COOKIE_SECURE when running over internal HTTP
+npm start
+```
+
+Allow TCP port `8080` through Windows Firewall if other machines need access:
+
+```powershell
+New-NetFirewallRule -DisplayName "Monitoring Platform 8080" `
+  -Direction Inbound -Action Allow -Protocol TCP -LocalPort 8080
+```
+
+### Linux
+
+**Option 1 — Automated One-Command Deployment:**
+
+```bash
+sudo bash deploy/setup-os.sh
+```
+
+This script automatically installs required dependencies (including Node.js >= 22.5 if missing), creates the `monitoring` system user, copies source files to `/opt/monitoring/app`, generates `/etc/monitoring/monitoring.env`, configures and enables the `monitoring.service` systemd unit on boot, and verifies `/api/health`.
+
+**Option 2 — Manual Step-by-Step Installation:**
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl iputils-ping
+sudo useradd --system --create-home --home-dir /opt/monitoring monitoring
+sudo mkdir -p /opt/monitoring/app /var/lib/monitoring
+sudo chown -R monitoring:monitoring /opt/monitoring /var/lib/monitoring
+```
+
+Copy the source code into `/opt/monitoring/app`, then test run:
+
+```bash
+cd /opt/monitoring/app
+sudo -u monitoring env ADMIN_PASSWORD='InitialPassword-2026!' \
+  HOST=0.0.0.0 PORT=8080 DB_FILE=/var/lib/monitoring/monitor.db \
+  node server/index.js
+```
+
+Verify health endpoint:
+
+```bash
+curl http://127.0.0.1:8080/api/health
+```
+
+To start automatically on Linux boot, create `/etc/systemd/system/monitoring.service`:
+
+```ini
+[Unit]
+Description=Monitoring Platform
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=monitoring
+Group=monitoring
+WorkingDirectory=/opt/monitoring/app
+Environment=HOST=0.0.0.0
+Environment=PORT=8080
+Environment=DB_FILE=/var/lib/monitoring/monitor.db
+EnvironmentFile=-/etc/monitoring/monitoring.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo mkdir -p /etc/monitoring
+sudo sh -c 'printf "ADMIN_PASSWORD=%s\n" "InitialPassword-2026!" > /etc/monitoring/monitoring.env'
+sudo chmod 600 /etc/monitoring/monitoring.env
+sudo systemctl daemon-reload
+sudo systemctl enable --now monitoring.service
+sudo systemctl status monitoring.service
+```
+
+For internal LAN deployments, access HTTP directly at `http://<server-IP>:8080`; no HTTPS, Nginx, Caddy, or reverse proxy is required. Do not set `COOKIE_SECURE` when running over plain HTTP.
+
+### One-Command Server Update
+
+On your development machine: `git push`. On the server VM:
+
+```bash
+sudo bash /opt/monitoring/app/deploy/update.sh
+```
+
+The script pulls the latest git commit, runs automated tests, applies restart/journald limits, restarts the service, checks `/api/health`, and automatically rolls back to the previous commit if any check fails. You can inspect the running version in the dashboard footer (`vX.Y.Z · commit xxxxxxxx`), under **Settings → System**, or via `curl http://127.0.0.1:8080/api/health` (`code` field).
+
+### Disk Space & Auto-Cleanup
+
+The server automatically prunes expired metrics, caps the event log at 100,000 rows, checkpoints the SQLite WAL file, and shortens retention automatically if free disk space drops below 500 MB. `deploy/monitoring-restart.conf` and `deploy/journald-monitoring.conf` cap log rate and systemd journal size (automatically installed by `update.sh`). Check disk status with:
+
+```bash
+df -h /
+sudo bash /opt/monitoring/app/deploy/disk-report.sh          # report only
+sudo bash /opt/monitoring/app/deploy/disk-report.sh --fix    # clean journal/apt cache
+```
+
+### Docker (Optional)
+
+Running directly on Node.js is recommended. If using Docker, mount a persistent volume for `/data` and expose port `8080`:
+
+```bash
+docker build -t monitoring-platform .
+docker volume create monitoring-data
+docker run -d --name monitoring --restart unless-stopped \
+  -p 8080:8080 -e ADMIN_PASSWORD='InitialPassword-2026!' \
+  -v monitoring-data:/data monitoring-platform
+```
+
+## 2. First Login & Initial Configuration
+
+Open `http://localhost:8080` and sign in with username `admin` and your `ADMIN_PASSWORD`. You will be prompted to change your password on first login.
+
+### Language Settings (Vietnamese / English)
+- **Quick Switch:** Use the `🇻🇳 VI` / `🇬🇧 EN` selector in the top navigation bar to switch the interface language immediately without reloading or disrupting live WebSocket/SSE streams. Your personal preference is saved to your user account and synced across dual-screen windows.
+- **System Default Language:** Admins can go to **Settings → General → Default Language** to set the default language (`Tiếng Việt` or `English`) for the entire organization.
+
+### Auto Agent Enrollment Key
+Go to **Settings → Auto Agent Enrollment**, click **Generate Random**, and save an enroll key of at least 16 characters. Keep this key confidential and never commit it to Git.
+
+## 3. Installing Monitoring Agents on Target Machines
+
+Agents require zero external dependencies (no Node.js, Python, or third-party packages needed on monitored hosts). They use built-in OS utilities, report JSON metrics every 5 seconds, and automatically retry with exponential backoff (up to 30s) during network outages. Devices are auto-created on first report using the enroll key.
+
+In **Devices → + Install Agent**, admins can copy pre-filled installation commands containing the exact server URL and enroll key.
+
+### Linux
+
+Run on the target Linux host:
+
+```bash
+curl -fsSL http://<server-IP>:8080/agent/install.sh | sudo bash -s -- --key '<enroll-key>'
+```
+
+The agent runs as a `systemd` service (`monitoring-agent`), starts on boot, and auto-restarts on failure:
+
+```bash
+sudo systemctl status monitoring-agent
+sudo journalctl -u monitoring-agent -f
+```
+
+Uninstall:
+
+```bash
+curl -fsSL http://<server-IP>:8080/agent/install.sh | \
+  sudo bash -s -- --uninstall
+```
+
+### Windows PowerShell 5.1+
+
+Open **Windows PowerShell as Administrator** and run:
+
+```powershell
+& ([scriptblock]::Create((irm http://<server-IP>:8080/agent/install.ps1))) -Key '<enroll-key>' -Server 'http://<server-IP>:8080'
+```
+
+The agent uses `Get-CimInstance` and `Get-NetIPAddress`, registered as a Windows Scheduled Task running as `SYSTEM` at startup. Verify status:
+
+```powershell
+Get-ScheduledTask -TaskName "Monitoring Platform Agent" | Get-ScheduledTaskInfo
+```
+
+Uninstall (PowerShell as Administrator):
+
+```powershell
+& ([scriptblock]::Create((irm http://<server-IP>:8080/agent/install.ps1))) -Uninstall
+```
+
+### macOS (Intel & Apple Silicon)
+
+Open Terminal and run:
+
+```bash
+curl -fsSL http://<server-IP>:8080/agent/install-macos.sh | \
+  sudo bash -s -- --key '<enroll-key>'
+```
+
+The agent runs as a `LaunchDaemon` (`com.monitoring.agent`) using `sysctl`, `vm_stat`, `top -l 1`, and `df`.
+
+Uninstall:
+
+```bash
+curl -fsSL http://<server-IP>:8080/agent/install-macos.sh | \
+  sudo bash -s -- --uninstall
+```
+
+## 4. SNMP Monitoring & Vendor Profiles
+
+On routers, switches, firewalls, wireless APs, or network printers: enable SNMP v2c, create a read-only community string restricted to the monitoring server's IP on UDP port 161 (avoid using `public` in production). Then go to **Devices**, add or edit the device, enable **SNMP Monitoring**, and enter the community string.
+
+The server automatically identifies the device via `sysObjectID` and `sysDescr`, selects a matching profile from `server/profiles/` (e.g., MikroTik RouterOS, Fortinet FortiGate, Cisco IOS/IOS-XE, pfSense/OPNsense, Synology DSM, or generic HOST-RESOURCES / UCD-SNMP / Printer-MIB), and polls CPU, RAM, storage, temperature, wireless SSIDs/clients, and printer supplies (toner, drum, paper trays, page count).
+
+On any device detail page, admins can manually override the SNMP profile or click **Export SNMP Walk** to download a `.walk` diagnostic file for adding new vendor support.
+
+## 5. Global Continuous Alarm, Dual-Screen & TV Wallboard
+
+- **Continuous Global Alarm (Critical & High Severity):**
+  - Enable sound alerts by clicking the `🔔` button in the top toolbar.
+  - When any device configured with **Critical** or **High** alert severity enters an unacknowledged **Disconnected (`down`)** or **Warning (`warning`)** state (or triggers an emergency hardware/DoS/thermal/UPS alert), the alarm bell rings continuously every 3.5 seconds and pulses red in the header.
+  - The alarm continues ringing until an operator clicks the **Acknowledge (`Đã biết`)** button on the global alert banner or inside the device detail page.
+- **Dual-Screen Mode (Key `D`):**
+  - Press `D` or click `🖥️` to split the dashboard into a primary device monitoring view (with pinned KPI summary cards and an independent sleek scrollable device grid) alongside a secondary Topology / Groups / Live Alerts panel, or pop out `#/secondary` onto a second physical monitor.
+- **Fullscreen Wallboard & Auto-Rotate (Key `F`):**
+  - Press `F` or click `📺` for fullscreen NOC wallboard mode, and click `🔁` to auto-rotate across Overview, Groups, and Topology maps (automatically pausing on Overview whenever an active alert occurs).
+
+## 6. Running Tests & Demo Seed
+
+```bash
+npm test
+node tools/seed-demo.js http://localhost:8080 admin YourAdminPassword
+```
+
