@@ -308,7 +308,7 @@ const UDP_IN_DATAGRAMS = '1.3.6.1.2.1.7.1.0';
 const IF_HC_IN_PKTS = '1.3.6.1.2.1.31.1.1.1.7';
 const IF_IN_UCAST_PKTS = '1.3.6.1.2.1.2.2.1.11';
 
-// -> { tcp: number|null, udp: number|null } or null when unsupported.
+// -> { tcp: number|null, udp: number|null, rows?: { ifIndex: [pkts, counterBits] } } or null when unsupported.
 async function readPktCounters(rd) {
   let tcp = null, udp = null;
   try { tcp = num(await rd.get(TCP_IN_SEGS)); } catch { /* optional TCP-MIB */ }
@@ -317,14 +317,23 @@ async function readPktCounters(rd) {
 
   // Fallback to interface packets (for routers like MikroTik RouterOS without host transport MIBs)
   try {
-    const tbl = await rd.table([IF_HC_IN_PKTS, IF_IN_UCAST_PKTS], 32);
+    const tbl = await rd.table([IF_COLS.type, IF_HC_IN_PKTS, IF_IN_UCAST_PKTS], 128);
     if (tbl) {
-      let sum = 0, found = false;
-      for (const r of Object.values(tbl)) {
-        const v = num(r[IF_HC_IN_PKTS]) !== null ? num(r[IF_HC_IN_PKTS]) : num(r[IF_IN_UCAST_PKTS]);
-        if (v !== null && v > 0) { sum += v; found = true; }
+      const all = Object.entries(tbl).map(([idx, r]) => {
+        const hc = num(r[IF_HC_IN_PKTS]);
+        const u32 = num(r[IF_IN_UCAST_PKTS]);
+        const v = hc !== null ? hc : u32;
+        return { idx, type: num(r[IF_COLS.type]), row: v !== null && v >= 0 ? [v, hc !== null ? 64 : 32] : null };
+      }).filter((x) => x.row);
+      let use = all.filter((x) => !IF_VIRTUAL_TYPES.has(x.type));
+      if (!use.length) use = all.filter((x) => x.type !== 24);
+      if (use.length) {
+        return {
+          tcp: null,
+          udp: null,
+          rows: Object.fromEntries(use.map((x) => [x.idx, x.row])),
+        };
       }
-      if (found) return { tcp: 0, udp: sum };
     }
   } catch { /* optional IF-MIB */ }
 

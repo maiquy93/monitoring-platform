@@ -25,8 +25,11 @@ const num = (v, min, max) => (Number.isFinite(v) ? Math.min(max, Math.max(min, v
 const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
 
 // ---- bandwidth from cumulative octet counters ------------------------------
-const NET_MAX_BPS = 1.25e11;     // 1 Tbit/s: anything above is a counter glitch, not traffic
-const NET_BASE_MAX_MS = 300e3;   // a baseline older than this is dropped instead of averaged
+const NET_MAX_BPS = 1.25e11;             // 1 Tbit/s: anything above is a counter glitch, not traffic
+const PKT_MAX_PPS = 1e7;                 // 10 Mpps: sanity ceiling to reject counter reset glitches
+const NET_BASE_MAX_MS = 300e3;           // a baseline older than this is dropped instead of averaged
+const COUNTER32_MAX = 2 ** 32;           // 4,294,967,296
+const COUNTER32_WRAP_MIN_PREV = 2 ** 31; // 2,147,483,648: 32-bit wrap is only valid if prev was in upper half of uint32
 
 // slot = { base: {ts, rows} | null, rate: {in, out, at} | null }; rows = { key: [inOctets, outOctets, counterBits] }.
 // Keeps the baseline until `minMs` has passed so a fast reporter is averaged over a longer window.
@@ -39,10 +42,11 @@ function updateNetSlot(slot, rows, now, minMs = 0) {
   for (const [k, cur] of Object.entries(rows)) {
     const prev = base.rows[k];
     if (!prev) continue;                       // interface appeared since the last sample
-    const wrap = cur[2] === 32 ? 2 ** 32 : 0;  // 32-bit counters roll over; 64-bit decrease = reset
+    const canWrapIn = cur[2] === 32 && prev[0] >= COUNTER32_WRAP_MIN_PREV;
+    const canWrapOut = cur[2] === 32 && prev[1] >= COUNTER32_WRAP_MIN_PREV;
     let din = cur[0] - prev[0], dout = cur[1] - prev[1];
-    if (din < 0) din = wrap ? din + wrap : NaN;
-    if (dout < 0) dout = wrap ? dout + wrap : NaN;
+    if (din < 0) din = canWrapIn ? din + COUNTER32_MAX : NaN;
+    if (dout < 0) dout = canWrapOut ? dout + COUNTER32_MAX : NaN;
     if (!Number.isFinite(din) || !Number.isFinite(dout) || din / dt > NET_MAX_BPS || dout / dt > NET_MAX_BPS) continue;
     rin += din; rout += dout; any = true;
   }
@@ -50,27 +54,54 @@ function updateNetSlot(slot, rows, now, minMs = 0) {
   if (any) slot.rate = { in: rin / dt, out: rout / dt, at: now };
 }
 
-// ---- packet rate (TCP + UDP) for Flood/DoS detection -----------------------
-// slot = { base: {ts, pkt} | null, rate: {rate, at} | null }; pkt = { tcp, udp }
+// ---- packet rate (TCP + UDP or per-interface IF-MIB) for Flood/DoS detection ----
+// slot = { base: {ts, pkt} | null, rate: {rate, at} | null };
+// pkt = { tcp, udp, rows?: { ifIndex: [pkts, counterBits] } }
 function updatePktSlot(slot, pkt, now) {
   const base = slot.base;
   if (!base || now - base.ts > NET_BASE_MAX_MS) { slot.base = { ts: now, pkt }; return; }
   const dt = (now - base.ts) / 1000;
   if (dt <= 0) return;
-  const wrap = 2 ** 32;
-  let totalPkts = 0, any = false;
-  for (const k of ['tcp', 'udp']) {
-    if (pkt[k] != null && base.pkt[k] != null) {
-      let d = pkt[k] - base.pkt[k];
-      if (d < 0) d += wrap;
-      if (Number.isFinite(d) && d >= 0) {
+  let totalPkts = 0, any = false, reset = false;
+
+  if (pkt.rows && base.pkt && base.pkt.rows) {
+    for (const [k, cur] of Object.entries(pkt.rows)) {
+      const prev = base.pkt.rows[k];
+      if (!prev) continue;
+      const bits = cur[1] || 32;
+      let d = cur[0] - prev[0];
+      if (d < 0) {
+        if (bits === 32 && prev[0] >= COUNTER32_WRAP_MIN_PREV) d += COUNTER32_MAX;
+        else { reset = true; break; } // Device or interface counter reset (reboot)
+      }
+      if (!Number.isFinite(d) || d < 0 || d / dt > PKT_MAX_PPS) { reset = true; break; }
+      totalPkts += d;
+      any = true;
+    }
+  } else {
+    for (const k of ['tcp', 'udp']) {
+      if (pkt[k] != null && base.pkt && base.pkt[k] != null) {
+        const bits = pkt.bits || 32;
+        let d = pkt[k] - base.pkt[k];
+        if (d < 0) {
+          if (bits === 32 && base.pkt[k] >= COUNTER32_WRAP_MIN_PREV) d += COUNTER32_MAX;
+          else { reset = true; break; } // Device rebooted or SNMP counter reset to 0
+        }
+        if (!Number.isFinite(d) || d < 0 || d / dt > PKT_MAX_PPS) { reset = true; break; }
         totalPkts += d;
         any = true;
       }
     }
   }
+
   slot.base = { ts: now, pkt };
-  if (any) slot.rate = { rate: totalPkts / dt, at: now };
+  if (reset) {
+    slot.rate = null;
+    return;
+  }
+  if (any && totalPkts / dt <= PKT_MAX_PPS) {
+    slot.rate = { rate: totalPkts / dt, at: now };
+  }
 }
 
 class Monitor extends EventEmitter {
@@ -245,6 +276,18 @@ class Monitor extends EventEmitter {
     st.snmp.nextAt = now + this.o.snmpIntervalMs;
     try {
       const { if_counters: ifc, pkt_counters: pkt, ...info } = await this.o.snmpFn({ host: d.address, port: d.snmp_port, community: d.snmp_community, profile: d.snmp_profile || '' });
+      const prevUptime = st.snmp.info && st.snmp.info.uptime != null ? st.snmp.info.uptime : null;
+      const baseTs = (st.snmp.pkt && st.snmp.pkt.base && st.snmp.pkt.base.ts)
+        || (st.snmp.net && st.snmp.net.base && st.snmp.net.base.ts)
+        || null;
+      const rebooted = info.uptime != null && (
+        (prevUptime != null && info.uptime < prevUptime) ||
+        (baseTs != null && info.uptime < (now - baseTs) / 1000 - 5)
+      );
+      if (rebooted || st.snmp.ok === false || st.snmp.fails > 0 || st.status === 'down') {
+        st.snmp.net = { base: null, rate: null };
+        st.snmp.pkt = { base: null, rate: null };
+      }
       st.snmp.info = info;
       if (ifc && ifc.rows) updateNetSlot(st.snmp.net, ifc.rows, now);
       if (pkt) updatePktSlot(st.snmp.pkt, pkt, now);
@@ -252,7 +295,11 @@ class Monitor extends EventEmitter {
     } catch (e) {
       st.snmp.fails++;
       st.snmp.error = { code: e.code || 'error', message: e.message, at: now };
-      if (st.snmp.fails >= this.o.snmpFailLimit) st.snmp.ok = false;
+      if (st.snmp.fails >= this.o.snmpFailLimit) {
+        st.snmp.ok = false;
+        st.snmp.net = { base: null, rate: null };
+        st.snmp.pkt = { base: null, rate: null };
+      }
     }
     st.snmp.busy = false;
     this.evaluate(now);
@@ -410,6 +457,11 @@ class Monitor extends EventEmitter {
     const sev = this.severityOf(d);
     const dur = Math.round((now - st.since) / 1000);
     const hasCritAlert = st.alerts && (st.alerts.dos || st.alerts.smart || st.alerts.thermal || st.alerts.ups);
+    if (next === 'down') {
+      st.snmp.net = { base: null, rate: null };
+      st.snmp.pkt = { base: null, rate: null };
+      if (st.alerts) st.alerts.dos = false;
+    }
     if (sev !== 'none') {
       if (next === 'down') this._event(d, 'down', sev, `${d.name} mất kết nối: ${st.reasons.join(', ')}`);
       else if (next === 'warning') this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), `${d.name}: ${st.reasons.join('; ')}`);

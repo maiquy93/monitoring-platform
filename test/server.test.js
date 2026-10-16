@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { open } = require('../server/db');
-const { Monitor, updateNetSlot } = require('../server/monitor');
+const { Monitor, updateNetSlot, updatePktSlot } = require('../server/monitor');
 const { createApp } = require('../server/app');
 const auth = require('../server/auth');
 const snmp = require('../server/snmp');
@@ -999,4 +999,110 @@ test('global continuous alarm & i18n pack: core.js, admin.js, style.css, and REA
   assert.ok(readme.includes('## 1. Server Installation & Startup'));
   assert.ok(readme.includes('## 5. Global Continuous Alarm, Dual-Screen & TV Wallboard'));
 });
+
+test('dos: updatePktSlot distinguishes router reboot counter reset from genuine 32-bit rollover', () => {
+  const t0 = 1000000;
+
+  // 1. Router reboot scenario: counter was at 150,000 before reboot, then dropped to 120 after 180s
+  // Previously this blindly added 2^32 (4,294,967,296) / 180s = ~23,832,593 pkt/s false DoS alert!
+  const sReboot = { base: null, rate: null };
+  updatePktSlot(sReboot, { tcp: 50000, udp: 150000 }, t0);
+  assert.equal(sReboot.rate, null);
+  updatePktSlot(sReboot, { tcp: 20, udp: 120 }, t0 + 180000);
+  assert.equal(sReboot.rate, null, 'Counter reset after reboot must not produce a bogus 23.8M pkt/s spike');
+  assert.deepEqual(sReboot.base.pkt, { tcp: 20, udp: 120 });
+
+  // Next sample 30s after reboot: normal traffic (+60 pkts / 30s = 2 pkt/s)
+  updatePktSlot(sReboot, { tcp: 50, udp: 150 }, t0 + 210000);
+  assert.equal(sReboot.rate.rate, 2);
+
+  // 2. Genuine 32-bit rollover: counter near 2^32 (4,294,960,000 >= 2^31) wraps to 5,000 over 10s
+  const sWrap = { base: null, rate: null };
+  updatePktSlot(sWrap, { tcp: 4294960000, udp: 1000 }, t0);
+  updatePktSlot(sWrap, { tcp: 5000, udp: 2000 }, t0 + 10000);
+  // tcp delta = 5000 + 4294967296 - 4294960000 = 12296; udp delta = 1000 => total = 13296 / 10s = 1329.6 pkt/s
+  assert.equal(Math.round(sWrap.rate.rate), 1330);
+
+  // 3. Per-interface 64-bit counter reset (IF-MIB fallback): decreasing 64-bit counter resets cleanly
+  const sIf = { base: null, rate: null };
+  updatePktSlot(sIf, { tcp: null, udp: null, rows: { 1: [500000, 64], 2: [300000, 64] } }, t0);
+  updatePktSlot(sIf, { tcp: null, udp: null, rows: { 1: [100, 64], 2: [50, 64] } }, t0 + 90000);
+  assert.equal(sIf.rate, null, '64-bit interface counter reset must not wrap or spike');
+});
+
+test('dos: router power-cycle / reboot recovery does not trigger false Flood/DoS alert', async () => {
+  let phase = 'before_reboot';
+  const t = await boot({
+    snmpFn: async () => {
+      if (phase === 'down') throw new Error('timeout');
+      if (phase === 'before_reboot') {
+        return {
+          sysDescr: 'RouterOS', sysName: 'Router VM', uptime: 7200, cpu: 8, ram: 22, disk: 10,
+          pkt_counters: { tcp: 85000, udp: 240000 },
+        };
+      }
+      if (phase === 'just_rebooted') {
+        return {
+          sysDescr: 'RouterOS', sysName: 'Router VM', uptime: 18, cpu: 15, ram: 20, disk: 10,
+          pkt_counters: { tcp: 15, udp: 45 },
+        };
+      }
+      return {
+        sysDescr: 'RouterOS', sysName: 'Router VM', uptime: 48, cpu: 6, ram: 20, disk: 10,
+        pkt_counters: { tcp: 30, udp: 60 },
+      };
+    },
+  });
+
+  try {
+    await loginAdmin(t);
+    const addr = '10.0.0.254';
+    t.alive.add(addr);
+    const c = await t.api('POST', '/api/devices', {
+      name: 'Router VM', type: 'router', address: addr, check_icmp: true, snmp_enabled: true,
+    });
+    assert.equal(c.status, 201);
+    const devId = c.body.id;
+
+    let now = Date.now() + 35000;
+    // 1. Initial poll before reboot establishes baseline
+    await t.monitor._ping(t.monitor.devices.get(devId), t.monitor.state.get(devId), now);
+    await t.monitor._snmp(t.monitor.devices.get(devId), t.monitor.state.get(devId), now);
+    assert.equal(t.monitor.snapshot().devices[0].status, 'up');
+
+    // 2. Router is powered off for 94s -> goes down
+    phase = 'down';
+    t.alive.delete(addr);
+    now += 4000;
+    await t.monitor._ping(t.monitor.devices.get(devId), t.monitor.state.get(devId), now);
+    now += 4000;
+    await t.monitor._ping(t.monitor.devices.get(devId), t.monitor.state.get(devId), now);
+    await t.monitor._snmp(t.monitor.devices.get(devId), t.monitor.state.get(devId), now);
+    await t.monitor._snmp(t.monitor.devices.get(devId), t.monitor.state.get(devId), now + 30000);
+    assert.equal(t.monitor.snapshot().devices[0].status, 'down');
+
+    // 3. Router boots back up after 94s with counters reset near 0 and uptime = 18s
+    phase = 'just_rebooted';
+    t.alive.add(addr);
+    now += 94000;
+    await t.monitor._ping(t.monitor.devices.get(devId), t.monitor.state.get(devId), now);
+    await t.monitor._snmp(t.monitor.devices.get(devId), t.monitor.state.get(devId), now + 26000);
+
+    const dAfterReboot = t.monitor.snapshot().devices[0];
+    assert.equal(dAfterReboot.status, 'up', 'Router must stay UP after reboot recovery, not warning');
+    assert.equal(dAfterReboot.dos_alert, false, 'Must not trigger false Flood/DoS alert on reboot');
+    assert.equal(dAfterReboot.alerts.dos, false);
+
+    const events = (await t.api('GET', `/api/events?device=${devId}`)).body.events;
+    assert.ok(!events.some((e) => e.kind === 'dos'), 'No false DoS event should be logged on router reboot');
+
+    // 4. Subsequent SNMP poll 30s later computes normal 1 pkt/s rate
+    phase = 'post_reboot_2';
+    await t.monitor._snmp(t.monitor.devices.get(devId), t.monitor.state.get(devId), now + 56000);
+    const dNormal = t.monitor.snapshot().devices[0];
+    assert.equal(dNormal.status, 'up');
+    assert.equal(dNormal.pkt_rate, 1);
+  } finally { t.close(); }
+});
+
 
