@@ -280,24 +280,29 @@
         el.innerHTML = `
           <div class="dual-layout">
             <div class="dual-pane dual-pane-main">
-              <div class="kpis" id="kpis"></div>
-              <div id="groups-sec"></div>
-              <div class="row" style="margin:20px 0 10px"><h2 style="margin:0">Thiết bị</h2>
-                <span class="spacer"></span>
-                <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:160px" value="${esc(F.q)}">
-                <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
-                  <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Online</option></select>
-                <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+              <div class="dual-main-pinned">
+                <div class="kpis" id="kpis"></div>
               </div>
-              <div class="grid" id="grid"></div>
+              <div class="dual-main-scroll" id="dual-main-scroll">
+                <div id="groups-sec"></div>
+                <div class="row dual-filter-bar"><h2 style="margin:0">Thiết bị</h2>
+                  <span class="dual-device-count" id="dev-count-badge">0</span>
+                  <span class="spacer"></span>
+                  <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:155px" value="${esc(F.q)}">
+                  <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
+                    <option value="down">Mất kết nối</option><option value="warning">Cảnh báo</option><option value="up">Online</option></select>
+                  <select class="sel" id="f-type"><option value="">Mọi loại</option>${Object.entries(M.TYPE_NAME).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+                </div>
+                <div class="grid" id="grid"></div>
+              </div>
             </div>
             <div class="dual-pane dual-pane-sub">
               <div class="dual-pane-head">
                 <span class="dual-title">🖥️ Màn hình 2</span>
                 <div class="dual-tabs">
                   <button class="btn sm ${dualTab === 'map' ? 'primary' : ''}" id="dual-tab-map">🗺️ Topology</button>
-                  <button class="btn sm ${dualTab === 'groups' ? 'primary' : ''}" id="dual-tab-groups">🗂️ Nhóm</button>
-                  <button class="btn sm ${dualTab === 'problems' ? 'primary' : ''}" id="dual-tab-problems">⚠️ Cảnh báo</button>
+                  <button class="btn sm ${dualTab === 'groups' ? 'primary' : ''}" id="dual-tab-groups">🗂️ Nhóm <span class="dual-tab-badge" id="dual-badge-groups">0</span></button>
+                  <button class="btn sm ${dualTab === 'problems' ? 'primary' : ''}" id="dual-tab-problems">⚠️ Cảnh báo <span class="dual-tab-badge" id="dual-badge-problems">0</span></button>
                 </div>
                 <span class="spacer"></span>
                 <button class="btn sm" id="btn-dual-popout" title="Mở cửa sổ tách biệt cho màn hình phụ thứ hai">🗗 Cửa sổ riêng</button>
@@ -328,10 +333,21 @@
         };
         const closeBtn = $('#btn-dual-close');
         if (closeBtn) closeBtn.onclick = () => M.toggleDual(false);
+
+        const body = $('#dual-pane-body');
+        if (body) {
+          body.addEventListener('click', (e) => {
+            const node = e.target.closest('.m-node[data-href]');
+            if (node && node.dataset.href) {
+              location.hash = node.dataset.href;
+            }
+          });
+        }
       } else {
         el.innerHTML = `<div class="kpis" id="kpis"></div>
           <div id="groups-sec"></div>
           <div class="row" style="margin:22px 0 10px"><h2 style="margin:0">Thiết bị</h2>
+            <span class="dual-device-count" id="dev-count-badge">0</span>
             <span class="spacer"></span>
             <input class="inp" id="f-q" placeholder="Tìm thiết bị…" style="width:200px" value="${esc(F.q)}">
             <select class="sel" id="f-status"><option value="">Tất cả trạng thái</option><option value="problem">Chỉ có vấn đề</option>
@@ -368,19 +384,30 @@
       };
 
       const updateAutoScroll = (clientY) => {
+        const scrollEl = $('#dual-main-scroll');
+        const useContainer = scrollEl && scrollEl.scrollHeight > scrollEl.clientHeight;
         const edge = 75;
         const maxSpeed = 14;
-        if (clientY < edge) {
-          scrollSpeed = -Math.round((1 - Math.max(0, clientY) / edge) * maxSpeed);
-        } else if (clientY > window.innerHeight - edge) {
-          scrollSpeed = Math.round((1 - Math.max(0, window.innerHeight - clientY) / edge) * maxSpeed);
+        let topBound = 0;
+        let bottomBound = window.innerHeight;
+        if (useContainer) {
+          const r = scrollEl.getBoundingClientRect();
+          topBound = r.top;
+          bottomBound = r.bottom;
+        }
+        if (clientY < topBound + edge) {
+          scrollSpeed = -Math.round((1 - Math.max(0, clientY - topBound) / edge) * maxSpeed);
+        } else if (clientY > bottomBound - edge) {
+          scrollSpeed = Math.round((1 - Math.max(0, bottomBound - clientY) / edge) * maxSpeed);
         } else {
           scrollSpeed = 0;
         }
         if (scrollSpeed !== 0 && !scrollRaf) {
           const loop = () => {
             if (scrollSpeed !== 0 && isDragging) {
-              window.scrollBy(0, scrollSpeed);
+              const sc = $('#dual-main-scroll');
+              if (sc && sc.scrollHeight > sc.clientHeight) sc.scrollBy(0, scrollSpeed);
+              else window.scrollBy(0, scrollSpeed);
               scrollRaf = requestAnimationFrame(loop);
             } else {
               scrollRaf = null;
@@ -699,13 +726,18 @@
         ${k('k-down', 'Mất kết nối', s.down, true, 'down', 'Bấm để xem danh sách thiết bị mất kết nối')}
         ${k('k-warn', 'Cảnh báo', s.warning, true, 'warn', 'Bấm để xem danh sách chi tiết các cảnh báo')}
         ${k('k-unk', 'Chưa rõ / Bảo trì', `${s.unknown}${s.maintenance ? `<small> / ${s.maintenance}</small>` : ''}`, !s.unknown && !s.maintenance, 'unk', 'Bấm để xem thiết bị chưa rõ hoặc đang bảo trì')}`;
-      $('#groups-sec').innerHTML = M.S.groups.length
+      // Khi ở chế độ màn hình đôi, Nhóm thiết bị đã có tab riêng ở Màn hình 2, tránh lặp lại ở cột trái để dành trọn không gian từ mục Thiết bị trở xuống
+      $('#groups-sec').innerHTML = (!M.S.dual && M.S.groups.length)
         ? `<h2>Nhóm thiết bị</h2><div class="grid">${M.S.groups.map(M.groupTile).join('')}</div>` : '';
       let list = snap.devices;
       if (F.q) list = list.filter((d) => (d.name + d.address + d.location).toLowerCase().includes(F.q.toLowerCase()));
       if (F.type) list = list.filter((d) => d.type === F.type);
       if (F.status === 'problem') list = list.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
       else if (F.status) list = list.filter((d) => d.status === F.status && (F.status !== 'warning' || d.severity !== 'none'));
+      const countBadge = $('#dev-count-badge');
+      if (countBadge) {
+        countBadge.textContent = list.length === snap.devices.length ? `${list.length}` : `${list.length}/${snap.devices.length}`;
+      }
       $('#grid').innerHTML = list.length ? sortDevices(list).map(M.tile).join('')
         : `<div class="muted">${snap.devices.length ? 'Không có thiết bị phù hợp' : 'Chưa có thiết bị nào. Vào mục "Thiết bị" để thêm.'}</div>`;
 
@@ -716,6 +748,15 @@
     updateDualPane(snap) {
       const body = $('#dual-pane-body');
       if (!body || !snap) return;
+      const probs = snap.devices.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
+      const bGroups = $('#dual-badge-groups');
+      if (bGroups) bGroups.textContent = `${M.S.groups.length}`;
+      const bProbs = $('#dual-badge-problems');
+      if (bProbs) {
+        bProbs.textContent = `${probs.length}`;
+        bProbs.classList.toggle('has-prob', probs.length > 0);
+      }
+
       if (dualTab === 'map') {
         if (M.S.maps && M.S.maps.length > 0) {
           const mapId = currentDualMapId || M.S.maps[0].id;
@@ -755,7 +796,6 @@
           ? `<div class="grid" style="grid-template-columns:repeat(auto-fill, minmax(200px, 1fr))">${M.S.groups.map(M.groupTile).join('')}</div>`
           : '<div class="muted">Chưa có nhóm thiết bị nào.</div>';
       } else if (dualTab === 'problems') {
-        const probs = snap.devices.filter((d) => (d.status === 'down' || d.status === 'warning') && d.severity !== 'none');
         if (!probs.length) {
           body.innerHTML = `<div class="panel" style="text-align:center;padding:36px 16px;border-color:var(--c-ok)">
             <div style="font-size:40px;margin-bottom:8px">✅</div>
@@ -814,6 +854,15 @@
       $('#sec-tab-groups').onclick = () => switchTab('groups');
       $('#sec-tab-problems').onclick = () => switchTab('problems');
       $('#sec-tab-wallboard').onclick = () => switchTab('wallboard');
+      const secBody = $('#sec-body');
+      if (secBody) {
+        secBody.addEventListener('click', (e) => {
+          const node = e.target.closest('.m-node[data-href]');
+          if (node && node.dataset.href) {
+            location.hash = node.dataset.href;
+          }
+        });
+      }
       this.update(M.S.snap);
     },
     update(snap) {

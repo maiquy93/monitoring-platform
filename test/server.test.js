@@ -914,4 +914,26 @@ test('agent deep monitoring: SMART failure, Thermal Throttling, and UPS on batte
   } finally { t.close(); }
 });
 
+test('ui: dual-screen layout pins KPI cards, provides independent scroll container for devices, and styles thin scrollbars', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const views = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
 
+  // 1. Custom thin scrollbar styling
+  assert.match(css, /scrollbar-width:\s*thin/);
+  assert.match(css, /::-webkit-scrollbar\s*\{[^}]*width:\s*5px/);
+  assert.match(css, /::-webkit-scrollbar-thumb/);
+
+  // 2. Dual screen layout pins KPI section and scrolls device section independently
+  assert.match(css, /\.dual-main-pinned\s*\{[^}]*flex-shrink:\s*0/);
+  assert.match(css, /\.dual-main-scroll\s*\{[^}]*overflow-y:\s*auto/);
+  assert.match(css, /\.dual-filter-bar\s*\{[^}]*position:\s*sticky/);
+
+  // 3. Views template contains pinned KPI wrapper and scrollable device container in dual mode
+  assert.ok(views.includes('<div class="dual-main-pinned">'));
+  assert.ok(views.includes('<div class="dual-main-scroll" id="dual-main-scroll">'));
+  assert.ok(views.includes('id="dev-count-badge"'));
+  assert.ok(views.includes('id="dual-badge-groups"'));
+  assert.ok(views.includes('id="dual-badge-problems"'));
+});
