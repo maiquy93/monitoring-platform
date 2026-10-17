@@ -97,7 +97,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
 .tile { --s: var(--c-unknown); display: block; color: var(--text); background: color-mix(in srgb, var(--s) 9%, var(--panel));
   border: 1px solid color-mix(in srgb, var(--s) 55%, var(--border)); border-left: 6px solid var(--s); border-radius: var(--radius);
-  padding: 12px 14px; cursor: pointer; position: relative; box-shadow: 0 0 10px color-mix(in srgb, var(--s) 18%, transparent); transition: transform .1s; }
+  padding: 9px 12px; cursor: pointer; position: relative; box-shadow: 0 0 10px color-mix(in srgb, var(--s) 18%, transparent); transition: transform .1s; }
 .tile:hover { transform: translateY(-2px); }
 #grid .tile { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
 #grid .tile:active { cursor: grabbing; }
@@ -140,13 +140,20 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
   box-shadow: 0 20px 48px rgba(0, 0, 0, .8), 0 0 28px var(--accent) !important;
 }
 .tile .t-top { display: flex; align-items: center; gap: 6px; }
-.tile .t-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
-.tile .t-ico { font-size: 18px; flex-shrink: 0; }
-.tile .t-state { font-size: 11px; font-weight: 700; color: var(--s); text-transform: uppercase; letter-spacing: .3px; flex-shrink: 0; white-space: nowrap; }
-.tile .t-sub { font-size: 12px; color: var(--muted); margin-top: 3px; min-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tile .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 6px; margin-top: 8px; }
-.bar { font-size: 11px; color: var(--muted); }
-.bar i { display: block; height: 5px; border-radius: 3px; background: var(--panel2); margin-top: 3px; overflow: hidden; }
+.tile .t-name { font-weight: 700; font-size: 14.5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.tile .t-state {
+  font-size: 11px; font-weight: 700; color: var(--s); text-transform: uppercase; letter-spacing: .4px;
+  flex-shrink: 0; white-space: nowrap; padding: 2px 7px; border-radius: 5px;
+  background: color-mix(in srgb, var(--s) 14%, var(--panel2));
+  border: 1px solid color-mix(in srgb, var(--s) 45%, transparent); line-height: 1.25;
+}
+.tile .t-sub {
+  font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 3px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tile .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 4px 6px; margin-top: 6px; }
+.bar { font-size: 10.5px; color: var(--muted); line-height: 1.2; }
+.bar i { display: block; height: 4px; border-radius: 2px; background: var(--panel2); margin-top: 2px; overflow: hidden; }
 .bar i b { display: block; height: 100%; background: var(--c-ok); }
 .bar.bar-na { opacity: 0.6; } .bar.bar-na i b { display: none; }
 .bar.bar-ap { grid-column: 1 / -1; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; line-height: 18px; }
@@ -176,8 +183,8 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .tile.sev-high { --s: var(--c-high); } .tile.sev-critical { --s: var(--c-critical); }
 .tile.down:not(.acked) { animation: pulse 1.4s infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 22px color-mix(in srgb, var(--s) 70%, transparent); } }
-.tile.group .g-count { font-size: 30px; font-weight: 800; color: var(--s); }
-.tile.group .g-count small { font-size: 16px; color: var(--muted); }
+.tile.group .g-count { font-size: 26px; font-weight: 800; color: var(--s); line-height: 1.15; margin: 2px 0; }
+.tile.group .g-count small { font-size: 14px; color: var(--muted); font-weight: 600; }
 
 /* ---------- alert badges on cards ---------- */
 .t-alert-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
@@ -203,7 +210,12 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .hero.sev-low { --s: var(--c-low); } .hero.sev-medium { --s: var(--c-medium); } .hero.sev-high { --s: var(--c-high); } .hero.sev-critical { --s: var(--c-critical); }
 .hero .h-ico { font-size: 44px; }
 .hero h1 { margin: 0; font-size: 28px; }
-.hero .h-state { font-size: 20px; font-weight: 800; color: var(--s); text-transform: uppercase; }
+.hero .h-state {
+  display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px; border-radius: 8px;
+  background: color-mix(in srgb, var(--s) 16%, var(--panel2));
+  border: 1.5px solid color-mix(in srgb, var(--s) 60%, transparent);
+  font-size: 18px; font-weight: 800; color: var(--s); text-transform: uppercase; letter-spacing: 0.5px;
+}
 .gauges { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-top: 14px; }
 .gauge { text-align: center; }
 .gauge svg { width: 130px; height: 130px; }
@@ -236,9 +248,36 @@ table.tbl { width: 100%; border-collapse: collapse; }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
 .field-grid .field.span-2, .field-grid .field.full { grid-column: 1 / -1; }
 select.sel.inp { width: 100%; max-width: 100%; }
-.sev-badge.low { background: var(--c-low); } .sev-badge.medium { background: var(--c-medium); } .sev-badge.high { background: var(--c-high); }
-.sev-badge.critical { background: var(--c-critical); color: #fff; } .sev-badge.ok { background: var(--c-ok); }
+
+/* ---------- severity & status badges ---------- */
+.sev-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+  letter-spacing: .3px;
+  border: 1px solid transparent;
+  vertical-align: middle;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+.sev-badge.low { background: var(--c-low); color: #fff; border-color: color-mix(in srgb, var(--c-low) 80%, #fff); }
+.sev-badge.medium, .sev-badge.ev-warning { background: var(--c-medium); color: #111; font-weight: 800; border-color: color-mix(in srgb, var(--c-medium) 80%, #000); }
+.sev-badge.high { background: var(--c-high); color: #fff; border-color: color-mix(in srgb, var(--c-high) 80%, #fff); }
+.sev-badge.critical, .sev-badge.ev-down, .sev-badge.ev-dos { background: var(--c-critical); color: #fff; font-weight: 800; border-color: color-mix(in srgb, var(--c-critical) 80%, #fff); }
+.sev-badge.ok, .sev-badge.ev-up, .sev-badge.ev-audit { background: #16a085; color: #fff; border-color: #2ecc71; }
+.sev-badge.maint { background: var(--c-maint); color: #fff; border-color: color-mix(in srgb, var(--c-maint) 80%, #fff); }
 .sev-badge.none { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
+:root[data-theme="light"] .sev-badge.ok, :root[data-theme="light"] .sev-badge.ev-up, :root[data-theme="light"] .sev-badge.ev-audit { background: #27ae60; color: #fff; }
+:root[data-theme="light"] .sev-badge.medium, :root[data-theme="light"] .sev-badge.ev-warning { background: #f39c12; color: #fff; font-weight: 700; }
+:root[data-theme="dark"] .sev-badge.ok, :root[data-theme="dark"] .sev-badge.ev-up, :root[data-theme="dark"] .sev-badge.ev-audit { background: #1e824c; color: #fff; }
+:root[data-theme="dark"] .sev-badge.medium, :root[data-theme="dark"] .sev-badge.ev-warning { background: #d4a017; color: #111; font-weight: 800; }
 .dot.sev-none { background: var(--muted); }
 
 /* ---------- modal / toast / login ---------- */
@@ -656,4 +695,241 @@ tr.ev-row.has-ai.ai-closed td {
   font-size: 12px;
   margin: 6px 0;
 }
+
+/* ==========================================================================
+   THEME NEON: HIGH-VISIBILITY NOC OPTIMIZATIONS (CHỐNG NHÒE MẮT, TĂNG ĐỘ NÉT)
+   ========================================================================== */
+
+/* 1. Thẻ phân loại trạng thái & sự kiện (.sev-badge) */
+:root[data-theme="neon"] .sev-badge {
+  font-size: 13px;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 6px;
+  letter-spacing: 0.4px;
+  text-shadow: none !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Thẻ "Mất kết nối", "Tấn công DoS", "Sự cố nghiêm trọng" */
+:root[data-theme="neon"] .sev-badge.critical,
+:root[data-theme="neon"] .sev-badge.ev-down,
+:root[data-theme="neon"] .sev-badge.ev-dos {
+  background: rgba(255, 35, 35, 0.22) !important;
+  color: #ff5555 !important;
+  border: 1.5px solid #ff3b3b !important;
+  box-shadow: 0 0 8px rgba(255, 59, 59, 0.4) !important;
+}
+
+/* Thẻ "Phục hồi", "Online", "Hệ thống" */
+:root[data-theme="neon"] .sev-badge.ok,
+:root[data-theme="neon"] .sev-badge.ev-up,
+:root[data-theme="neon"] .sev-badge.ev-audit {
+  background: rgba(57, 255, 20, 0.18) !important;
+  color: #39ff14 !important;
+  border: 1.5px solid #39ff14 !important;
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.35) !important;
+}
+
+/* Thẻ "Cảnh báo" */
+:root[data-theme="neon"] .sev-badge.medium,
+:root[data-theme="neon"] .sev-badge.ev-warning {
+  background: rgba(245, 197, 24, 0.2) !important;
+  color: #ffd32a !important;
+  border: 1.5px solid #f5c518 !important;
+  box-shadow: 0 0 8px rgba(245, 197, 24, 0.32) !important;
+}
+
+/* Thẻ mức "Cao" (Mất điện lưới, Quá nhiệt, Lỗi đĩa) */
+:root[data-theme="neon"] .sev-badge.high,
+:root[data-theme="neon"] .sev-badge.ev-power,
+:root[data-theme="neon"] .sev-badge.ev-thermal,
+:root[data-theme="neon"] .sev-badge.ev-smart {
+  background: rgba(255, 140, 26, 0.22) !important;
+  color: #ff9f43 !important;
+  border: 1.5px solid #ff8c1a !important;
+  box-shadow: 0 0 8px rgba(255, 140, 26, 0.32) !important;
+}
+
+/* Thẻ mức "Thấp" */
+:root[data-theme="neon"] .sev-badge.low {
+  background: rgba(59, 158, 255, 0.2) !important;
+  color: #54a0ff !important;
+  border: 1.5px solid #3b9eff !important;
+  box-shadow: 0 0 8px rgba(59, 158, 255, 0.32) !important;
+}
+
+/* Thẻ "Bảo trì" */
+:root[data-theme="neon"] .sev-badge.maint {
+  background: rgba(167, 139, 250, 0.22) !important;
+  color: #c4b5fd !important;
+  border: 1.5px solid #a78bfa !important;
+  box-shadow: 0 0 8px rgba(167, 139, 250, 0.35) !important;
+}
+
+/* Thẻ "Bình thường / Chưa rõ" */
+:root[data-theme="neon"] .sev-badge.none {
+  background: rgba(95, 178, 124, 0.14) !important;
+  color: #7bed9f !important;
+  border: 1.5px solid #2ed573 !important;
+}
+
+/* 2. Thẻ trạng thái trên thẻ thiết bị (.tile .t-state) */
+:root[data-theme="neon"] .tile .t-state {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+  border-width: 1.5px;
+  text-shadow: none;
+}
+:root[data-theme="neon"] .tile.down .t-state {
+  background: rgba(255, 35, 35, 0.22);
+  border-color: #ff3b3b;
+  color: #ff5555;
+  box-shadow: 0 0 8px rgba(255, 59, 59, 0.4);
+}
+:root[data-theme="neon"] .tile.up .t-state {
+  background: rgba(57, 255, 20, 0.18);
+  border-color: #39ff14;
+  color: #39ff14;
+  box-shadow: 0 0 6px rgba(57, 255, 20, 0.35);
+}
+:root[data-theme="neon"] .tile.warning .t-state {
+  background: rgba(245, 197, 24, 0.2);
+  border-color: #f5c518;
+  color: #ffd32a;
+  box-shadow: 0 0 6px rgba(245, 197, 24, 0.3);
+}
+:root[data-theme="neon"] .tile.maint .t-state {
+  background: rgba(167, 139, 250, 0.2);
+  border-color: #a78bfa;
+  color: #c4b5fd;
+}
+:root[data-theme="neon"] .tile.unknown .t-state {
+  background: rgba(123, 135, 148, 0.18);
+  border-color: #7b8794;
+  color: #a4b0be;
+}
+:root[data-theme="neon"] .tile .t-sub {
+  color: #8ed6aa;
+  font-weight: 600;
+}
+
+/* 3. Tiêu đề trạng thái trang chi tiết thiết bị (.hero .h-state) */
+:root[data-theme="neon"] .hero .h-state {
+  font-size: 19px;
+  font-weight: 800;
+  padding: 4px 14px;
+  border-radius: 8px;
+  text-shadow: none;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--s) 35%, transparent);
+}
+:root[data-theme="neon"] .hero.down .h-state {
+  background: rgba(255, 35, 35, 0.25);
+  border-color: #ff3b3b;
+  color: #ff5555;
+  box-shadow: 0 0 12px rgba(255, 59, 59, 0.45);
+}
+:root[data-theme="neon"] .hero.up .h-state {
+  background: rgba(57, 255, 20, 0.2);
+  border-color: #39ff14;
+  color: #39ff14;
+  box-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+}
+:root[data-theme="neon"] .hero.warning .h-state {
+  background: rgba(245, 197, 24, 0.22);
+  border-color: #f5c518;
+  color: #ffd32a;
+  box-shadow: 0 0 10px rgba(245, 197, 24, 0.35);
+}
+
+/* 4. Huy hiệu cảnh báo khẩn cấp trên thẻ thiết bị (.t-badge-alert) */
+:root[data-theme="neon"] .t-badge-alert {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  padding: 3px 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  text-shadow: none;
+  box-shadow: 0 0 8px rgba(255, 59, 59, 0.45);
+}
+
+/* 5. Nút badge AI & Copy Tech Logs (.ai-badge) */
+:root[data-theme="neon"] .ai-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  text-shadow: none;
+}
+:root[data-theme="neon"] .ai-badge.tech-copy,
+:root[data-theme="neon"] .btn.tech-copy {
+  border: 1.5px solid color-mix(in srgb, var(--c-ok) 65%, var(--border));
+  font-weight: 700;
+  text-shadow: none;
+}
+
+/* 6. Chip chỉ số trực tuyến trên header & màn hình phụ */
+:root[data-theme="neon"] .chip {
+  background: color-mix(in srgb, var(--lvl) 16%, var(--panel2));
+  border: 1.5px solid var(--lvl);
+  font-weight: 800;
+  font-size: 13px;
+  text-shadow: none;
+}
+
+/* 7. Chỉ số KPI: hiển thị sắc nét, giảm mờ nhòe chữ số lớn */
+:root[data-theme="neon"] .kpi .val {
+  text-shadow: 0 0 5px color-mix(in srgb, var(--c) 45%, transparent);
+  font-weight: 900;
+}
+:root[data-theme="neon"] .kpi.k-down {
+  border-color: rgba(255, 59, 59, 0.55);
+  box-shadow: 0 0 12px rgba(255, 59, 59, 0.22);
+}
+:root[data-theme="neon"] .kpi.k-warn {
+  border-color: rgba(245, 197, 24, 0.5);
+  box-shadow: 0 0 12px rgba(245, 197, 24, 0.2);
+}
+
+/* 8. Danh sách cảnh báo trong hộp thoại chi tiết KPI (.kpi-alert-item) */
+:root[data-theme="neon"] .kpi-alert-item {
+  background: rgba(245, 197, 24, 0.15);
+  border: 1px solid rgba(245, 197, 24, 0.4);
+  border-left: 4px solid #f5c518;
+  border-radius: 6px;
+}
+:root[data-theme="neon"] .kpi-alert-item.crit {
+  background: rgba(255, 59, 59, 0.18);
+  border: 1px solid rgba(255, 59, 59, 0.45);
+  border-left-color: #ff3b3b;
+}
+:root[data-theme="neon"] .kpi-alert-item-title {
+  font-weight: 800;
+  color: #fff;
+}
+
+/* 9. Bảng sự kiện: dòng hover, tiêu đề cột, điểm trạng thái & lý do cảnh báo sắc nét */
+:root[data-theme="neon"] .tbl th {
+  color: #7bed9f;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+}
+:root[data-theme="neon"] .tbl td {
+  font-weight: 500;
+}
+:root[data-theme="neon"] tr.ev-row:hover td {
+  background: rgba(57, 255, 20, 0.08);
+}
+:root[data-theme="neon"] .dot {
+  box-shadow: 0 0 5px currentColor;
+}
+:root[data-theme="neon"] .reason {
+  color: #ffd32a;
+  font-weight: 700;
+}
+
 

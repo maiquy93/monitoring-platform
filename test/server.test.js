@@ -1765,5 +1765,121 @@ test('ai: manual forced incident analysis, down device diagnosis, reasoning mode
   } finally { t.close(); }
 });
 
+test('ui theme neon: high-visibility NOC optimizations for tags, status highlights, bold typography and backward compatibility', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const views = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
 
+  // 1. Base .sev-badge styling: padding, rounded corners, bold, accessible across all themes
+  assert.match(css, /\.sev-badge\s*\{[^}]*display:\s*inline-flex/);
+  assert.match(css, /\.sev-badge\s*\{[^}]*padding:\s*3px\s+10px/);
+  assert.match(css, /\.sev-badge\s*\{[^}]*border-radius:\s*6px/);
+  assert.match(css, /\.sev-badge\s*\{[^}]*font-weight:\s*700/);
 
+  // 2. High-visibility theme Neon optimizations for NOC operators
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\s*\{[^}]*font-weight:\s*800/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\s*\{[^}]*font-size:\s*13px/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\s*\{[^}]*text-shadow:\s*none/);
+
+  // 3. Highlight categories: "Mất kết nối" (critical / ev-down) & "Phục hồi" (ok / ev-up)
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\.critical/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\.ev-down/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\.ok/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.sev-badge\.ev-up/);
+
+  // 4. Tile status tag (.tile .t-state) and Hero detail header (.hero .h-state)
+  assert.match(css, /\.tile\s+\.t-state\s*\{[^}]*border-radius/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.tile\s+\.t-state/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.tile\.down\s+\.t-state/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.tile\.up\s+\.t-state/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.hero\s+\.h-state\s*\{[^}]*font-weight:\s*800/);
+
+  // 5. Views integration: M.eventsTable attaches ev-kind classes and M.showKpiModal has consistent badges
+  assert.match(views, /<span class="sev-badge \$\{badge\(e\)\} ev-\$\{e\.kind\}">/);
+  assert.match(views, /<span class="sev-badge critical ev-down">/);
+  assert.match(views, /<span class="sev-badge ok ev-up">/);
+});
+
+test('ui overview: compact device tile height and single non-duplicated AP wireless info', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
+
+  // 1. CSS optimizations for moderate, compact device tile height
+  assert.match(css, /\.tile\s*\{[^}]*padding:\s*9px\s+12px/);
+  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*font-size:\s*11\.5px/);
+  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*text-overflow:\s*ellipsis/);
+  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*white-space:\s*nowrap/);
+  assert.match(css, /\.tile\s+\.bars\s*\{[^}]*margin-top:\s*6px/);
+  assert.match(css, /:root\[data-theme="neon"\]\s+\.tile\s+\.t-sub/);
+
+  // 2. Evaluation of M.tile for AP devices: single non-duplicated line "2 SSID - 1 client"
+  const M = {
+    esc: (s) => String(s || ''),
+    $: () => null,
+    $$: () => [],
+    t: (s) => s,
+    trData: (s) => s,
+    views: {},
+    S: { lang: 'vi', settings: { thresholds: { cpu: 85, ram: 85, disk: 90 } } },
+    statusClass: (d) => d.status || 'up',
+    ICON: { ap: '📡', server: '🖥️' },
+    STATE_NAME: { up: 'Online', down: 'Mất kết nối', warning: 'Cảnh báo' },
+    fmtDur: () => '2h',
+  };
+
+  const sandbox = {
+    M,
+    window: { M },
+    document: { addEventListener: () => {} },
+    localStorage: { getItem: () => null },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(viewsJs, sandbox);
+
+  // AP with 2 SSID and 1 client (exact user test case)
+  const apHtml = sandbox.M.tile({
+    id: 10,
+    type: 'ap',
+    name: 'AP-Alcatel',
+    address: '192.168.1.50',
+    status: 'up',
+    rtt: 2,
+    total_ssids: 2,
+    total_clients: 1,
+    uptime: 3600,
+    since: Date.now() - 3600000,
+  });
+
+  // Must contain single unified info "2 SSID - 1 client"
+  assert.ok(apHtml.includes('2 SSID - 1 client'));
+  // Must NOT duplicate with .bar-ap box
+  assert.ok(!apHtml.includes('bar-ap'));
+  assert.ok(!apHtml.includes('class="bars"'));
+
+  // AP with CPU and RAM (e.g. Cisco/Mikrotik): CPU and RAM bars present, but no bar-ap
+  const apWithCpuHtml = sandbox.M.tile({
+    id: 11,
+    type: 'ap',
+    name: 'AP-Cisco',
+    address: '192.168.1.51',
+    status: 'up',
+    rtt: 3,
+    total_ssids: 4,
+    total_clients: 25,
+    cpu: 15,
+    ram: 40,
+    uptime: 7200,
+    since: Date.now() - 7200000,
+  });
+
+  assert.ok(apWithCpuHtml.includes('4 SSID - 25 client'));
+  assert.ok(!apWithCpuHtml.includes('bar-ap'));
+  assert.ok(apWithCpuHtml.includes('class="bars"'));
+  assert.ok(apWithCpuHtml.includes('CPU 15%'));
+  assert.ok(apWithCpuHtml.includes('RAM 40%'));
+});

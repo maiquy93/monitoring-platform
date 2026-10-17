@@ -48,16 +48,25 @@
       sub = parts.filter(Boolean).join(' · ');
     } else if (d.type === 'ap') {
       const parts = [d.address];
-      if (d.rtt != null) parts.push(`${d.rtt} ms`);
-      if (d.total_ssids != null) parts.push(`📶 ${d.total_ssids} SSID`);
-      if (d.total_clients != null) parts.push(`👥 ${d.total_clients} client`);
+      if (d.status === 'warning' && d.reasons && d.reasons.length) parts.push(tr(d.reasons[0]));
+      else if (d.rtt != null) parts.push(`${d.rtt} ms`);
+      if (d.total_ssids != null || d.total_clients != null) {
+        const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
+        const c = d.total_clients != null ? `${d.total_clients} client` : '';
+        const wifi = s && c ? `${s} - ${c}` : (s || c);
+        if (wifi) parts.push(wifi);
+      }
       if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
       sub = parts.filter(Boolean).join(' · ');
     } else if (d.status === 'warning') sub = tr(d.reasons[0]);
     else {
       const parts = [d.address, d.rtt != null ? `${d.rtt} ms` : null];
-      if (d.total_ssids != null) parts.push(`📶 ${d.total_ssids} SSID`);
-      if (d.total_clients != null) parts.push(`👥 ${d.total_clients} client`);
+      if (d.total_ssids != null || d.total_clients != null) {
+        const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
+        const c = d.total_clients != null ? `${d.total_clients} client` : '';
+        const wifi = s && c ? `${s} - ${c}` : (s || c);
+        if (wifi) parts.push(wifi);
+      }
       if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
       sub = parts.filter(Boolean).join(' · ');
     }
@@ -65,14 +74,9 @@
     if (d.status === 'up' || d.status === 'warning') {
       const pBars = [];
       if (d.type === 'ap') {
-        if (d.total_ssids != null || d.total_clients != null) {
-          const sText = d.total_ssids != null ? `${d.total_ssids} SSID` : '— SSID';
-          const cText = d.total_clients != null ? `${d.total_clients} client` : '— client';
-          pBars.push(`<div class="bar bar-ap" style="background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-size:11px;display:flex;align-items:center;justify-content:space-between;line-height:18px" title="${esc(t('Tổng số lượng SSID phát sóng và Client kết nối'))}"><span style="color:var(--c-low);font-weight:600">📶 ${sText}</span><span style="color:var(--c-ok);font-weight:700">👥 ${cText}</span></div>`);
-        }
         const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram']].filter(([, value]) => value != null);
         for (const [lbl, val, k] of metrics) pBars.push(bar(lbl, val, k));
-        bars = `<div class="bars">${pBars.join('')}</div>`;
+        if (pBars.length) bars = `<div class="bars">${pBars.join('')}</div>`;
       } else if (d.type === 'printer') {
         // 1. Drum (tuổi thọ trống từ)
         if (d.drum != null) {
@@ -436,7 +440,7 @@
       return `<tr class="ev-row ${hasAi ? 'has-ai' : ''} ${hasAi && isHidden ? 'ai-closed' : ''}" data-ev-id="${e.id}" ${rowTitle ? `title="${rowTitle}"` : ''}>
         <td>${M.fmtTime(e.ts)}</td>
         ${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
-        <td><span class="sev-badge ${badge(e)}">${esc(label[e.kind] || e.kind)}</span></td>
+        <td><span class="sev-badge ${badge(e)} ev-${e.kind}">${esc(label[e.kind] || e.kind)}</span></td>
         <td>${esc(tr(e.message))} ${aiBtns.join('')}</td>
       </tr>
       <tr id="ai-ev-row-${e.id}" class="${isHidden ? 'hidden' : ''}">
@@ -1997,15 +2001,15 @@
 
         let statusBadge = '';
         if (d.status === 'down') {
-          statusBadge = `<span class="sev-badge critical">${esc(t('Mất kết nối'))}</span>`;
+          statusBadge = `<span class="sev-badge critical ev-down">${esc(t('Mất kết nối'))}</span>`;
         } else if (d.status === 'warning') {
-          statusBadge = `<span class="sev-badge medium">${esc(t('Cảnh báo'))}</span>`;
+          statusBadge = `<span class="sev-badge medium ev-warning">${esc(t('Cảnh báo'))}</span>`;
         } else if (d.status === 'maint') {
-          statusBadge = `<span class="sev-badge" style="background:var(--c-maint);color:#fff">${esc(t('Bảo trì'))}</span>`;
+          statusBadge = `<span class="sev-badge maint">${esc(t('Bảo trì'))}</span>`;
         } else if (d.status === 'unknown') {
           statusBadge = `<span class="sev-badge none">${esc(t('Chưa rõ'))}</span>`;
         } else {
-          statusBadge = `<span class="sev-badge ok">${esc(t('Online'))}</span>`;
+          statusBadge = `<span class="sev-badge ok ev-up">${esc(t('Online'))}</span>`;
         }
 
         let detailSection = '';
