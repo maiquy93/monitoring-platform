@@ -1,0 +1,87 @@
+{
+  "id": "alcatel-aos7",
+  "name": "Alcatel-Lucent OmniSwitch AOS 7 / AOS 8 (OS6360 / OS6465 / OS6560 / OS6860 / OS6865 / OS6900 / OS9900)",
+  "description": "Dòng OmniSwitch thế hệ mới chạy hệ điều hành AOS 7.x / 8.x của Alcatel-Lucent Enterprise (nhánh enterprise 1.3.6.1.4.1.6486.801). Theo tài liệu ALCATEL-IND1-HEALTH-MIB (AOS 7/8), chỉ số mức thiết bị đã chuyển sang bảng healthModuleTable (1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1): CPU đọc cột 15 (healthModuleCpuLatest, %) hoặc dự phòng cột 11 (healthModuleCpu1MinAvg, %); RAM đọc cột 16 (healthModuleMemoryLatest, %) hoặc dự phòng cột 8 (healthModuleMemory1MinAvg, %). Nhiệt độ đọc từ ALCATEL-IND1-CHASSIS-MIB: chasCPMAHardwareBoardTemp (1.3.6.1.4.1.6486.801.1.1.1.3.1.1.3.1.8) hoặc dự phòng chasEntTempCurrent (1.3.6.1.4.1.6486.801.1.1.1.3.1.2.1.1).",
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.6486.801"] },
+    { "sysDescr": "(?:omniswitch|alcatel).*[78]\\.[0-9]|aos.*[78]\\.[0-9]|os6(?:360|465|560|860|865|900)|os9900|os10k" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU (module cao nhất)",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        {
+          "table": {
+            "columns": { "load": "1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.15" },
+            "value": { "column": "load" },
+            "agg": "max"
+          },
+          "unverified": true
+        },
+        {
+          "table": {
+            "columns": { "load": "1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.11" },
+            "value": { "column": "load" },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "ram": {
+      "label": "RAM (module cao nhất)",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        {
+          "table": {
+            "columns": { "mem": "1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.16" },
+            "value": { "column": "mem" },
+            "agg": "max"
+          },
+          "unverified": true
+        },
+        {
+          "table": {
+            "columns": { "mem": "1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.8" },
+            "value": { "column": "mem" },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "temperature": {
+      "label": "Nhiệt độ (cao nhất)",
+      "unit": "°C",
+      "round": 0,
+      "optional": true,
+      "sources": [
+        {
+          "table": {
+            "columns": { "temp": "1.3.6.1.4.1.6486.801.1.1.1.3.1.1.3.1.8" },
+            "value": { "column": "temp" },
+            "agg": "max"
+          },
+          "unverified": true
+        },
+        {
+          "table": {
+            "columns": { "temp": "1.3.6.1.4.1.6486.801.1.1.1.3.1.2.1.1" },
+            "value": { "column": "temp" },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "disk": null,
+    "toner": null,
+    "drum": null,
+    "page_count": null
+  }
+}

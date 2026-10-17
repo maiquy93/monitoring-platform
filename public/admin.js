@@ -50,7 +50,18 @@
       M.toast(t('Đã lưu thiết bị'));
       if (M.current === M.views.devices) M.views.devices.paint();
     });
-    $('#f-type', form).onchange = (e) => { $('#f-sev', form).options[0].text = byTypeLabel(def[e.target.value]); };
+    $('#f-type', form).onchange = (e) => {
+      const tp = e.target.value;
+      $('#f-sev', form).options[0].text = byTypeLabel(def[tp]);
+      if (!id && ['switch', 'router', 'ap', 'printer', 'nas'].includes(tp)) {
+        form.snmp_enabled.checked = true;
+      }
+    };
+    const snmpBox = $('#snmp-box', form);
+    if (snmpBox) {
+      snmpBox.addEventListener('input', () => { form.snmp_enabled.checked = true; });
+      snmpBox.addEventListener('change', () => { form.snmp_enabled.checked = true; });
+    }
     const del = $('#f-del', form);
     if (del) del.onclick = () => M.confirm(M.S.lang === 'en' ? `Delete device "${d.name}" and all its history?` : `Xóa thiết bị "${d.name}" cùng toàn bộ lịch sử?`, async () => {
       await M.api('DELETE', `/api/devices/${id}`);

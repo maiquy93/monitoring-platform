@@ -1,0 +1,3671 @@
+# monitoring-platform snmp walk v1
+# captured: 2026-10-17T05:41:35.109Z
+# sysObjectID: 1.3.6.1.4.1.6486.800.1.1.2.2.4.1.4
+# sysDescr: OmniStack LS 6200
+# sysName: 
+# roots: 1.3.6.1.2.1.1 1.3.6.1.2.1.25 1.3.6.1.2.1.47.1.1.1.1.2 1.3.6.1.2.1.47.1.1.1.1.5 1.3.6.1.2.1.47.1.1.1.1.7 1.3.6.1.2.1.2.2.1.2 1.3.6.1.2.1.2.2.1.3 1.3.6.1.2.1.2.2.1.8 1.3.6.1.2.1.2.2.1.10 1.3.6.1.2.1.2.2.1.16 1.3.6.1.2.1.31.1.1.1.1 1.3.6.1.2.1.31.1.1.1.6 1.3.6.1.2.1.31.1.1.1.10 1.3.6.1.2.1.6.10 1.3.6.1.2.1.7.1 1.3.6.1.4.1.89.1 1.3.6.1.4.1.89.83
+1.3.6.1.2.1.1.1.0 STRING "OmniStack LS 6200"
+1.3.6.1.2.1.1.2.0 OID 1.3.6.1.4.1.6486.800.1.1.2.2.4.1.4
+1.3.6.1.2.1.1.3.0 TIMETICKS 1472000
+1.3.6.1.2.1.1.4.0 STRING ""
+1.3.6.1.2.1.1.5.0 STRING ""
+1.3.6.1.2.1.1.6.0 STRING ""
+1.3.6.1.2.1.1.7.0 INTEGER 2
+1.3.6.1.2.1.1.8.0 TIMETICKS 0
+1.3.6.1.2.1.1.9.1.2.1 OID 1.3.6.1.4.1.89.73
+1.3.6.1.2.1.1.9.1.3.1 STRING "RS capabilities"
+1.3.6.1.2.1.1.9.1.4.1 TIMETICKS 0
+1.3.6.1.2.1.2.2.1.2.1 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.2 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.3 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.4 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.5 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.6 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.7 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.8 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.9 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.10 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.11 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.12 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.13 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.14 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.15 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.16 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.17 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.18 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.19 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.20 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.21 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.22 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.23 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.24 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.25 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.26 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.27 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.28 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.29 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.30 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.31 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.32 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.33 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.34 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.35 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.36 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.37 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.38 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.39 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.40 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.41 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.42 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.43 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.44 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.45 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.46 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.47 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.48 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.49 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.50 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.51 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.52 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.55 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.56 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.57 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.58 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.59 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.60 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.61 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.62 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.63 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.64 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.65 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.66 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.67 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.68 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.69 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.70 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.71 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.72 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.73 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.74 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.75 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.76 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.77 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.78 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.79 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.80 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.81 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.82 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.83 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.84 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.85 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.86 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.87 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.88 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.89 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.90 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.91 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.92 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.93 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.94 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.95 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.96 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.97 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.98 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.99 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.100 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.101 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.102 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.103 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.104 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.105 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.106 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.109 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.110 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.111 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.112 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.113 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.114 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.115 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.116 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.117 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.118 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.119 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.120 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.121 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.122 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.123 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.124 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.125 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.126 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.127 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.128 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.129 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.130 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.131 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.132 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.133 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.134 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.135 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.136 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.137 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.138 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.139 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.140 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.141 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.142 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.143 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.144 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.145 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.146 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.147 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.148 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.149 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.150 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.151 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.152 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.153 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.154 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.155 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.156 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.157 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.158 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.159 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.160 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.163 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.164 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.165 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.166 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.167 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.168 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.169 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.170 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.171 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.172 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.173 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.174 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.175 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.176 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.177 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.178 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.179 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.180 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.181 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.182 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.183 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.184 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.185 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.186 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.187 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.188 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.189 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.190 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.191 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.192 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.193 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.194 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.195 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.196 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.197 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.198 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.199 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.200 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.201 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.202 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.203 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.204 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.205 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.206 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.207 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.208 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.209 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.210 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.211 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.212 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.213 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.214 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.217 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.218 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.219 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.220 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.221 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.222 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.223 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.224 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.225 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.226 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.227 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.228 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.229 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.230 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.231 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.232 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.233 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.234 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.235 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.236 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.237 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.238 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.239 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.240 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.241 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.242 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.243 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.244 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.245 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.246 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.247 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.248 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.249 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.250 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.251 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.252 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.253 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.254 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.255 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.256 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.257 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.258 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.259 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.260 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.261 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.262 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.263 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.264 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.265 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.266 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.267 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.268 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.271 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.272 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.273 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.274 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.275 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.276 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.277 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.278 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.279 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.280 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.281 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.282 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.283 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.284 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.285 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.286 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.287 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.288 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.289 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.290 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.291 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.292 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.293 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.294 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.295 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.296 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.297 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.298 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.299 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.300 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.301 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.302 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.303 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.304 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.305 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.306 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.307 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.308 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.309 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.310 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.311 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.312 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.313 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.314 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.315 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.316 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.317 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.318 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.319 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.320 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.321 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.322 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.325 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.326 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.327 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.328 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.329 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.330 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.331 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.332 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.333 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.334 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.335 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.336 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.337 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.338 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.339 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.340 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.341 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.342 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.343 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.344 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.345 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.346 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.347 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.348 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.349 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.350 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.351 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.352 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.353 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.354 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.355 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.356 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.357 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.358 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.359 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.360 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.361 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.362 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.363 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.364 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.365 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.366 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.367 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.368 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.369 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.370 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.371 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.372 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.373 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.374 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.375 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.376 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.379 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.380 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.381 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.382 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.383 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.384 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.385 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.386 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.387 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.388 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.389 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.390 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.391 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.392 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.393 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.394 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.395 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.396 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.397 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.398 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.399 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.400 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.401 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.402 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.403 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.404 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.405 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.406 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.407 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.408 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.409 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.410 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.411 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.412 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.413 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.414 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.415 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.416 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.417 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.418 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.419 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.420 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.421 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.422 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.423 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.424 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.425 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.426 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.427 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.428 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.429 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.430 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1000 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1001 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1002 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1003 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1004 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1005 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1006 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.1007 STRING "Ethernet Interface"
+1.3.6.1.2.1.2.2.1.2.9000 STRING "Internal Interface"
+1.3.6.1.2.1.2.2.1.2.100000 STRING "vlan"
+1.3.6.1.2.1.2.2.1.2.100009 STRING "vlan"
+1.3.6.1.2.1.2.2.1.3.1 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.2 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.3 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.4 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.5 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.6 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.7 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.8 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.9 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.10 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.11 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.12 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.13 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.14 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.15 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.16 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.17 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.18 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.19 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.20 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.21 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.22 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.23 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.24 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.25 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.26 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.27 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.28 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.29 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.30 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.31 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.32 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.33 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.34 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.35 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.36 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.37 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.38 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.39 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.40 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.41 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.42 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.43 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.44 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.45 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.46 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.47 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.48 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.49 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.50 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.51 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.52 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.55 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.56 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.57 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.58 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.59 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.60 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.61 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.62 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.63 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.64 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.65 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.66 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.67 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.68 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.69 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.70 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.71 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.72 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.73 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.74 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.75 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.76 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.77 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.78 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.79 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.80 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.81 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.82 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.83 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.84 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.85 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.86 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.87 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.88 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.89 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.90 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.91 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.92 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.93 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.94 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.95 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.96 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.97 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.98 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.99 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.100 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.101 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.102 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.103 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.104 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.105 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.106 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.109 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.110 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.111 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.112 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.113 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.114 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.115 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.116 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.117 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.118 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.119 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.120 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.121 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.122 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.123 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.124 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.125 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.126 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.127 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.128 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.129 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.130 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.131 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.132 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.133 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.134 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.135 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.136 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.137 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.138 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.139 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.140 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.141 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.142 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.143 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.144 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.145 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.146 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.147 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.148 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.149 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.150 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.151 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.152 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.153 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.154 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.155 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.156 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.157 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.158 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.159 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.160 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.163 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.164 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.165 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.166 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.167 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.168 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.169 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.170 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.171 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.172 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.173 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.174 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.175 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.176 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.177 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.178 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.179 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.180 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.181 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.182 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.183 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.184 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.185 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.186 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.187 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.188 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.189 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.190 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.191 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.192 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.193 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.194 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.195 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.196 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.197 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.198 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.199 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.200 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.201 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.202 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.203 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.204 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.205 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.206 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.207 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.208 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.209 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.210 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.211 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.212 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.213 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.214 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.217 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.218 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.219 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.220 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.221 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.222 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.223 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.224 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.225 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.226 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.227 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.228 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.229 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.230 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.231 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.232 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.233 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.234 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.235 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.236 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.237 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.238 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.239 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.240 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.241 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.242 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.243 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.244 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.245 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.246 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.247 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.248 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.249 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.250 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.251 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.252 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.253 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.254 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.255 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.256 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.257 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.258 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.259 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.260 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.261 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.262 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.263 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.264 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.265 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.266 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.267 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.268 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.271 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.272 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.273 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.274 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.275 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.276 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.277 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.278 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.279 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.280 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.281 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.282 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.283 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.284 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.285 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.286 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.287 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.288 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.289 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.290 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.291 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.292 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.293 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.294 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.295 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.296 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.297 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.298 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.299 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.300 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.301 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.302 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.303 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.304 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.305 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.306 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.307 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.308 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.309 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.310 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.311 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.312 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.313 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.314 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.315 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.316 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.317 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.318 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.319 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.320 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.321 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.322 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.325 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.326 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.327 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.328 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.329 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.330 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.331 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.332 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.333 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.334 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.335 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.336 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.337 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.338 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.339 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.340 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.341 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.342 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.343 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.344 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.345 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.346 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.347 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.348 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.349 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.350 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.351 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.352 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.353 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.354 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.355 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.356 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.357 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.358 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.359 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.360 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.361 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.362 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.363 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.364 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.365 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.366 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.367 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.368 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.369 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.370 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.371 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.372 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.373 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.374 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.375 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.376 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.379 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.380 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.381 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.382 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.383 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.384 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.385 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.386 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.387 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.388 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.389 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.390 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.391 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.392 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.393 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.394 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.395 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.396 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.397 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.398 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.399 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.400 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.401 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.402 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.403 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.404 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.405 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.406 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.407 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.408 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.409 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.410 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.411 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.412 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.413 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.414 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.415 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.416 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.417 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.418 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.419 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.420 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.421 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.422 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.423 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.424 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.425 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.426 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.427 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.428 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.429 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.430 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1000 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1001 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1002 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1003 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1004 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1005 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1006 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.1007 INTEGER 6
+1.3.6.1.2.1.2.2.1.3.9000 INTEGER 53
+1.3.6.1.2.1.2.2.1.3.100000 INTEGER 53
+1.3.6.1.2.1.2.2.1.3.100009 INTEGER 53
+1.3.6.1.2.1.2.2.1.8.1 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.2 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.3 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.4 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.5 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.6 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.7 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.8 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.9 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.10 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.11 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.12 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.13 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.14 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.15 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.16 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.17 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.18 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.19 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.20 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.21 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.22 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.23 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.24 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.25 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.26 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.27 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.28 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.29 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.30 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.31 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.32 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.33 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.34 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.35 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.36 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.37 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.38 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.39 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.40 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.41 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.42 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.43 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.44 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.45 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.46 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.47 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.48 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.49 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.50 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.51 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.52 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.55 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.56 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.57 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.58 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.59 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.60 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.61 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.62 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.63 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.64 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.65 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.66 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.67 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.68 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.69 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.70 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.71 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.72 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.73 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.74 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.75 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.76 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.77 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.78 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.79 INTEGER 1
+1.3.6.1.2.1.2.2.1.8.80 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.81 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.82 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.83 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.84 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.85 INTEGER 1
+1.3.6.1.2.1.2.2.1.8.86 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.87 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.88 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.89 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.90 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.91 INTEGER 1
+1.3.6.1.2.1.2.2.1.8.92 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.93 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.94 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.95 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.96 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.97 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.98 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.99 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.100 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.101 INTEGER 1
+1.3.6.1.2.1.2.2.1.8.102 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.103 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.104 INTEGER 2
+1.3.6.1.2.1.2.2.1.8.105 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.106 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.109 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.110 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.111 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.112 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.113 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.114 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.115 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.116 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.117 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.118 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.119 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.120 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.121 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.122 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.123 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.124 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.125 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.126 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.127 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.128 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.129 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.130 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.131 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.132 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.133 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.134 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.135 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.136 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.137 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.138 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.139 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.140 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.141 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.142 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.143 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.144 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.145 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.146 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.147 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.148 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.149 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.150 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.151 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.152 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.153 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.154 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.155 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.156 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.157 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.158 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.159 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.160 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.163 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.164 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.165 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.166 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.167 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.168 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.169 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.170 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.171 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.172 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.173 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.174 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.175 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.176 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.177 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.178 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.179 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.180 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.181 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.182 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.183 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.184 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.185 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.186 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.187 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.188 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.189 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.190 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.191 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.192 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.193 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.194 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.195 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.196 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.197 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.198 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.199 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.200 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.201 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.202 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.203 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.204 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.205 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.206 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.207 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.208 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.209 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.210 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.211 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.212 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.213 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.214 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.217 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.218 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.219 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.220 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.221 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.222 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.223 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.224 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.225 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.226 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.227 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.228 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.229 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.230 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.231 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.232 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.233 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.234 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.235 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.236 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.237 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.238 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.239 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.240 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.241 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.242 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.243 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.244 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.245 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.246 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.247 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.248 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.249 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.250 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.251 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.252 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.253 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.254 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.255 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.256 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.257 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.258 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.259 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.260 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.261 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.262 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.263 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.264 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.265 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.266 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.267 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.268 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.271 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.272 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.273 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.274 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.275 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.276 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.277 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.278 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.279 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.280 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.281 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.282 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.283 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.284 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.285 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.286 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.287 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.288 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.289 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.290 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.291 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.292 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.293 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.294 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.295 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.296 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.297 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.298 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.299 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.300 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.301 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.302 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.303 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.304 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.305 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.306 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.307 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.308 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.309 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.310 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.311 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.312 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.313 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.314 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.315 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.316 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.317 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.318 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.319 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.320 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.321 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.322 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.325 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.326 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.327 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.328 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.329 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.330 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.331 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.332 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.333 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.334 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.335 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.336 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.337 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.338 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.339 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.340 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.341 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.342 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.343 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.344 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.345 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.346 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.347 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.348 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.349 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.350 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.351 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.352 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.353 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.354 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.355 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.356 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.357 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.358 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.359 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.360 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.361 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.362 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.363 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.364 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.365 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.366 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.367 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.368 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.369 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.370 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.371 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.372 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.373 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.374 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.375 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.376 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.379 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.380 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.381 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.382 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.383 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.384 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.385 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.386 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.387 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.388 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.389 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.390 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.391 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.392 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.393 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.394 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.395 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.396 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.397 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.398 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.399 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.400 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.401 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.402 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.403 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.404 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.405 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.406 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.407 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.408 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.409 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.410 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.411 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.412 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.413 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.414 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.415 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.416 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.417 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.418 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.419 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.420 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.421 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.422 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.423 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.424 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.425 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.426 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.427 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.428 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.429 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.430 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1000 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1001 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1002 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1003 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1004 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1005 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1006 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.1007 INTEGER 6
+1.3.6.1.2.1.2.2.1.8.9000 INTEGER 1
+1.3.6.1.2.1.2.2.1.8.100000 INTEGER 1
+1.3.6.1.2.1.2.2.1.8.100009 INTEGER 1
+1.3.6.1.2.1.2.2.1.10.1 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.2 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.3 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.4 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.5 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.6 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.7 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.8 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.9 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.10 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.11 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.12 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.13 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.14 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.15 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.16 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.17 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.18 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.19 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.20 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.21 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.22 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.23 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.24 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.25 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.26 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.27 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.28 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.29 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.30 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.31 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.32 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.33 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.34 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.35 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.36 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.37 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.38 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.39 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.40 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.41 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.42 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.43 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.44 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.45 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.46 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.47 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.48 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.49 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.50 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.51 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.52 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.55 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.56 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.57 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.58 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.59 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.60 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.61 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.62 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.63 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.64 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.65 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.66 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.67 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.68 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.69 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.70 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.71 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.72 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.73 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.74 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.75 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.76 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.77 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.78 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.79 COUNTER32 13278754
+1.3.6.1.2.1.2.2.1.10.80 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.81 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.82 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.83 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.84 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.85 COUNTER32 8630586
+1.3.6.1.2.1.2.2.1.10.86 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.87 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.88 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.89 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.90 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.91 COUNTER32 540948801
+1.3.6.1.2.1.2.2.1.10.92 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.93 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.94 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.95 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.96 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.97 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.98 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.99 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.100 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.101 COUNTER32 1981326312
+1.3.6.1.2.1.2.2.1.10.102 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.103 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.104 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.105 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.106 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.109 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.110 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.111 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.112 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.113 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.114 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.115 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.116 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.117 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.118 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.119 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.120 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.121 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.122 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.123 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.124 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.125 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.126 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.127 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.128 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.129 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.130 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.131 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.132 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.133 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.134 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.135 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.136 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.137 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.138 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.139 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.140 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.141 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.142 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.143 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.144 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.145 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.146 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.147 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.148 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.149 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.150 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.151 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.152 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.153 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.154 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.155 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.156 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.157 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.158 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.159 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.160 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.163 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.164 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.165 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.166 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.167 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.168 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.169 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.170 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.171 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.172 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.173 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.174 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.175 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.176 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.177 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.178 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.179 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.180 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.181 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.182 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.183 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.184 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.185 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.186 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.187 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.188 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.189 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.190 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.191 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.192 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.193 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.194 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.195 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.196 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.197 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.198 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.199 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.200 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.201 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.202 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.203 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.204 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.205 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.206 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.207 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.208 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.209 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.210 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.211 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.212 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.213 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.214 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.217 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.218 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.219 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.220 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.221 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.222 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.223 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.224 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.225 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.226 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.227 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.228 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.229 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.230 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.231 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.232 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.233 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.234 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.235 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.236 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.237 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.238 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.239 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.240 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.241 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.242 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.243 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.244 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.245 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.246 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.247 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.248 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.249 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.250 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.251 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.252 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.253 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.254 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.255 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.256 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.257 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.258 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.259 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.260 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.261 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.262 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.263 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.264 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.265 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.266 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.267 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.268 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.271 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.272 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.273 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.274 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.275 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.276 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.277 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.278 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.279 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.280 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.281 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.282 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.283 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.284 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.285 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.286 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.287 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.288 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.289 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.290 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.291 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.292 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.293 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.294 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.295 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.296 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.297 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.298 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.299 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.300 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.301 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.302 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.303 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.304 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.305 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.306 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.307 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.308 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.309 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.310 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.311 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.312 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.313 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.314 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.315 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.316 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.317 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.318 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.319 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.320 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.321 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.322 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.325 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.326 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.327 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.328 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.329 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.330 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.331 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.332 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.333 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.334 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.335 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.336 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.337 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.338 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.339 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.340 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.341 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.342 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.343 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.344 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.345 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.346 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.347 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.348 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.349 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.350 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.351 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.352 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.353 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.354 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.355 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.356 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.357 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.358 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.359 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.360 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.361 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.362 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.363 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.364 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.365 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.366 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.367 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.368 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.369 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.370 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.371 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.372 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.373 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.374 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.375 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.376 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.379 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.380 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.381 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.382 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.383 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.384 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.385 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.386 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.387 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.388 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.389 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.390 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.391 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.392 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.393 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.394 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.395 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.396 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.397 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.398 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.399 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.400 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.401 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.402 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.403 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.404 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.405 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.406 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.407 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.408 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.409 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.410 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.411 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.412 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.413 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.414 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.415 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.416 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.417 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.418 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.419 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.420 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.421 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.422 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.423 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.424 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.425 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.426 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.427 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.428 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.429 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.430 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1000 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1001 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1002 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1003 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1004 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1005 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1006 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.1007 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.9000 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.100000 COUNTER32 0
+1.3.6.1.2.1.2.2.1.10.100009 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.2 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.3 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.4 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.5 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.6 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.7 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.8 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.9 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.10 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.11 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.12 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.13 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.14 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.15 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.16 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.17 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.18 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.19 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.20 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.21 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.22 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.23 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.24 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.25 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.26 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.27 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.28 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.29 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.30 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.31 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.32 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.33 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.34 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.35 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.36 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.37 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.38 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.39 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.40 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.41 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.42 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.43 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.44 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.45 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.46 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.47 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.48 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.49 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.50 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.51 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.52 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.55 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.56 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.57 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.58 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.59 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.60 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.61 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.62 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.63 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.64 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.65 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.66 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.67 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.68 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.69 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.70 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.71 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.72 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.73 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.74 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.75 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.76 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.77 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.78 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.79 COUNTER32 31812681
+1.3.6.1.2.1.2.2.1.16.80 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.81 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.82 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.83 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.84 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.85 COUNTER32 71720394
+1.3.6.1.2.1.2.2.1.16.86 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.87 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.88 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.89 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.90 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.91 COUNTER32 1898575072
+1.3.6.1.2.1.2.2.1.16.92 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.93 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.94 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.95 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.96 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.97 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.98 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.99 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.100 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.101 COUNTER32 541764897
+1.3.6.1.2.1.2.2.1.16.102 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.103 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.104 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.105 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.106 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.109 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.110 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.111 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.112 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.113 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.114 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.115 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.116 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.117 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.118 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.119 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.120 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.121 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.122 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.123 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.124 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.125 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.126 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.127 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.128 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.129 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.130 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.131 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.132 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.133 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.134 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.135 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.136 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.137 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.138 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.139 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.140 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.141 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.142 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.143 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.144 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.145 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.146 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.147 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.148 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.149 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.150 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.151 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.152 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.153 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.154 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.155 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.156 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.157 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.158 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.159 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.160 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.163 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.164 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.165 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.166 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.167 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.168 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.169 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.170 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.171 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.172 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.173 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.174 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.175 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.176 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.177 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.178 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.179 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.180 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.181 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.182 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.183 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.184 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.185 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.186 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.187 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.188 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.189 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.190 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.191 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.192 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.193 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.194 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.195 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.196 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.197 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.198 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.199 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.200 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.201 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.202 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.203 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.204 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.205 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.206 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.207 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.208 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.209 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.210 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.211 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.212 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.213 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.214 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.217 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.218 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.219 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.220 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.221 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.222 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.223 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.224 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.225 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.226 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.227 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.228 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.229 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.230 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.231 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.232 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.233 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.234 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.235 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.236 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.237 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.238 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.239 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.240 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.241 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.242 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.243 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.244 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.245 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.246 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.247 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.248 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.249 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.250 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.251 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.252 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.253 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.254 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.255 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.256 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.257 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.258 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.259 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.260 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.261 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.262 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.263 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.264 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.265 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.266 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.267 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.268 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.271 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.272 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.273 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.274 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.275 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.276 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.277 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.278 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.279 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.280 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.281 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.282 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.283 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.284 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.285 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.286 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.287 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.288 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.289 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.290 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.291 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.292 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.293 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.294 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.295 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.296 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.297 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.298 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.299 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.300 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.301 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.302 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.303 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.304 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.305 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.306 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.307 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.308 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.309 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.310 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.311 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.312 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.313 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.314 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.315 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.316 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.317 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.318 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.319 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.320 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.321 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.322 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.325 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.326 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.327 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.328 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.329 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.330 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.331 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.332 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.333 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.334 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.335 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.336 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.337 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.338 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.339 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.340 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.341 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.342 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.343 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.344 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.345 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.346 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.347 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.348 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.349 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.350 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.351 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.352 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.353 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.354 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.355 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.356 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.357 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.358 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.359 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.360 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.361 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.362 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.363 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.364 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.365 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.366 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.367 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.368 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.369 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.370 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.371 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.372 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.373 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.374 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.375 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.376 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.379 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.380 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.381 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.382 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.383 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.384 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.385 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.386 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.387 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.388 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.389 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.390 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.391 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.392 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.393 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.394 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.395 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.396 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.397 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.398 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.399 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.400 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.401 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.402 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.403 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.404 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.405 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.406 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.407 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.408 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.409 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.410 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.411 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.412 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.413 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.414 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.415 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.416 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.417 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.418 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.419 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.420 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.421 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.422 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.423 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.424 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.425 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.426 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.427 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.428 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.429 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.430 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1000 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1001 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1002 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1003 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1004 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1005 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1006 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.1007 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.9000 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.100000 COUNTER32 0
+1.3.6.1.2.1.2.2.1.16.100009 COUNTER32 0
+1.3.6.1.2.1.6.10.0 COUNTER32 13
+1.3.6.1.2.1.7.1.0 COUNTER32 15301
+1.3.6.1.2.1.31.1.1.1.1.1 STRING "1/e1"
+1.3.6.1.2.1.31.1.1.1.1.2 STRING "1/e2"
+1.3.6.1.2.1.31.1.1.1.1.3 STRING "1/e3"
+1.3.6.1.2.1.31.1.1.1.1.4 STRING "1/e4"
+1.3.6.1.2.1.31.1.1.1.1.5 STRING "1/e5"
+1.3.6.1.2.1.31.1.1.1.1.6 STRING "1/e6"
+1.3.6.1.2.1.31.1.1.1.1.7 STRING "1/e7"
+1.3.6.1.2.1.31.1.1.1.1.8 STRING "1/e8"
+1.3.6.1.2.1.31.1.1.1.1.9 STRING "1/e9"
+1.3.6.1.2.1.31.1.1.1.1.10 STRING "1/e10"
+1.3.6.1.2.1.31.1.1.1.1.11 STRING "1/e11"
+1.3.6.1.2.1.31.1.1.1.1.12 STRING "1/e12"
+1.3.6.1.2.1.31.1.1.1.1.13 STRING "1/e13"
+1.3.6.1.2.1.31.1.1.1.1.14 STRING "1/e14"
+1.3.6.1.2.1.31.1.1.1.1.15 STRING "1/e15"
+1.3.6.1.2.1.31.1.1.1.1.16 STRING "1/e16"
+1.3.6.1.2.1.31.1.1.1.1.17 STRING "1/e17"
+1.3.6.1.2.1.31.1.1.1.1.18 STRING "1/e18"
+1.3.6.1.2.1.31.1.1.1.1.19 STRING "1/e19"
+1.3.6.1.2.1.31.1.1.1.1.20 STRING "1/e20"
+1.3.6.1.2.1.31.1.1.1.1.21 STRING "1/e21"
+1.3.6.1.2.1.31.1.1.1.1.22 STRING "1/e22"
+1.3.6.1.2.1.31.1.1.1.1.23 STRING "1/e23"
+1.3.6.1.2.1.31.1.1.1.1.24 STRING "1/e24"
+1.3.6.1.2.1.31.1.1.1.1.25 STRING "1/e25"
+1.3.6.1.2.1.31.1.1.1.1.26 STRING "1/e26"
+1.3.6.1.2.1.31.1.1.1.1.27 STRING "1/e27"
+1.3.6.1.2.1.31.1.1.1.1.28 STRING "1/e28"
+1.3.6.1.2.1.31.1.1.1.1.29 STRING "1/e29"
+1.3.6.1.2.1.31.1.1.1.1.30 STRING "1/e30"
+1.3.6.1.2.1.31.1.1.1.1.31 STRING "1/e31"
+1.3.6.1.2.1.31.1.1.1.1.32 STRING "1/e32"
+1.3.6.1.2.1.31.1.1.1.1.33 STRING "1/e33"
+1.3.6.1.2.1.31.1.1.1.1.34 STRING "1/e34"
+1.3.6.1.2.1.31.1.1.1.1.35 STRING "1/e35"
+1.3.6.1.2.1.31.1.1.1.1.36 STRING "1/e36"
+1.3.6.1.2.1.31.1.1.1.1.37 STRING "1/e37"
+1.3.6.1.2.1.31.1.1.1.1.38 STRING "1/e38"
+1.3.6.1.2.1.31.1.1.1.1.39 STRING "1/e39"
+1.3.6.1.2.1.31.1.1.1.1.40 STRING "1/e40"
+1.3.6.1.2.1.31.1.1.1.1.41 STRING "1/e41"
+1.3.6.1.2.1.31.1.1.1.1.42 STRING "1/e42"
+1.3.6.1.2.1.31.1.1.1.1.43 STRING "1/e43"
+1.3.6.1.2.1.31.1.1.1.1.44 STRING "1/e44"
+1.3.6.1.2.1.31.1.1.1.1.45 STRING "1/e45"
+1.3.6.1.2.1.31.1.1.1.1.46 STRING "1/e46"
+1.3.6.1.2.1.31.1.1.1.1.47 STRING "1/e47"
+1.3.6.1.2.1.31.1.1.1.1.48 STRING "1/e48"
+1.3.6.1.2.1.31.1.1.1.1.49 STRING "1/g1"
+1.3.6.1.2.1.31.1.1.1.1.50 STRING "1/g2"
+1.3.6.1.2.1.31.1.1.1.1.51 STRING "1/g3"
+1.3.6.1.2.1.31.1.1.1.1.52 STRING "1/g4"
+1.3.6.1.2.1.31.1.1.1.1.55 STRING "2/e1"
+1.3.6.1.2.1.31.1.1.1.1.56 STRING "2/e2"
+1.3.6.1.2.1.31.1.1.1.1.57 STRING "2/e3"
+1.3.6.1.2.1.31.1.1.1.1.58 STRING "2/e4"
+1.3.6.1.2.1.31.1.1.1.1.59 STRING "2/e5"
+1.3.6.1.2.1.31.1.1.1.1.60 STRING "2/e6"
+1.3.6.1.2.1.31.1.1.1.1.61 STRING "2/e7"
+1.3.6.1.2.1.31.1.1.1.1.62 STRING "2/e8"
+1.3.6.1.2.1.31.1.1.1.1.63 STRING "2/e9"
+1.3.6.1.2.1.31.1.1.1.1.64 STRING "2/e10"
+1.3.6.1.2.1.31.1.1.1.1.65 STRING "2/e11"
+1.3.6.1.2.1.31.1.1.1.1.66 STRING "2/e12"
+1.3.6.1.2.1.31.1.1.1.1.67 STRING "2/e13"
+1.3.6.1.2.1.31.1.1.1.1.68 STRING "2/e14"
+1.3.6.1.2.1.31.1.1.1.1.69 STRING "2/e15"
+1.3.6.1.2.1.31.1.1.1.1.70 STRING "2/e16"
+1.3.6.1.2.1.31.1.1.1.1.71 STRING "2/e17"
+1.3.6.1.2.1.31.1.1.1.1.72 STRING "2/e18"
+1.3.6.1.2.1.31.1.1.1.1.73 STRING "2/e19"
+1.3.6.1.2.1.31.1.1.1.1.74 STRING "2/e20"
+1.3.6.1.2.1.31.1.1.1.1.75 STRING "2/e21"
+1.3.6.1.2.1.31.1.1.1.1.76 STRING "2/e22"
+1.3.6.1.2.1.31.1.1.1.1.77 STRING "2/e23"
+1.3.6.1.2.1.31.1.1.1.1.78 STRING "2/e24"
+1.3.6.1.2.1.31.1.1.1.1.79 STRING "2/e25"
+1.3.6.1.2.1.31.1.1.1.1.80 STRING "2/e26"
+1.3.6.1.2.1.31.1.1.1.1.81 STRING "2/e27"
+1.3.6.1.2.1.31.1.1.1.1.82 STRING "2/e28"
+1.3.6.1.2.1.31.1.1.1.1.83 STRING "2/e29"
+1.3.6.1.2.1.31.1.1.1.1.84 STRING "2/e30"
+1.3.6.1.2.1.31.1.1.1.1.85 STRING "2/e31"
+1.3.6.1.2.1.31.1.1.1.1.86 STRING "2/e32"
+1.3.6.1.2.1.31.1.1.1.1.87 STRING "2/e33"
+1.3.6.1.2.1.31.1.1.1.1.88 STRING "2/e34"
+1.3.6.1.2.1.31.1.1.1.1.89 STRING "2/e35"
+1.3.6.1.2.1.31.1.1.1.1.90 STRING "2/e36"
+1.3.6.1.2.1.31.1.1.1.1.91 STRING "2/e37"
+1.3.6.1.2.1.31.1.1.1.1.92 STRING "2/e38"
+1.3.6.1.2.1.31.1.1.1.1.93 STRING "2/e39"
+1.3.6.1.2.1.31.1.1.1.1.94 STRING "2/e40"
+1.3.6.1.2.1.31.1.1.1.1.95 STRING "2/e41"
+1.3.6.1.2.1.31.1.1.1.1.96 STRING "2/e42"
+1.3.6.1.2.1.31.1.1.1.1.97 STRING "2/e43"
+1.3.6.1.2.1.31.1.1.1.1.98 STRING "2/e44"
+1.3.6.1.2.1.31.1.1.1.1.99 STRING "2/e45"
+1.3.6.1.2.1.31.1.1.1.1.100 STRING "2/e46"
+1.3.6.1.2.1.31.1.1.1.1.101 STRING "2/e47"
+1.3.6.1.2.1.31.1.1.1.1.102 STRING "2/e48"
+1.3.6.1.2.1.31.1.1.1.1.103 STRING "2/g1"
+1.3.6.1.2.1.31.1.1.1.1.104 STRING "2/g2"
+1.3.6.1.2.1.31.1.1.1.1.105 STRING "2/g3"
+1.3.6.1.2.1.31.1.1.1.1.106 STRING "2/g4"
+1.3.6.1.2.1.31.1.1.1.1.109 STRING "3/e1"
+1.3.6.1.2.1.31.1.1.1.1.110 STRING "3/e2"
+1.3.6.1.2.1.31.1.1.1.1.111 STRING "3/e3"
+1.3.6.1.2.1.31.1.1.1.1.112 STRING "3/e4"
+1.3.6.1.2.1.31.1.1.1.1.113 STRING "3/e5"
+1.3.6.1.2.1.31.1.1.1.1.114 STRING "3/e6"
+1.3.6.1.2.1.31.1.1.1.1.115 STRING "3/e7"
+1.3.6.1.2.1.31.1.1.1.1.116 STRING "3/e8"
+1.3.6.1.2.1.31.1.1.1.1.117 STRING "3/e9"
+1.3.6.1.2.1.31.1.1.1.1.118 STRING "3/e10"
+1.3.6.1.2.1.31.1.1.1.1.119 STRING "3/e11"
+1.3.6.1.2.1.31.1.1.1.1.120 STRING "3/e12"
+1.3.6.1.2.1.31.1.1.1.1.121 STRING "3/e13"
+1.3.6.1.2.1.31.1.1.1.1.122 STRING "3/e14"
+1.3.6.1.2.1.31.1.1.1.1.123 STRING "3/e15"
+1.3.6.1.2.1.31.1.1.1.1.124 STRING "3/e16"
+1.3.6.1.2.1.31.1.1.1.1.125 STRING "3/e17"
+1.3.6.1.2.1.31.1.1.1.1.126 STRING "3/e18"
+1.3.6.1.2.1.31.1.1.1.1.127 STRING "3/e19"
+1.3.6.1.2.1.31.1.1.1.1.128 STRING "3/e20"
+1.3.6.1.2.1.31.1.1.1.1.129 STRING "3/e21"
+1.3.6.1.2.1.31.1.1.1.1.130 STRING "3/e22"
+1.3.6.1.2.1.31.1.1.1.1.131 STRING "3/e23"
+1.3.6.1.2.1.31.1.1.1.1.132 STRING "3/e24"
+1.3.6.1.2.1.31.1.1.1.1.133 STRING "3/e25"
+1.3.6.1.2.1.31.1.1.1.1.134 STRING "3/e26"
+1.3.6.1.2.1.31.1.1.1.1.135 STRING "3/e27"
+1.3.6.1.2.1.31.1.1.1.1.136 STRING "3/e28"
+1.3.6.1.2.1.31.1.1.1.1.137 STRING "3/e29"
+1.3.6.1.2.1.31.1.1.1.1.138 STRING "3/e30"
+1.3.6.1.2.1.31.1.1.1.1.139 STRING "3/e31"
+1.3.6.1.2.1.31.1.1.1.1.140 STRING "3/e32"
+1.3.6.1.2.1.31.1.1.1.1.141 STRING "3/e33"
+1.3.6.1.2.1.31.1.1.1.1.142 STRING "3/e34"
+1.3.6.1.2.1.31.1.1.1.1.143 STRING "3/e35"
+1.3.6.1.2.1.31.1.1.1.1.144 STRING "3/e36"
+1.3.6.1.2.1.31.1.1.1.1.145 STRING "3/e37"
+1.3.6.1.2.1.31.1.1.1.1.146 STRING "3/e38"
+1.3.6.1.2.1.31.1.1.1.1.147 STRING "3/e39"
+1.3.6.1.2.1.31.1.1.1.1.148 STRING "3/e40"
+1.3.6.1.2.1.31.1.1.1.1.149 STRING "3/e41"
+1.3.6.1.2.1.31.1.1.1.1.150 STRING "3/e42"
+1.3.6.1.2.1.31.1.1.1.1.151 STRING "3/e43"
+1.3.6.1.2.1.31.1.1.1.1.152 STRING "3/e44"
+1.3.6.1.2.1.31.1.1.1.1.153 STRING "3/e45"
+1.3.6.1.2.1.31.1.1.1.1.154 STRING "3/e46"
+1.3.6.1.2.1.31.1.1.1.1.155 STRING "3/e47"
+1.3.6.1.2.1.31.1.1.1.1.156 STRING "3/e48"
+1.3.6.1.2.1.31.1.1.1.1.157 STRING "3/g1"
+1.3.6.1.2.1.31.1.1.1.1.158 STRING "3/g2"
+1.3.6.1.2.1.31.1.1.1.1.159 STRING "3/g3"
+1.3.6.1.2.1.31.1.1.1.1.160 STRING "3/g4"
+1.3.6.1.2.1.31.1.1.1.1.163 STRING "4/e1"
+1.3.6.1.2.1.31.1.1.1.1.164 STRING "4/e2"
+1.3.6.1.2.1.31.1.1.1.1.165 STRING "4/e3"
+1.3.6.1.2.1.31.1.1.1.1.166 STRING "4/e4"
+1.3.6.1.2.1.31.1.1.1.1.167 STRING "4/e5"
+1.3.6.1.2.1.31.1.1.1.1.168 STRING "4/e6"
+1.3.6.1.2.1.31.1.1.1.1.169 STRING "4/e7"
+1.3.6.1.2.1.31.1.1.1.1.170 STRING "4/e8"
+1.3.6.1.2.1.31.1.1.1.1.171 STRING "4/e9"
+1.3.6.1.2.1.31.1.1.1.1.172 STRING "4/e10"
+1.3.6.1.2.1.31.1.1.1.1.173 STRING "4/e11"
+1.3.6.1.2.1.31.1.1.1.1.174 STRING "4/e12"
+1.3.6.1.2.1.31.1.1.1.1.175 STRING "4/e13"
+1.3.6.1.2.1.31.1.1.1.1.176 STRING "4/e14"
+1.3.6.1.2.1.31.1.1.1.1.177 STRING "4/e15"
+1.3.6.1.2.1.31.1.1.1.1.178 STRING "4/e16"
+1.3.6.1.2.1.31.1.1.1.1.179 STRING "4/e17"
+1.3.6.1.2.1.31.1.1.1.1.180 STRING "4/e18"
+1.3.6.1.2.1.31.1.1.1.1.181 STRING "4/e19"
+1.3.6.1.2.1.31.1.1.1.1.182 STRING "4/e20"
+1.3.6.1.2.1.31.1.1.1.1.183 STRING "4/e21"
+1.3.6.1.2.1.31.1.1.1.1.184 STRING "4/e22"
+1.3.6.1.2.1.31.1.1.1.1.185 STRING "4/e23"
+1.3.6.1.2.1.31.1.1.1.1.186 STRING "4/e24"
+1.3.6.1.2.1.31.1.1.1.1.187 STRING "4/e25"
+1.3.6.1.2.1.31.1.1.1.1.188 STRING "4/e26"
+1.3.6.1.2.1.31.1.1.1.1.189 STRING "4/e27"
+1.3.6.1.2.1.31.1.1.1.1.190 STRING "4/e28"
+1.3.6.1.2.1.31.1.1.1.1.191 STRING "4/e29"
+1.3.6.1.2.1.31.1.1.1.1.192 STRING "4/e30"
+1.3.6.1.2.1.31.1.1.1.1.193 STRING "4/e31"
+1.3.6.1.2.1.31.1.1.1.1.194 STRING "4/e32"
+1.3.6.1.2.1.31.1.1.1.1.195 STRING "4/e33"
+1.3.6.1.2.1.31.1.1.1.1.196 STRING "4/e34"
+1.3.6.1.2.1.31.1.1.1.1.197 STRING "4/e35"
+1.3.6.1.2.1.31.1.1.1.1.198 STRING "4/e36"
+1.3.6.1.2.1.31.1.1.1.1.199 STRING "4/e37"
+1.3.6.1.2.1.31.1.1.1.1.200 STRING "4/e38"
+1.3.6.1.2.1.31.1.1.1.1.201 STRING "4/e39"
+1.3.6.1.2.1.31.1.1.1.1.202 STRING "4/e40"
+1.3.6.1.2.1.31.1.1.1.1.203 STRING "4/e41"
+1.3.6.1.2.1.31.1.1.1.1.204 STRING "4/e42"
+1.3.6.1.2.1.31.1.1.1.1.205 STRING "4/e43"
+1.3.6.1.2.1.31.1.1.1.1.206 STRING "4/e44"
+1.3.6.1.2.1.31.1.1.1.1.207 STRING "4/e45"
+1.3.6.1.2.1.31.1.1.1.1.208 STRING "4/e46"
+1.3.6.1.2.1.31.1.1.1.1.209 STRING "4/e47"
+1.3.6.1.2.1.31.1.1.1.1.210 STRING "4/e48"
+1.3.6.1.2.1.31.1.1.1.1.211 STRING "4/g1"
+1.3.6.1.2.1.31.1.1.1.1.212 STRING "4/g2"
+1.3.6.1.2.1.31.1.1.1.1.213 STRING "4/g3"
+1.3.6.1.2.1.31.1.1.1.1.214 STRING "4/g4"
+1.3.6.1.2.1.31.1.1.1.1.217 STRING "5/e1"
+1.3.6.1.2.1.31.1.1.1.1.218 STRING "5/e2"
+1.3.6.1.2.1.31.1.1.1.1.219 STRING "5/e3"
+1.3.6.1.2.1.31.1.1.1.1.220 STRING "5/e4"
+1.3.6.1.2.1.31.1.1.1.1.221 STRING "5/e5"
+1.3.6.1.2.1.31.1.1.1.1.222 STRING "5/e6"
+1.3.6.1.2.1.31.1.1.1.1.223 STRING "5/e7"
+1.3.6.1.2.1.31.1.1.1.1.224 STRING "5/e8"
+1.3.6.1.2.1.31.1.1.1.1.225 STRING "5/e9"
+1.3.6.1.2.1.31.1.1.1.1.226 STRING "5/e10"
+1.3.6.1.2.1.31.1.1.1.1.227 STRING "5/e11"
+1.3.6.1.2.1.31.1.1.1.1.228 STRING "5/e12"
+1.3.6.1.2.1.31.1.1.1.1.229 STRING "5/e13"
+1.3.6.1.2.1.31.1.1.1.1.230 STRING "5/e14"
+1.3.6.1.2.1.31.1.1.1.1.231 STRING "5/e15"
+1.3.6.1.2.1.31.1.1.1.1.232 STRING "5/e16"
+1.3.6.1.2.1.31.1.1.1.1.233 STRING "5/e17"
+1.3.6.1.2.1.31.1.1.1.1.234 STRING "5/e18"
+1.3.6.1.2.1.31.1.1.1.1.235 STRING "5/e19"
+1.3.6.1.2.1.31.1.1.1.1.236 STRING "5/e20"
+1.3.6.1.2.1.31.1.1.1.1.237 STRING "5/e21"
+1.3.6.1.2.1.31.1.1.1.1.238 STRING "5/e22"
+1.3.6.1.2.1.31.1.1.1.1.239 STRING "5/e23"
+1.3.6.1.2.1.31.1.1.1.1.240 STRING "5/e24"
+1.3.6.1.2.1.31.1.1.1.1.241 STRING "5/e25"
+1.3.6.1.2.1.31.1.1.1.1.242 STRING "5/e26"
+1.3.6.1.2.1.31.1.1.1.1.243 STRING "5/e27"
+1.3.6.1.2.1.31.1.1.1.1.244 STRING "5/e28"
+1.3.6.1.2.1.31.1.1.1.1.245 STRING "5/e29"
+1.3.6.1.2.1.31.1.1.1.1.246 STRING "5/e30"
+1.3.6.1.2.1.31.1.1.1.1.247 STRING "5/e31"
+1.3.6.1.2.1.31.1.1.1.1.248 STRING "5/e32"
+1.3.6.1.2.1.31.1.1.1.1.249 STRING "5/e33"
+1.3.6.1.2.1.31.1.1.1.1.250 STRING "5/e34"
+1.3.6.1.2.1.31.1.1.1.1.251 STRING "5/e35"
+1.3.6.1.2.1.31.1.1.1.1.252 STRING "5/e36"
+1.3.6.1.2.1.31.1.1.1.1.253 STRING "5/e37"
+1.3.6.1.2.1.31.1.1.1.1.254 STRING "5/e38"
+1.3.6.1.2.1.31.1.1.1.1.255 STRING "5/e39"
+1.3.6.1.2.1.31.1.1.1.1.256 STRING "5/e40"
+1.3.6.1.2.1.31.1.1.1.1.257 STRING "5/e41"
+1.3.6.1.2.1.31.1.1.1.1.258 STRING "5/e42"
+1.3.6.1.2.1.31.1.1.1.1.259 STRING "5/e43"
+1.3.6.1.2.1.31.1.1.1.1.260 STRING "5/e44"
+1.3.6.1.2.1.31.1.1.1.1.261 STRING "5/e45"
+1.3.6.1.2.1.31.1.1.1.1.262 STRING "5/e46"
+1.3.6.1.2.1.31.1.1.1.1.263 STRING "5/e47"
+1.3.6.1.2.1.31.1.1.1.1.264 STRING "5/e48"
+1.3.6.1.2.1.31.1.1.1.1.265 STRING "5/g1"
+1.3.6.1.2.1.31.1.1.1.1.266 STRING "5/g2"
+1.3.6.1.2.1.31.1.1.1.1.267 STRING "5/g3"
+1.3.6.1.2.1.31.1.1.1.1.268 STRING "5/g4"
+1.3.6.1.2.1.31.1.1.1.1.271 STRING "6/e1"
+1.3.6.1.2.1.31.1.1.1.1.272 STRING "6/e2"
+1.3.6.1.2.1.31.1.1.1.1.273 STRING "6/e3"
+1.3.6.1.2.1.31.1.1.1.1.274 STRING "6/e4"
+1.3.6.1.2.1.31.1.1.1.1.275 STRING "6/e5"
+1.3.6.1.2.1.31.1.1.1.1.276 STRING "6/e6"
+1.3.6.1.2.1.31.1.1.1.1.277 STRING "6/e7"
+1.3.6.1.2.1.31.1.1.1.1.278 STRING "6/e8"
+1.3.6.1.2.1.31.1.1.1.1.279 STRING "6/e9"
+1.3.6.1.2.1.31.1.1.1.1.280 STRING "6/e10"
+1.3.6.1.2.1.31.1.1.1.1.281 STRING "6/e11"
+1.3.6.1.2.1.31.1.1.1.1.282 STRING "6/e12"
+1.3.6.1.2.1.31.1.1.1.1.283 STRING "6/e13"
+1.3.6.1.2.1.31.1.1.1.1.284 STRING "6/e14"
+1.3.6.1.2.1.31.1.1.1.1.285 STRING "6/e15"
+1.3.6.1.2.1.31.1.1.1.1.286 STRING "6/e16"
+1.3.6.1.2.1.31.1.1.1.1.287 STRING "6/e17"
+1.3.6.1.2.1.31.1.1.1.1.288 STRING "6/e18"
+1.3.6.1.2.1.31.1.1.1.1.289 STRING "6/e19"
+1.3.6.1.2.1.31.1.1.1.1.290 STRING "6/e20"
+1.3.6.1.2.1.31.1.1.1.1.291 STRING "6/e21"
+1.3.6.1.2.1.31.1.1.1.1.292 STRING "6/e22"
+1.3.6.1.2.1.31.1.1.1.1.293 STRING "6/e23"
+1.3.6.1.2.1.31.1.1.1.1.294 STRING "6/e24"
+1.3.6.1.2.1.31.1.1.1.1.295 STRING "6/e25"
+1.3.6.1.2.1.31.1.1.1.1.296 STRING "6/e26"
+1.3.6.1.2.1.31.1.1.1.1.297 STRING "6/e27"
+1.3.6.1.2.1.31.1.1.1.1.298 STRING "6/e28"
+1.3.6.1.2.1.31.1.1.1.1.299 STRING "6/e29"
+1.3.6.1.2.1.31.1.1.1.1.300 STRING "6/e30"
+1.3.6.1.2.1.31.1.1.1.1.301 STRING "6/e31"
+1.3.6.1.2.1.31.1.1.1.1.302 STRING "6/e32"
+1.3.6.1.2.1.31.1.1.1.1.303 STRING "6/e33"
+1.3.6.1.2.1.31.1.1.1.1.304 STRING "6/e34"
+1.3.6.1.2.1.31.1.1.1.1.305 STRING "6/e35"
+1.3.6.1.2.1.31.1.1.1.1.306 STRING "6/e36"
+1.3.6.1.2.1.31.1.1.1.1.307 STRING "6/e37"
+1.3.6.1.2.1.31.1.1.1.1.308 STRING "6/e38"
+1.3.6.1.2.1.31.1.1.1.1.309 STRING "6/e39"
+1.3.6.1.2.1.31.1.1.1.1.310 STRING "6/e40"
+1.3.6.1.2.1.31.1.1.1.1.311 STRING "6/e41"
+1.3.6.1.2.1.31.1.1.1.1.312 STRING "6/e42"
+1.3.6.1.2.1.31.1.1.1.1.313 STRING "6/e43"
+1.3.6.1.2.1.31.1.1.1.1.314 STRING "6/e44"
+1.3.6.1.2.1.31.1.1.1.1.315 STRING "6/e45"
+1.3.6.1.2.1.31.1.1.1.1.316 STRING "6/e46"
+1.3.6.1.2.1.31.1.1.1.1.317 STRING "6/e47"
+1.3.6.1.2.1.31.1.1.1.1.318 STRING "6/e48"
+1.3.6.1.2.1.31.1.1.1.1.319 STRING "6/g1"
+1.3.6.1.2.1.31.1.1.1.1.320 STRING "6/g2"
+1.3.6.1.2.1.31.1.1.1.1.321 STRING "6/g3"
+1.3.6.1.2.1.31.1.1.1.1.322 STRING "6/g4"
+1.3.6.1.2.1.31.1.1.1.1.325 STRING "7/e1"
+1.3.6.1.2.1.31.1.1.1.1.326 STRING "7/e2"
+1.3.6.1.2.1.31.1.1.1.1.327 STRING "7/e3"
+1.3.6.1.2.1.31.1.1.1.1.328 STRING "7/e4"
+1.3.6.1.2.1.31.1.1.1.1.329 STRING "7/e5"
+1.3.6.1.2.1.31.1.1.1.1.330 STRING "7/e6"
+1.3.6.1.2.1.31.1.1.1.1.331 STRING "7/e7"
+1.3.6.1.2.1.31.1.1.1.1.332 STRING "7/e8"
+1.3.6.1.2.1.31.1.1.1.1.333 STRING "7/e9"
+1.3.6.1.2.1.31.1.1.1.1.334 STRING "7/e10"
+1.3.6.1.2.1.31.1.1.1.1.335 STRING "7/e11"
+1.3.6.1.2.1.31.1.1.1.1.336 STRING "7/e12"
+1.3.6.1.2.1.31.1.1.1.1.337 STRING "7/e13"
+1.3.6.1.2.1.31.1.1.1.1.338 STRING "7/e14"
+1.3.6.1.2.1.31.1.1.1.1.339 STRING "7/e15"
+1.3.6.1.2.1.31.1.1.1.1.340 STRING "7/e16"
+1.3.6.1.2.1.31.1.1.1.1.341 STRING "7/e17"
+1.3.6.1.2.1.31.1.1.1.1.342 STRING "7/e18"
+1.3.6.1.2.1.31.1.1.1.1.343 STRING "7/e19"
+1.3.6.1.2.1.31.1.1.1.1.344 STRING "7/e20"
+1.3.6.1.2.1.31.1.1.1.1.345 STRING "7/e21"
+1.3.6.1.2.1.31.1.1.1.1.346 STRING "7/e22"
+1.3.6.1.2.1.31.1.1.1.1.347 STRING "7/e23"
+1.3.6.1.2.1.31.1.1.1.1.348 STRING "7/e24"
+1.3.6.1.2.1.31.1.1.1.1.349 STRING "7/e25"
+1.3.6.1.2.1.31.1.1.1.1.350 STRING "7/e26"
+1.3.6.1.2.1.31.1.1.1.1.351 STRING "7/e27"
+1.3.6.1.2.1.31.1.1.1.1.352 STRING "7/e28"
+1.3.6.1.2.1.31.1.1.1.1.353 STRING "7/e29"
+1.3.6.1.2.1.31.1.1.1.1.354 STRING "7/e30"
+1.3.6.1.2.1.31.1.1.1.1.355 STRING "7/e31"
+1.3.6.1.2.1.31.1.1.1.1.356 STRING "7/e32"
+1.3.6.1.2.1.31.1.1.1.1.357 STRING "7/e33"
+1.3.6.1.2.1.31.1.1.1.1.358 STRING "7/e34"
+1.3.6.1.2.1.31.1.1.1.1.359 STRING "7/e35"
+1.3.6.1.2.1.31.1.1.1.1.360 STRING "7/e36"
+1.3.6.1.2.1.31.1.1.1.1.361 STRING "7/e37"
+1.3.6.1.2.1.31.1.1.1.1.362 STRING "7/e38"
+1.3.6.1.2.1.31.1.1.1.1.363 STRING "7/e39"
+1.3.6.1.2.1.31.1.1.1.1.364 STRING "7/e40"
+1.3.6.1.2.1.31.1.1.1.1.365 STRING "7/e41"
+1.3.6.1.2.1.31.1.1.1.1.366 STRING "7/e42"
+1.3.6.1.2.1.31.1.1.1.1.367 STRING "7/e43"
+1.3.6.1.2.1.31.1.1.1.1.368 STRING "7/e44"
+1.3.6.1.2.1.31.1.1.1.1.369 STRING "7/e45"
+1.3.6.1.2.1.31.1.1.1.1.370 STRING "7/e46"
+1.3.6.1.2.1.31.1.1.1.1.371 STRING "7/e47"
+1.3.6.1.2.1.31.1.1.1.1.372 STRING "7/e48"
+1.3.6.1.2.1.31.1.1.1.1.373 STRING "7/g1"
+1.3.6.1.2.1.31.1.1.1.1.374 STRING "7/g2"
+1.3.6.1.2.1.31.1.1.1.1.375 STRING "7/g3"
+1.3.6.1.2.1.31.1.1.1.1.376 STRING "7/g4"
+1.3.6.1.2.1.31.1.1.1.1.379 STRING "8/e1"
+1.3.6.1.2.1.31.1.1.1.1.380 STRING "8/e2"
+1.3.6.1.2.1.31.1.1.1.1.381 STRING "8/e3"
+1.3.6.1.2.1.31.1.1.1.1.382 STRING "8/e4"
+1.3.6.1.2.1.31.1.1.1.1.383 STRING "8/e5"
+1.3.6.1.2.1.31.1.1.1.1.384 STRING "8/e6"
+1.3.6.1.2.1.31.1.1.1.1.385 STRING "8/e7"
+1.3.6.1.2.1.31.1.1.1.1.386 STRING "8/e8"
+1.3.6.1.2.1.31.1.1.1.1.387 STRING "8/e9"
+1.3.6.1.2.1.31.1.1.1.1.388 STRING "8/e10"
+1.3.6.1.2.1.31.1.1.1.1.389 STRING "8/e11"
+1.3.6.1.2.1.31.1.1.1.1.390 STRING "8/e12"
+1.3.6.1.2.1.31.1.1.1.1.391 STRING "8/e13"
+1.3.6.1.2.1.31.1.1.1.1.392 STRING "8/e14"
+1.3.6.1.2.1.31.1.1.1.1.393 STRING "8/e15"
+1.3.6.1.2.1.31.1.1.1.1.394 STRING "8/e16"
+1.3.6.1.2.1.31.1.1.1.1.395 STRING "8/e17"
+1.3.6.1.2.1.31.1.1.1.1.396 STRING "8/e18"
+1.3.6.1.2.1.31.1.1.1.1.397 STRING "8/e19"
+1.3.6.1.2.1.31.1.1.1.1.398 STRING "8/e20"
+1.3.6.1.2.1.31.1.1.1.1.399 STRING "8/e21"
+1.3.6.1.2.1.31.1.1.1.1.400 STRING "8/e22"
+1.3.6.1.2.1.31.1.1.1.1.401 STRING "8/e23"
+1.3.6.1.2.1.31.1.1.1.1.402 STRING "8/e24"
+1.3.6.1.2.1.31.1.1.1.1.403 STRING "8/e25"
+1.3.6.1.2.1.31.1.1.1.1.404 STRING "8/e26"
+1.3.6.1.2.1.31.1.1.1.1.405 STRING "8/e27"
+1.3.6.1.2.1.31.1.1.1.1.406 STRING "8/e28"
+1.3.6.1.2.1.31.1.1.1.1.407 STRING "8/e29"
+1.3.6.1.2.1.31.1.1.1.1.408 STRING "8/e30"
+1.3.6.1.2.1.31.1.1.1.1.409 STRING "8/e31"
+1.3.6.1.2.1.31.1.1.1.1.410 STRING "8/e32"
+1.3.6.1.2.1.31.1.1.1.1.411 STRING "8/e33"
+1.3.6.1.2.1.31.1.1.1.1.412 STRING "8/e34"
+1.3.6.1.2.1.31.1.1.1.1.413 STRING "8/e35"
+1.3.6.1.2.1.31.1.1.1.1.414 STRING "8/e36"
+1.3.6.1.2.1.31.1.1.1.1.415 STRING "8/e37"
+1.3.6.1.2.1.31.1.1.1.1.416 STRING "8/e38"
+1.3.6.1.2.1.31.1.1.1.1.417 STRING "8/e39"
+1.3.6.1.2.1.31.1.1.1.1.418 STRING "8/e40"
+1.3.6.1.2.1.31.1.1.1.1.419 STRING "8/e41"
+1.3.6.1.2.1.31.1.1.1.1.420 STRING "8/e42"
+1.3.6.1.2.1.31.1.1.1.1.421 STRING "8/e43"
+1.3.6.1.2.1.31.1.1.1.1.422 STRING "8/e44"
+1.3.6.1.2.1.31.1.1.1.1.423 STRING "8/e45"
+1.3.6.1.2.1.31.1.1.1.1.424 STRING "8/e46"
+1.3.6.1.2.1.31.1.1.1.1.425 STRING "8/e47"
+1.3.6.1.2.1.31.1.1.1.1.426 STRING "8/e48"
+1.3.6.1.2.1.31.1.1.1.1.427 STRING "8/g1"
+1.3.6.1.2.1.31.1.1.1.1.428 STRING "8/g2"
+1.3.6.1.2.1.31.1.1.1.1.429 STRING "8/g3"
+1.3.6.1.2.1.31.1.1.1.1.430 STRING "8/g4"
+1.3.6.1.2.1.31.1.1.1.1.1000 STRING "ch1"
+1.3.6.1.2.1.31.1.1.1.1.1001 STRING "ch2"
+1.3.6.1.2.1.31.1.1.1.1.1002 STRING "ch3"
+1.3.6.1.2.1.31.1.1.1.1.1003 STRING "ch4"
+1.3.6.1.2.1.31.1.1.1.1.1004 STRING "ch5"
+1.3.6.1.2.1.31.1.1.1.1.1005 STRING "ch6"
+1.3.6.1.2.1.31.1.1.1.1.1006 STRING "ch7"
+1.3.6.1.2.1.31.1.1.1.1.1007 STRING "ch8"
+1.3.6.1.2.1.31.1.1.1.1.9000 STRING "stack-port"
+1.3.6.1.2.1.31.1.1.1.1.100000 STRING "1"
+1.3.6.1.2.1.31.1.1.1.1.100009 STRING "10"
+1.3.6.1.2.1.31.1.1.1.6.1 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.2 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.3 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.4 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.5 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.6 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.7 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.8 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.9 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.10 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.11 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.12 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.13 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.14 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.15 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.16 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.17 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.18 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.19 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.20 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.21 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.22 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.23 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.24 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.25 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.26 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.27 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.28 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.29 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.30 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.31 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.32 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.33 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.34 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.35 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.36 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.37 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.38 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.39 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.40 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.41 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.42 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.43 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.44 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.45 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.46 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.47 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.48 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.49 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.50 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.51 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.52 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.55 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.56 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.57 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.58 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.59 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.60 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.61 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.62 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.63 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.64 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.65 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.66 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.67 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.68 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.69 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.70 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.71 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.72 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.73 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.74 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.75 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.76 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.77 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.78 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.79 COUNTER64 13278754
+1.3.6.1.2.1.31.1.1.1.6.80 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.81 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.82 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.83 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.84 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.85 COUNTER64 8630586
+1.3.6.1.2.1.31.1.1.1.6.86 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.87 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.88 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.89 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.90 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.91 COUNTER64 540948801
+1.3.6.1.2.1.31.1.1.1.6.92 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.93 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.94 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.95 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.96 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.97 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.98 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.99 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.100 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.101 COUNTER64 1981326312
+1.3.6.1.2.1.31.1.1.1.6.102 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.103 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.104 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.105 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.106 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.109 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.110 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.111 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.112 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.113 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.114 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.115 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.116 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.117 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.118 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.119 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.120 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.121 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.122 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.123 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.124 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.125 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.126 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.127 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.128 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.129 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.130 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.131 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.132 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.133 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.134 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.135 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.136 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.137 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.138 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.139 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.140 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.141 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.142 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.143 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.144 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.145 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.146 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.147 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.148 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.149 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.150 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.151 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.152 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.153 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.154 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.155 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.156 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.157 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.158 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.159 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.160 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.163 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.164 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.165 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.166 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.167 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.168 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.169 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.170 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.171 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.172 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.173 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.174 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.175 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.176 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.177 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.178 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.179 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.180 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.181 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.182 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.183 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.184 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.185 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.186 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.187 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.188 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.189 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.190 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.191 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.192 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.193 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.194 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.195 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.196 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.197 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.198 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.199 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.200 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.201 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.202 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.203 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.204 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.205 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.206 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.207 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.208 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.209 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.210 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.211 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.212 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.213 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.214 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.217 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.218 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.219 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.220 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.221 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.222 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.223 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.224 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.225 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.226 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.227 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.228 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.229 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.230 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.231 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.232 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.233 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.234 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.235 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.236 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.237 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.238 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.239 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.240 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.241 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.242 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.243 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.244 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.245 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.246 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.247 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.248 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.249 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.250 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.251 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.252 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.253 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.254 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.255 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.256 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.257 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.258 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.259 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.260 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.261 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.262 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.263 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.264 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.265 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.266 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.267 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.268 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.271 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.272 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.273 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.274 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.275 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.276 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.277 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.278 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.279 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.280 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.281 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.282 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.283 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.284 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.285 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.286 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.287 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.288 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.289 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.290 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.291 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.292 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.293 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.294 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.295 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.296 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.297 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.298 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.299 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.300 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.301 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.302 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.303 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.304 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.305 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.306 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.307 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.308 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.309 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.310 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.311 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.312 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.313 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.314 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.315 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.316 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.317 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.318 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.319 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.320 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.321 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.322 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.325 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.326 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.327 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.328 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.329 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.330 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.331 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.332 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.333 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.334 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.335 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.336 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.337 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.338 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.339 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.340 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.341 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.342 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.343 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.344 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.345 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.346 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.347 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.348 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.349 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.350 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.351 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.352 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.353 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.354 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.355 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.356 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.357 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.358 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.359 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.360 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.361 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.362 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.363 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.364 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.365 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.366 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.367 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.368 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.369 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.370 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.371 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.372 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.373 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.374 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.375 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.376 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.379 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.380 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.381 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.382 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.383 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.384 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.385 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.386 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.387 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.388 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.389 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.390 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.391 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.392 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.393 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.394 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.395 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.396 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.397 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.398 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.399 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.400 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.401 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.402 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.403 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.404 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.405 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.406 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.407 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.408 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.409 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.410 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.411 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.412 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.413 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.414 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.415 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.416 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.417 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.418 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.419 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.420 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.421 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.422 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.423 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.424 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.425 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.426 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.427 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.428 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.429 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.430 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1000 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1001 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1002 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1003 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1004 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1005 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1006 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.1007 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.9000 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.100000 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.6.100009 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.2 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.3 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.4 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.5 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.6 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.7 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.8 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.9 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.10 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.11 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.12 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.13 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.14 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.15 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.16 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.17 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.18 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.19 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.20 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.21 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.22 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.23 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.24 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.25 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.26 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.27 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.28 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.29 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.30 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.31 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.32 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.33 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.34 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.35 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.36 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.37 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.38 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.39 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.40 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.41 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.42 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.43 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.44 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.45 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.46 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.47 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.48 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.49 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.50 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.51 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.52 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.55 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.56 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.57 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.58 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.59 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.60 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.61 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.62 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.63 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.64 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.65 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.66 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.67 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.68 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.69 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.70 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.71 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.72 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.73 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.74 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.75 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.76 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.77 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.78 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.79 COUNTER64 31812681
+1.3.6.1.2.1.31.1.1.1.10.80 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.81 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.82 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.83 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.84 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.85 COUNTER64 71720394
+1.3.6.1.2.1.31.1.1.1.10.86 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.87 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.88 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.89 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.90 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.91 COUNTER64 1898575072
+1.3.6.1.2.1.31.1.1.1.10.92 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.93 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.94 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.95 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.96 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.97 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.98 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.99 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.100 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.101 COUNTER64 541764897
+1.3.6.1.2.1.31.1.1.1.10.102 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.103 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.104 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.105 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.106 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.109 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.110 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.111 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.112 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.113 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.114 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.115 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.116 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.117 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.118 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.119 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.120 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.121 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.122 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.123 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.124 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.125 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.126 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.127 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.128 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.129 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.130 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.131 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.132 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.133 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.134 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.135 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.136 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.137 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.138 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.139 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.140 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.141 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.142 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.143 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.144 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.145 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.146 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.147 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.148 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.149 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.150 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.151 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.152 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.153 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.154 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.155 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.156 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.157 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.158 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.159 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.160 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.163 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.164 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.165 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.166 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.167 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.168 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.169 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.170 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.171 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.172 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.173 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.174 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.175 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.176 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.177 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.178 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.179 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.180 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.181 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.182 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.183 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.184 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.185 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.186 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.187 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.188 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.189 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.190 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.191 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.192 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.193 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.194 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.195 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.196 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.197 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.198 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.199 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.200 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.201 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.202 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.203 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.204 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.205 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.206 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.207 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.208 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.209 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.210 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.211 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.212 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.213 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.214 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.217 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.218 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.219 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.220 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.221 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.222 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.223 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.224 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.225 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.226 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.227 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.228 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.229 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.230 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.231 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.232 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.233 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.234 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.235 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.236 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.237 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.238 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.239 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.240 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.241 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.242 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.243 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.244 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.245 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.246 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.247 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.248 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.249 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.250 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.251 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.252 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.253 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.254 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.255 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.256 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.257 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.258 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.259 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.260 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.261 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.262 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.263 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.264 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.265 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.266 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.267 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.268 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.271 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.272 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.273 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.274 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.275 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.276 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.277 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.278 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.279 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.280 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.281 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.282 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.283 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.284 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.285 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.286 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.287 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.288 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.289 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.290 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.291 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.292 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.293 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.294 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.295 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.296 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.297 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.298 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.299 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.300 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.301 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.302 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.303 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.304 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.305 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.306 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.307 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.308 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.309 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.310 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.311 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.312 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.313 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.314 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.315 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.316 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.317 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.318 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.319 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.320 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.321 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.322 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.325 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.326 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.327 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.328 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.329 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.330 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.331 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.332 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.333 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.334 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.335 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.336 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.337 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.338 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.339 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.340 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.341 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.342 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.343 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.344 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.345 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.346 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.347 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.348 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.349 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.350 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.351 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.352 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.353 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.354 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.355 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.356 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.357 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.358 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.359 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.360 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.361 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.362 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.363 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.364 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.365 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.366 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.367 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.368 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.369 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.370 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.371 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.372 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.373 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.374 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.375 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.376 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.379 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.380 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.381 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.382 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.383 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.384 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.385 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.386 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.387 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.388 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.389 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.390 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.391 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.392 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.393 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.394 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.395 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.396 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.397 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.398 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.399 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.400 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.401 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.402 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.403 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.404 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.405 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.406 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.407 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.408 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.409 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.410 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.411 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.412 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.413 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.414 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.415 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.416 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.417 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.418 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.419 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.420 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.421 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.422 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.423 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.424 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.425 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.426 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.427 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.428 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.429 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.430 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1000 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1001 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1002 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1003 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1004 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1005 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1006 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.1007 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.9000 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.100000 COUNTER64 0
+1.3.6.1.2.1.31.1.1.1.10.100009 COUNTER64 0
+1.3.6.1.2.1.47.1.1.1.1.2.64 STRING "Stack"
+1.3.6.1.2.1.47.1.1.1.1.2.134217856 STRING "OmniStack LS 6248P"
+1.3.6.1.2.1.47.1.1.1.1.2.134218049 STRING "PowerSupply"
+1.3.6.1.2.1.47.1.1.1.1.2.134218113 STRING "Fan"
+1.3.6.1.2.1.47.1.1.1.1.2.134218114 STRING "Fan"
+1.3.6.1.2.1.47.1.1.1.1.2.134218115 STRING "Fan"
+1.3.6.1.2.1.47.1.1.1.1.2.135266816 STRING "Slot"
+1.3.6.1.2.1.47.1.1.1.1.2.135529216 STRING "OmniStack LS 6248P"
+1.3.6.1.2.1.47.1.1.1.1.2.135529345 STRING "Thermal Sensor"
+1.3.6.1.2.1.47.1.1.1.1.2.135533568 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135533639 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135533640 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135533641 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135533642 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537664 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.2.135537729 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537730 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537731 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537732 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537733 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537734 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537735 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135537736 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541760 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.2.135541825 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541826 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541827 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541828 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541829 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541830 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541831 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135541832 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545856 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.2.135545921 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545922 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545923 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545924 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545925 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545926 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545927 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135545928 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135549952 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.2.135550017 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550018 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550019 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550020 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550021 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550022 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550023 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135550024 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554048 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.2.135554113 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554114 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554115 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554116 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554117 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554118 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554119 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135554120 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558144 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.2.135558209 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558210 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558211 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558212 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558213 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558214 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558215 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.2.135558216 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.5.64 INTEGER 11
+1.3.6.1.2.1.47.1.1.1.1.5.134217856 INTEGER 3
+1.3.6.1.2.1.47.1.1.1.1.5.134218049 INTEGER 6
+1.3.6.1.2.1.47.1.1.1.1.5.134218113 INTEGER 7
+1.3.6.1.2.1.47.1.1.1.1.5.134218114 INTEGER 7
+1.3.6.1.2.1.47.1.1.1.1.5.134218115 INTEGER 7
+1.3.6.1.2.1.47.1.1.1.1.5.135266816 INTEGER 5
+1.3.6.1.2.1.47.1.1.1.1.5.135529216 INTEGER 9
+1.3.6.1.2.1.47.1.1.1.1.5.135529345 INTEGER 8
+1.3.6.1.2.1.47.1.1.1.1.5.135533568 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135533639 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135533640 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135533641 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135533642 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537664 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135537729 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537730 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537731 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537732 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537733 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537734 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537735 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135537736 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541760 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135541825 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541826 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541827 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541828 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541829 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541830 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541831 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135541832 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545856 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135545921 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545922 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545923 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545924 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545925 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545926 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545927 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135545928 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135549952 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135550017 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550018 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550019 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550020 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550021 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550022 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550023 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135550024 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554048 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135554113 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554114 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554115 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554116 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554117 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554118 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554119 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135554120 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558144 INTEGER 1
+1.3.6.1.2.1.47.1.1.1.1.5.135558209 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558210 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558211 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558212 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558213 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558214 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558215 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.5.135558216 INTEGER 10
+1.3.6.1.2.1.47.1.1.1.1.7.64 STRING "Stack"
+1.3.6.1.2.1.47.1.1.1.1.7.134217856 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.134218049 STRING "MAIN PowerSupply"
+1.3.6.1.2.1.47.1.1.1.1.7.134218113 STRING "Fan1"
+1.3.6.1.2.1.47.1.1.1.1.7.134218114 STRING "Fan2"
+1.3.6.1.2.1.47.1.1.1.1.7.134218115 STRING "Fan3"
+1.3.6.1.2.1.47.1.1.1.1.7.135266816 STRING "Slot"
+1.3.6.1.2.1.47.1.1.1.1.7.135529216 STRING "OmniStack LS 6248P"
+1.3.6.1.2.1.47.1.1.1.1.7.135529345 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135533568 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135533639 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135533640 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135533641 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135533642 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537664 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.7.135537729 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537730 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537731 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537732 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537733 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537734 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537735 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135537736 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541760 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.7.135541825 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541826 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541827 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541828 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541829 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541830 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541831 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135541832 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545856 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.7.135545921 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545922 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545923 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545924 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545925 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545926 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545927 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135545928 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135549952 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.7.135550017 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550018 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550019 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550020 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550021 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550022 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550023 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135550024 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554048 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.7.135554113 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554114 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554115 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554116 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554117 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554118 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554119 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135554120 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558144 STRING "GT 88E6095"
+1.3.6.1.2.1.47.1.1.1.1.7.135558209 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558210 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558211 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558212 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558213 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558214 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558215 STRING ""
+1.3.6.1.2.1.47.1.1.1.1.7.135558216 STRING ""
+1.3.6.1.4.1.89.1.1.0 INTEGER 65535
+1.3.6.1.4.1.89.1.2.0 INTEGER 26
+1.3.6.1.4.1.89.1.4.0 HEX e0
+1.3.6.1.4.1.89.1.5.0 INTEGER 1
+1.3.6.1.4.1.89.1.6.0 INTEGER 1
+1.3.6.1.4.1.89.1.7.0 INTEGER 8
+1.3.6.1.4.1.89.1.8.0 INTEGER 7
+1.3.6.1.4.1.89.1.9.0 INTEGER 7
+1.3.6.1.4.1.89.1.10.0 TIMETICKS 4294967295
+1.3.6.1.4.1.89.83.1.1.1.2.134218113 STRING "fan1_unit2"
+1.3.6.1.4.1.89.83.1.1.1.2.134218114 STRING "fan2_unit2"
+1.3.6.1.4.1.89.83.1.1.1.2.134218115 STRING "fan3_unit2"
+1.3.6.1.4.1.89.83.1.1.1.3.134218113 INTEGER 6
+1.3.6.1.4.1.89.83.1.1.1.3.134218114 INTEGER 6
+1.3.6.1.4.1.89.83.1.1.1.3.134218115 INTEGER 6
+1.3.6.1.4.1.89.83.1.2.1.2.134218049 STRING "MAIN PowerSupply"
+1.3.6.1.4.1.89.83.1.2.1.2.134218050 STRING "ps2_unit2"
+1.3.6.1.4.1.89.83.1.2.1.3.134218049 INTEGER 1
+1.3.6.1.4.1.89.83.1.2.1.3.134218050 INTEGER 5
+1.3.6.1.4.1.89.83.1.2.1.4.134218049 INTEGER 5
+1.3.6.1.4.1.89.83.1.2.1.4.134218050 INTEGER 1
+1.3.6.1.4.1.89.83.2.1.1.1.1.135529345 INTEGER 8
+1.3.6.1.4.1.89.83.2.1.1.1.2.135529345 INTEGER 9
+1.3.6.1.4.1.89.83.2.1.1.1.3.135529345 INTEGER 1
+1.3.6.1.4.1.89.83.2.1.1.1.4.135529345 INTEGER 50
+1.3.6.1.4.1.89.83.2.1.1.1.5.135529345 INTEGER 1
+1.3.6.1.4.1.89.83.2.1.1.1.6.135529345 STRING ""
+1.3.6.1.4.1.89.83.2.1.1.1.7.135529345 TIMETICKS 1472000
+1.3.6.1.4.1.89.83.2.1.1.1.8.135529345 GAUGE32 10000
+1.3.6.1.4.1.89.83.3.1.1.135529345 INTEGER 0
+1.3.6.1.4.1.89.83.3.1.2.135529345 INTEGER 70
+1.3.6.1.4.1.89.83.3.1.3.135529345 INTEGER 70

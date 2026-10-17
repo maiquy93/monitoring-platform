@@ -185,6 +185,91 @@ test('cisco: ram reports a reason when the device has no CISCO-MEMORY-POOL-MIB r
   } finally { r.close(); }
 });
 
+// ---- Alcatel-Lucent Enterprise: dữ liệu THẬT (OmniStack LS 6200) & MIB chuẩn (AOS 6 / AOS 7/8) ----
+test('alcatel-omnistack (real walk 192.168.2.2): auto-detected, reads Radlan CPU & thermal sensor, skips unsupported RAM/disk', async () => {
+  const r = await startReplay('alcatel-omnistack-ls6200');
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'alcatel-omnistack');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.cpu, 7);
+    assert.equal(out.temperature, 50);
+    assert.equal(out.uptime, 14720);
+    assert.equal(out.diag.cpu.ok, true);
+    assert.equal(out.diag.cpu.unverified, false);
+    assert.equal(out.diag.temperature.ok, true);
+    assert.equal(out.ram, undefined);
+    assert.equal(out.diag.ram, undefined);
+    assert.equal(out.disk, undefined);
+    assert.equal(out.diag.disk, undefined);
+    assert.ok(out.if_counters && Object.keys(out.if_counters.rows).length > 0, 'phải đọc được bộ đếm cổng IF-MIB');
+    assert.ok(out.pkt_counters, 'phải đọc được bộ đếm gói tin');
+  } finally { r.close(); }
+});
+
+test('detectProfile: alcatel-omnistack / alcatel-aos6 / alcatel-aos7 disambiguated by sysObjectID and sysDescr', () => {
+  const d = (sysObjectID, sysDescr = '') => engine.detectProfile({ sysObjectID, sysDescr }).id;
+  // OmniStack LS series (.6486.800.1.1.2.2.*) & Radlan (.89.*)
+  assert.equal(d('1.3.6.1.4.1.6486.800.1.1.2.2.4.1.4', 'OmniStack LS 6200'), 'alcatel-omnistack');
+  assert.equal(d('1.3.6.1.4.1.89.1.1', 'Ethernet Switch'), 'alcatel-omnistack');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Alcatel-Lucent OmniStack LS 6224'), 'alcatel-omnistack');
+  // OmniSwitch AOS 6 (.6486.800.1.1.2.1.*)
+  assert.equal(d('1.3.6.1.4.1.6486.800.1.1.2.1.63.1.2.2.1.1', 'Alcatel-Lucent OS6450-P24L 6.6.4.179.R01'), 'alcatel-aos6');
+  assert.equal(d('1.3.6.1.4.1.6486.800.1.1.2.1.47.1.2', 'Alcatel-Lucent OS6850-48X 6.4.4.343.R01'), 'alcatel-aos6');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'Alcatel-Lucent OmniSwitch 6250 AOS 6.6.3'), 'alcatel-aos6');
+  // OmniSwitch AOS 7 / AOS 8 (.6486.801.*)
+  assert.equal(d('1.3.6.1.4.1.6486.801.1.1.2.1.11.1.2', 'Alcatel-Lucent Enterprise OS6860E-P48 8.7.252.R01'), 'alcatel-aos7');
+  assert.equal(d('1.3.6.1.4.1.6486.801.1.1.2.1.14.1.2', 'Alcatel-Lucent Enterprise OS6560-P24X4 8.6.289.R01'), 'alcatel-aos7');
+  assert.equal(d('1.3.6.1.4.1.8072.3.2.10', 'OmniSwitch OS6900-X40 AOS 8.5.1'), 'alcatel-aos7');
+});
+
+test('alcatel-aos6 (synthetic MIB data): reads CPU, RAM and board temperature from ALCATEL-IND1-HEALTH-MIB & CHASSIS-MIB', async () => {
+  const rows = [
+    ['1.3.6.1.2.1.1.1.0', 'Alcatel-Lucent OS6850-48X 6.4.4.343.R01 Service Release', 'STRING'],
+    ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.6486.800.1.1.2.1.47.1.2', 'OID'],
+    ['1.3.6.1.2.1.1.3.0', 8640000, 'TIMETICKS'],
+    ['1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.13.0', 14, 'INTEGER'],  // healthDeviceCpuLatest
+    ['1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.9.0', 62, 'INTEGER'],   // healthDeviceMemoryLatest
+    ['1.3.6.1.4.1.6486.800.1.1.1.3.1.1.3.1.4.1', 43, 'INTEGER'],  // chasHardwareBoardTemp chassis 1
+    ['1.3.6.1.4.1.6486.800.1.1.1.3.1.1.3.1.4.2', 46, 'INTEGER'],  // chasHardwareBoardTemp chassis 2
+  ];
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'alcatel-aos6');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.cpu, 14);
+    assert.equal(out.ram, 62);
+    assert.equal(out.temperature, 46);
+    assert.equal(out.uptime, 86400);
+    assert.equal(out.diag.disk, undefined);
+  } finally { r.close(); }
+});
+
+test('alcatel-aos7 (synthetic MIB data): reads CPU, RAM and temperature from AOS 7/8 healthModuleTable & CHASSIS-MIB', async () => {
+  const rows = [
+    ['1.3.6.1.2.1.1.1.0', 'Alcatel-Lucent Enterprise OS6860E-P48 8.7.252.R01 GA', 'STRING'],
+    ['1.3.6.1.2.1.1.2.0', '1.3.6.1.4.1.6486.801.1.1.2.1.11.1.2', 'OID'],
+    ['1.3.6.1.2.1.1.3.0', 4320000, 'TIMETICKS'],
+    ['1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.15.1', 11, 'INTEGER'], // healthModuleCpuLatest slot 1
+    ['1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.15.2', 19, 'INTEGER'], // healthModuleCpuLatest slot 2
+    ['1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.16.1', 48, 'INTEGER'], // healthModuleMemoryLatest slot 1
+    ['1.3.6.1.4.1.6486.801.1.2.1.16.1.1.1.1.1.16.2', 54, 'INTEGER'], // healthModuleMemoryLatest slot 2
+    ['1.3.6.1.4.1.6486.801.1.1.1.3.1.1.3.1.8.291', 41, 'INTEGER'],   // chasCPMAHardwareBoardTemp
+  ];
+  const r = await startReplay(null, { rows });
+  try {
+    const out = await poll(r);
+    assert.equal(out.profile.id, 'alcatel-aos7');
+    assert.equal(out.profile.auto, true);
+    assert.equal(out.cpu, 19);
+    assert.equal(out.ram, 54);
+    assert.equal(out.temperature, 41);
+    assert.equal(out.uptime, 43200);
+    assert.equal(out.diag.disk, undefined);
+  } finally { r.close(); }
+});
+
 // ---- pfSense / OPNsense: dữ liệu TỔNG HỢP theo UCD-SNMP-MIB + HOST-RESOURCES-MIB (chưa có walk thật) ----
 const HRS = '1.3.6.1.2.1.25.2.3.1.';
 const hrStorageRows = () => [

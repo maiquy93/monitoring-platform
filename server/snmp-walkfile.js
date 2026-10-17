@@ -52,7 +52,15 @@ async function exportWalk({ host, port = 161, community = 'public', roots, max =
   const objectId = id[snmp.OIDS.sysObjectID] || '';
   const list = new Set(roots || STANDARD_ROOTS);
   const ent = /^(1\.3\.6\.1\.4\.1\.\d+)/.exec(objectId);
-  if (!roots && ent) list.add(ent[1]);
+  if (!roots && ent) {
+    list.add(ent[1]);
+    // Alcatel-Lucent OmniStack LS switches report sysObjectID under 6486.800.1.1.2.2
+    // but store CPU and thermal sensors under Radlan (RND) enterprise 1.3.6.1.4.1.89.
+    if (objectId.replace(/^\./, '').startsWith('1.3.6.1.4.1.6486.800.1.1.2.2')) {
+      list.add('1.3.6.1.4.1.89.1');
+      list.add('1.3.6.1.4.1.89.83');
+    }
+  }
   const results = await Promise.all([...list].map(async (root) => {
     try { return { root, rows: await snmp.walk({ host, port, community, root, max, timeout, typed: true }) }; } catch (e) { return { root, rows: [], error: e.message }; }
   }));

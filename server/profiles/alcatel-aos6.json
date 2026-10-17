@@ -1,0 +1,75 @@
+{
+  "id": "alcatel-aos6",
+  "name": "Alcatel-Lucent OmniSwitch AOS 6 (OS6250 / OS6400 / OS6450 / OS6850 / OS6855 / OS9000)",
+  "description": "Dòng OmniSwitch chạy hệ điều hành AOS 6.x của Alcatel-Lucent Enterprise (sysObjectID nhánh 1.3.6.1.4.1.6486.800.1.1.2.1.x). CPU đọc từ ALCATEL-IND1-HEALTH-MIB: healthDeviceCpuLatest (1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.13.0), dự phòng healthDeviceCpu1MinAvg (.14.0) và bảng healthModuleCpuLatest (1.3.6.1.4.1.6486.800.1.2.1.16.1.1.2.1.1.14). RAM đọc healthDeviceMemoryLatest (1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.9.0), dự phòng healthDeviceMemory1MinAvg (.10.0) và bảng healthModuleMemoryLatest (.2.1.1.10). Nhiệt độ đọc từ ALCATEL-IND1-CHASSIS-MIB: chasHardwareBoardTemp (1.3.6.1.4.1.6486.800.1.1.1.3.1.1.3.1.4) và chasHardwareCpuTemp (.5). Lưu ý quan trọng trên AOS 6: mặc định SNMP yêu cầu cấu hình `snmp security no security`, ánh xạ `snmp community map \"<community>\" user \"<user>\" on`, và cho phép dịch vụ `ip service snmp`.",
+  "match": [
+    { "sysObjectID": ["1.3.6.1.4.1.6486.800.1.1.2.1"] },
+    { "sysDescr": "(?:omniswitch|alcatel).*6\\.[0-9]|aos.*6\\.[0-9]|os6(?:250|400|450|850|855)|os9[0678]00" }
+  ],
+  "extends": "generic",
+  "verified_with": [],
+  "metrics": {
+    "cpu": {
+      "label": "CPU",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "get": "1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.13.0", "unverified": true },
+        { "get": "1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.14.0", "unverified": true },
+        {
+          "table": {
+            "columns": { "load": "1.3.6.1.4.1.6486.800.1.2.1.16.1.1.2.1.1.14" },
+            "value": { "column": "load" },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "ram": {
+      "label": "RAM",
+      "unit": "%",
+      "round": 0,
+      "sources": [
+        { "get": "1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.9.0", "unverified": true },
+        { "get": "1.3.6.1.4.1.6486.800.1.2.1.16.1.1.1.10.0", "unverified": true },
+        {
+          "table": {
+            "columns": { "mem": "1.3.6.1.4.1.6486.800.1.2.1.16.1.1.2.1.1.10" },
+            "value": { "column": "mem" },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "temperature": {
+      "label": "Nhiệt độ bo mạch (cao nhất)",
+      "unit": "°C",
+      "round": 0,
+      "optional": true,
+      "sources": [
+        {
+          "table": {
+            "columns": { "temp": "1.3.6.1.4.1.6486.800.1.1.1.3.1.1.3.1.4" },
+            "value": { "column": "temp" },
+            "agg": "max"
+          },
+          "unverified": true
+        },
+        {
+          "table": {
+            "columns": { "temp": "1.3.6.1.4.1.6486.800.1.1.1.3.1.1.3.1.5" },
+            "value": { "column": "temp" },
+            "agg": "max"
+          },
+          "unverified": true
+        }
+      ]
+    },
+    "disk": null,
+    "toner": null,
+    "drum": null,
+    "page_count": null
+  }
+}
