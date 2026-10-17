@@ -253,6 +253,7 @@
         <span class="muted">· ${M.fmtTime(r.ts)}</span>
         <span class="spacer"></span>
         ${srcBadge}
+        ${r.event_id ? `<button type="button" class="btn sm" data-ai-toggle="${r.event_id}" style="padding:1px 7px;font-size:11px;margin-left:6px" title="${isEn ? 'Collapse AI report' : 'Thu gọn bảng phân tích AI'}">▲ ${isEn ? 'Collapse' : 'Thu gọn'}</button>` : ''}
       </div>`}
       <div class="ai-grid">
         <div class="ai-box">
@@ -351,6 +352,52 @@
     }
   };
 
+  const _hiddenAiSet = new Set();
+  const _syncHiddenAi = () => {
+    try {
+      const raw = localStorage.getItem('hidden_ai_events');
+      if (raw) {
+        _hiddenAiSet.clear();
+        JSON.parse(raw).forEach((id) => _hiddenAiSet.add(Number(id)));
+      }
+    } catch {}
+  };
+  _syncHiddenAi();
+
+  M.getHiddenAiEvents = () => {
+    _syncHiddenAi();
+    return _hiddenAiSet;
+  };
+
+  M.isAiRowHidden = (id) => {
+    if (!id) return false;
+    const numId = Number(id);
+    _syncHiddenAi();
+    if (_hiddenAiSet.has(numId)) return true;
+    const existing = document.getElementById(`ai-ev-row-${numId}`);
+    if (existing && existing.classList.contains('hidden')) {
+      _hiddenAiSet.add(numId);
+      return true;
+    }
+    return false;
+  };
+
+  M.setAiRowHidden = (id, hidden) => {
+    if (!id) return;
+    const numId = Number(id);
+    _syncHiddenAi();
+    if (hidden) {
+      _hiddenAiSet.add(numId);
+    } else {
+      _hiddenAiSet.delete(numId);
+    }
+    try {
+      const arr = Array.from(_hiddenAiSet);
+      if (arr.length > 500) arr.splice(0, arr.length - 500);
+      localStorage.setItem('hidden_ai_events', JSON.stringify(arr));
+    } catch {}
+  };
+
   M.eventsTable = (events, showDevice) => {
     if (!events.length) return `<div class="muted">${esc(t('Chưa có sự kiện'))}</div>`;
     const isEn = M.S.lang === 'en';
@@ -364,22 +411,28 @@
     const rowsHtml = events.map((e) => {
       const isEligible = M.isAiEligibleEvent(e);
       const hasAi = !!e.ai_report;
+      const isHidden = !hasAi || M.isAiRowHidden(e.id);
       const aiBtns = [];
       if (hasAi) {
-        aiBtns.push(`<button type="button" class="ai-badge" data-ai-toggle="${e.id}" title="${isEn ? 'Click to view/hide AI diagnosis' : 'Bấm để xem/ẩn chẩn đoán AI'}">🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}</button>`);
+        aiBtns.push(`<button type="button" class="ai-badge" data-ai-toggle="${e.id}" title="${isHidden ? (isEn ? 'Click to show AI diagnosis' : 'Bấm để hiện chẩn đoán AI') : (isEn ? 'Click to hide AI diagnosis' : 'Bấm để ẩn chẩn đoán AI')}">🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}</button>`);
       } else if (isEligible && canOp) {
         aiBtns.push(`<button type="button" class="ai-badge" data-ai-analyze="${e.id}" data-dev-id="${e.device_id || ''}" title="${isEn ? 'Collect tech logs & analyze with AI' : 'Thu thập log kỹ thuật & gọi AI phân tích'}">✨ ${isEn ? 'AI Analyze' : 'Phân tích AI'}</button>`);
       }
       if (isEligible || hasAi) {
         aiBtns.push(`<button type="button" class="ai-badge tech-copy" data-ai-copy-logs="${e.id}" data-dev-id="${e.device_id || ''}" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude / Gemini' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude / Gemini'}">📋 ${isEn ? 'Copy Tech Logs' : 'Copy Logs Kỹ thuật'}</button>`);
       }
-      return `<tr class="ev-row ${hasAi ? 'has-ai' : ''}" data-ev-id="${e.id}" ${hasAi ? `title="${isEn ? 'Click to hide/show AI diagnosis' : 'Bấm vào sự kiện để ẩn/hiện bảng phân tích AI'}"` : ''}>
+      const rowTitle = hasAi
+        ? (isHidden
+          ? (isEn ? 'Click to show AI diagnosis' : 'Bấm vào sự kiện để hiện bảng phân tích AI')
+          : (isEn ? 'Click to hide AI diagnosis' : 'Bấm vào sự kiện để ẩn bảng phân tích AI'))
+        : '';
+      return `<tr class="ev-row ${hasAi ? 'has-ai' : ''} ${hasAi && isHidden ? 'ai-closed' : ''}" data-ev-id="${e.id}" ${rowTitle ? `title="${rowTitle}"` : ''}>
         <td>${M.fmtTime(e.ts)}</td>
         ${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
         <td><span class="sev-badge ${badge(e)}">${esc(label[e.kind] || e.kind)}</span></td>
         <td>${esc(tr(e.message))} ${aiBtns.join('')}</td>
       </tr>
-      <tr id="ai-ev-row-${e.id}" class="${hasAi ? '' : 'hidden'}">
+      <tr id="ai-ev-row-${e.id}" class="${isHidden ? 'hidden' : ''}">
         <td colspan="${colSpan}" style="padding-top:0;border-top:none">${hasAi ? M.renderAiReportCard(e.ai_report, false) : ''}</td>
       </tr>`;
     }).join('');
@@ -392,6 +445,7 @@
       const row = document.getElementById(`ai-ev-row-${id}`);
       if (!row) return;
       const isHidden = row.classList.toggle('hidden');
+      M.setAiRowHidden(id, isHidden);
       const evRow = document.querySelector(`tr.ev-row[data-ev-id="${id}"]`);
       if (evRow) {
         evRow.classList.toggle('ai-closed', isHidden);
@@ -399,12 +453,12 @@
           ? (isEn ? 'Click to show AI diagnosis' : 'Bấm vào sự kiện để hiện bảng phân tích AI')
           : (isEn ? 'Click to hide AI diagnosis' : 'Bấm vào sự kiện để ẩn bảng phân tích AI'));
       }
-      const toggleBtn = document.querySelector(`button[data-ai-toggle="${id}"]`);
-      if (toggleBtn) {
+      const toggleBtns = document.querySelectorAll(`button[data-ai-toggle="${id}"]`);
+      toggleBtns.forEach((toggleBtn) => {
         toggleBtn.setAttribute('title', isHidden
           ? (isEn ? 'Click to show AI diagnosis' : 'Bấm để hiện chẩn đoán AI')
           : (isEn ? 'Click to hide AI diagnosis' : 'Bấm để ẩn chẩn đoán AI'));
-      }
+      });
     };
 
     const toggleBtn = ev.target.closest('[data-ai-toggle]');
@@ -468,6 +522,7 @@
           row.firstElementChild.innerHTML = M.renderAiReportCard(res.report, false);
           row.classList.remove('hidden');
         }
+        M.setAiRowHidden(id, false);
         analyzeBtn.removeAttribute('data-ai-analyze');
         analyzeBtn.setAttribute('data-ai-toggle', String(id));
         analyzeBtn.textContent = `🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}`;

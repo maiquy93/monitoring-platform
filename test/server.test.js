@@ -1584,14 +1584,68 @@ test('events & ai tab navigation: router supports #/events and #/events/ai, view
   // Verify views.js clears interval before re-scheduling to prevent timer leaks
   assert.match(viewsJs, /clearInterval\(this\.t\);/);
 
-  // Verify event row click-to-toggle AI report and backwards compatibility
-  assert.match(viewsJs, /class="ev-row \$\{hasAi \? 'has-ai' : ''\}"/);
+  // Verify event row click-to-toggle AI report, state persistence, and backwards compatibility
+  assert.match(viewsJs, /class="ev-row \$\{hasAi \? 'has-ai' : ''\} \$\{hasAi && isHidden \? 'ai-closed' : ''\}"/);
+  assert.match(viewsJs, /<tr id="ai-ev-row-\$\{e\.id\}" class="\$\{isHidden \? 'hidden' : ''\}">/);
+  assert.match(viewsJs, /M\.isAiRowHidden\s*=\s*\(id\)\s*=>/);
+  assert.match(viewsJs, /M\.setAiRowHidden\s*=\s*\(id,\s*hidden\)\s*=>/);
+  assert.match(viewsJs, /localStorage\.setItem\('hidden_ai_events',/);
   assert.match(viewsJs, /const evRow = ev\.target\.closest\('tr\.ev-row\.has-ai'\);/);
   assert.match(viewsJs, /if \(ev\.target\.closest\('a, button, input, textarea, select'\)\) return;/);
   assert.match(viewsJs, /const toggleBtn = ev\.target\.closest\('\[data-ai-toggle\]'\);/);
+  assert.match(viewsJs, /M\.setAiRowHidden\(id, isHidden\);/);
+  assert.match(viewsJs, /M\.setAiRowHidden\(id, false\);/);
 
   const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
   assert.match(styleCss, /tr\.ev-row\.has-ai\s*\{[^}]*cursor:\s*pointer;/);
+
+  // Functional simulation of eventsTable with hiddenAi state persistence
+  const mockStorage = new Map();
+  const mockLocalStorage = {
+    getItem: (k) => mockStorage.get(k) || null,
+    setItem: (k, v) => mockStorage.set(k, String(v)),
+  };
+  const mockDoc = {
+    addEventListener: () => {},
+    getElementById: () => null,
+    querySelectorAll: () => [],
+    querySelector: () => null,
+  };
+  const mockM = {
+    S: { lang: 'vi', user: { role: 'admin' } },
+    fmtTime: () => '12:00:00',
+    isAiEligibleEvent: () => true,
+    renderAiReportCard: () => '<div class="ai-card">Diagnosis</div>',
+  };
+  const fn = new Function('M', 'localStorage', 'document', 'esc', 't', 'tr', '$', `
+    ${viewsJs.slice(viewsJs.indexOf('const _hiddenAiSet = new Set();'), viewsJs.indexOf('document.addEventListener('))}
+    return { eventsTable: M.eventsTable, setAiRowHidden: M.setAiRowHidden, isAiRowHidden: M.isAiRowHidden };
+  `);
+  const mod = fn(mockM, mockLocalStorage, mockDoc, (x) => x, (x) => x, (x) => x, () => null);
+
+  const testEvent = { id: 101, ts: Date.now(), kind: 'dos', severity: 'critical', message: 'DoS alert', ai_report: { id: 1, issue: 'DoS' } };
+
+  // 1. By default, event table renders AI card visible
+  const htmlOpen = mod.eventsTable([testEvent], true);
+  assert.match(htmlOpen, /<tr id="ai-ev-row-101" class="">/);
+  assert.doesNotMatch(htmlOpen, /ai-closed/);
+
+  // 2. When hidden, event table renders AI card with class="hidden" and ev-row with ai-closed
+  mod.setAiRowHidden(101, true);
+  assert.equal(mockStorage.get('hidden_ai_events'), '[101]');
+  assert.equal(mod.isAiRowHidden(101), true);
+
+  const htmlHidden = mod.eventsTable([testEvent], true);
+  assert.match(htmlHidden, /<tr id="ai-ev-row-101" class="hidden">/);
+  assert.match(htmlHidden, /class="ev-row has-ai ai-closed"/);
+
+  // 3. When unhidden, it switches back to open
+  mod.setAiRowHidden(101, false);
+  assert.equal(mockStorage.get('hidden_ai_events'), '[]');
+  assert.equal(mod.isAiRowHidden(101), false);
+  const htmlReopened = mod.eventsTable([testEvent], true);
+  assert.match(htmlReopened, /<tr id="ai-ev-row-101" class="">/);
+  assert.doesNotMatch(htmlReopened, /ai-closed/);
 });
 
 test('ai: manual forced incident analysis, down device diagnosis, reasoning models, and error resilience', async () => {
