@@ -350,6 +350,8 @@ function createApp(db, monitor, opts = {}) {
     ctx.res.end(out.text);
   });
 
+  require('./diagnostics').registerRoutes({ route, db, monitor, readBody, send, idOf, bad, HttpError, audit }, opts.diag);
+
   const RANGES = { '1h': 3600e3, '6h': 6 * 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
   route('GET', '/api/devices/:id/history', 'any', (ctx) => {
     const id = idOf(ctx.p.id);
