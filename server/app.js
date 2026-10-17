@@ -351,6 +351,7 @@ function createApp(db, monitor, opts = {}) {
   });
 
   require('./diagnostics').registerRoutes({ route, db, monitor, readBody, send, idOf, bad, HttpError, audit }, opts.diag);
+  require('./discovery').registerRoutes({ route, db, monitor, readBody, send, idOf, bad, HttpError, audit, cleanDevice, insertDevice, setGroups }, opts.discovery);
 
   const RANGES = { '1h': 3600e3, '6h': 6 * 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
   route('GET', '/api/devices/:id/history', 'any', (ctx) => {
