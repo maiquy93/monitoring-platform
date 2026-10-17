@@ -35,98 +35,119 @@
   M.tile = (d) => {
     const ago = M.fmtDur((Date.now() - d.since) / 1000);
     const numLoc = M.S.lang === 'en' ? 'en-US' : 'vi-VN';
-    let subLeft = '';
+
+    // Tầng 2 (Meta Info): Chỉ chứa duy nhất IP Address (trái) và Uptime / Thời gian trạng thái (phải)
+    const subLeft = d.address || '';
     let subRight = '';
     if (d.status === 'down') {
-      subLeft = d.address ? `${d.address} · ${tr(d.reasons[0] || t('Mất kết nối'))}` : tr(d.reasons[0] || t('Mất kết nối'));
       subRight = ago;
     } else if (d.status === 'maint') {
-      subLeft = d.address || '';
       subRight = t('Đang bảo trì');
     } else if (d.status === 'unknown') {
-      subLeft = d.address || '';
       subRight = t('Chưa có dữ liệu');
-    } else if (d.type === 'printer') {
-      const parts = [d.address];
-      if (d.printer_status) parts.push(tr(d.printer_status));
-      if (d.printer_errors && d.printer_errors.length && !d.mute_local_alerts) parts.unshift(tr(d.printer_errors[0]));
-      subLeft = parts.filter(Boolean).join(' · ');
-      subRight = d.page_count != null ? `${Number(d.page_count).toLocaleString(numLoc)} ${t('trang')}` : (d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '');
-    } else if (d.type === 'ap') {
-      const parts = [d.address];
-      if (d.status === 'warning' && d.reasons && d.reasons.length) parts.push(tr(d.reasons[0]));
-      if (d.total_ssids != null || d.total_clients != null) {
-        const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
-        const c = d.total_clients != null ? `${d.total_clients} client` : '';
-        const wifi = s && c ? `${s} - ${c}` : (s || c);
-        if (wifi) parts.push(wifi);
-      }
-      subLeft = parts.filter(Boolean).join(' · ');
-      subRight = d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '';
-    } else if (d.status === 'warning') {
-      subLeft = d.address ? `${d.address} · ${tr(d.reasons[0])}` : tr(d.reasons[0]);
-      subRight = d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '';
-    } else {
-      const parts = [d.address];
-      if (d.total_ssids != null || d.total_clients != null) {
-        const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
-        const c = d.total_clients != null ? `${d.total_clients} client` : '';
-        const wifi = s && c ? `${s} - ${c}` : (s || c);
-        if (wifi) parts.push(wifi);
-      }
-      subLeft = parts.filter(Boolean).join(' · ');
-      subRight = d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '';
+    } else if (d.uptime != null) {
+      subRight = `up ${M.fmtDur(d.uptime)}`;
     }
+
+    // Tầng 3 (Dynamic Metrics Zone): Container chuyên dụng cho các chỉ số đo lường & chip trạng thái
     let bars = '';
-    if (d.status === 'up' || d.status === 'warning') {
-      const pBars = [];
+    const metricItems = [];
+
+    if (d.status === 'down' && d.reasons && d.reasons.length) {
+      const rText = tr(d.reasons[0] || t('Mất kết nối'));
+      metricItems.push(`<div class="bar metric-chip chip-reason" title="${esc(rText)}"><span class="mc-ico">⚠️</span><span class="mc-val">${esc(rText)}</span></div>`);
+    } else if (d.status === 'up' || d.status === 'warning') {
+      if (d.status === 'warning' && d.reasons && d.reasons.length) {
+        const rText = tr(d.reasons[0]);
+        metricItems.push(`<div class="bar metric-chip chip-reason" title="${esc(rText)}"><span class="mc-ico">⚠️</span><span class="mc-val">${esc(rText)}</span></div>`);
+      }
+
       if (d.type === 'ap') {
+        if (d.total_ssids != null) {
+          const sLabel = `${d.total_ssids} SSID`;
+          metricItems.push(`<div class="bar metric-chip chip-ssid" title="${esc(t('Tổng số lượng SSID phát sóng'))}"><span class="mc-ico">📶</span><span class="mc-val">${esc(sLabel)}</span></div>`);
+        }
+        if (d.total_clients != null) {
+          const cUnit = d.total_clients === 1 ? 'Client' : 'Clients';
+          const cLabel = `${d.total_clients} ${cUnit}`;
+          metricItems.push(`<div class="bar metric-chip chip-clients" title="${esc(t('Tổng số lượng Client đang kết nối'))}"><span class="mc-ico">👥</span><span class="mc-val">${esc(cLabel)}</span></div>`);
+        }
         const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram']].filter(([, value]) => value != null);
-        for (const [lbl, val, k] of metrics) pBars.push(bar(lbl, val, k));
-        if (pBars.length) bars = `<div class="bars">${pBars.join('')}</div>`;
+        for (const [lbl, val, k] of metrics) metricItems.push(bar(lbl, val, k));
+        if (d.temperature != null) {
+          const tTh = (th() && th().temp) || 85;
+          const tLv = d.temperature >= tTh ? 'crit' : d.temperature >= tTh - 10 ? 'hi' : '';
+          metricItems.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
+        }
       } else if (d.type === 'printer') {
         // 1. Drum (tuổi thọ trống từ)
         if (d.drum != null) {
           const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
-          pBars.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
+          metricItems.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
         } else {
-          pBars.push(`<div class="bar bar-na" title="${esc(t('Hộp mực tích hợp (all-in-one) hoặc không có cảm biến drum riêng'))}">Drum —<i><b style="width:0%"></b></i></div>`);
+          metricItems.push(`<div class="bar bar-na" title="${esc(t('Hộp mực tích hợp (all-in-one) hoặc không có cảm biến drum riêng'))}">Drum —<i><b style="width:0%"></b></i></div>`);
         }
         // 2. Mực (lượng mực còn lại)
         if (d.toner != null) {
           const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
-          pBars.push(`<div class="bar ${lv}">${esc(t('Mực'))} ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
+          metricItems.push(`<div class="bar ${lv}">${esc(t('Mực'))} ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
         } else {
-          pBars.push(`<div class="bar bar-na" title="${esc(t('Không đọc được dữ liệu mức mực'))}">${esc(t('Mực'))} —<i><b style="width:0%"></b></i></div>`);
+          metricItems.push(`<div class="bar bar-na" title="${esc(t('Không đọc được dữ liệu mức mực'))}">${esc(t('Mực'))} —<i><b style="width:0%"></b></i></div>`);
         }
-        bars = `<div class="bars">${pBars.join('')}</div>`;
+        // 3. Trạng thái máy in & Số trang in (chip nhỏ gọn)
+        if (d.printer_status) {
+          const stText = tr(d.printer_status);
+          metricItems.push(`<div class="bar metric-chip chip-status" title="${esc(stText)}"><span class="mc-ico">🖨️</span><span class="mc-val">${esc(stText)}</span></div>`);
+        }
+        if (d.page_count != null) {
+          const pgText = `${Number(d.page_count).toLocaleString(numLoc)} ${t('trang')}`;
+          metricItems.push(`<div class="bar metric-chip chip-pages" title="${esc(pgText)}"><span class="mc-ico">📄</span><span class="mc-val">${esc(pgText)}</span></div>`);
+        }
       } else {
-        if (d.drum != null) {
-          const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
-          pBars.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
-        }
-        if (d.toner != null) {
-          const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
-          pBars.push(`<div class="bar ${lv}">${esc(t('Mực'))} ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
-        }
         const metrics = [['CPU', d.cpu, 'cpu'], ['RAM', d.ram, 'ram'], ['Disk', d.disk, 'disk']]
           .filter(([, value]) => value != null);
-        const metricBars = metrics.map(([label, value, key]) => bar(label, value, key));
+        for (const [label, value, key] of metrics) {
+          metricItems.push(bar(label, value, key));
+        }
         if (d.temperature != null) {
           const tTh = (th() && th().temp) || 85;
           const tLv = d.temperature >= tTh ? 'crit' : d.temperature >= tTh - 10 ? 'hi' : '';
-          metricBars.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
+          metricItems.push(`<div class="bar ${tLv}">Temp ${Math.round(d.temperature)}°C<i><b style="width:${Math.min(100, Math.max(0, d.temperature))}%"></b></i></div>`);
         } else if (d.type === 'vm' || d.type === 'server' || (d.checks && d.checks.agent)) {
-          metricBars.push(`<div class="bar bar-na" title="${esc(t('Môi trường máy ảo (VM) hoặc phần cứng không có cảm biến nhiệt'))}">Temp —<i><b style="width:0%"></b></i></div>`);
+          metricItems.push(`<div class="bar bar-na" title="${esc(t('Môi trường máy ảo (VM) hoặc phần cứng không có cảm biến nhiệt'))}">Temp —<i><b style="width:0%"></b></i></div>`);
         }
-        if (pBars.length && !metricBars.length) {
-          bars = `<div class="bars">${pBars.join('')}</div>`;
-        } else if (metricBars.length) {
-          if (pBars.length) metricBars.push(...pBars);
-          bars = `<div class="bars">${metricBars.join('')}</div>`;
+        if (d.fan != null || d.fan_status != null) {
+          const fanVal = String(d.fan ?? d.fan_status);
+          metricItems.push(`<div class="bar metric-chip chip-fan" title="${esc(t('Trạng thái quạt tản nhiệt'))}"><span class="mc-ico">🌀</span><span class="mc-val">${esc(fanVal)}</span></div>`);
+        }
+        if (d.drum != null) {
+          const lv = d.drum <= 10 ? 'crit' : d.drum <= 25 ? 'hi' : '';
+          metricItems.push(`<div class="bar ${lv}">Drum ${Math.round(d.drum)}%<i><b style="width:${Math.min(100, Math.max(0, d.drum))}%"></b></i></div>`);
+        }
+        if (d.toner != null) {
+          const lv = d.toner <= 10 ? 'crit' : d.toner <= 25 ? 'hi' : '';
+          metricItems.push(`<div class="bar ${lv}">${esc(t('Mực'))} ${Math.round(d.toner)}%<i><b style="width:${Math.min(100, Math.max(0, d.toner))}%"></b></i></div>`);
+        }
+        if (d.total_ssids != null) {
+          const sLabel = `${d.total_ssids} SSID`;
+          metricItems.push(`<div class="bar metric-chip chip-ssid" title="${esc(t('Tổng số lượng SSID phát sóng'))}"><span class="mc-ico">📶</span><span class="mc-val">${esc(sLabel)}</span></div>`);
+        }
+        if (d.total_clients != null) {
+          const cUnit = d.total_clients === 1 ? 'Client' : 'Clients';
+          const cLabel = `${d.total_clients} ${cUnit}`;
+          metricItems.push(`<div class="bar metric-chip chip-clients" title="${esc(t('Tổng số lượng Client đang kết nối'))}"><span class="mc-ico">👥</span><span class="mc-val">${esc(cLabel)}</span></div>`);
+        }
+        if (d.page_count != null) {
+          const pgText = `${Number(d.page_count).toLocaleString(numLoc)} ${t('trang')}`;
+          metricItems.push(`<div class="bar metric-chip chip-pages" title="${esc(pgText)}"><span class="mc-ico">📄</span><span class="mc-val">${esc(pgText)}</span></div>`);
         }
       }
     }
+
+    if (metricItems.length) {
+      bars = `<div class="bars t-metrics">${metricItems.join('')}</div>`;
+    }
+
     let alertBadges = '';
     const al = d.alerts;
     if (al && !d.mute_local_alerts) {
@@ -173,7 +194,7 @@
       : `<div class="t-sub" title="${esc(subTitle)}"><span class="t-sub-left">${esc(subLeft)}</span></div>`;
     return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}" data-id="${d.id}" draggable="false">
       <div class="t-top"><span class="t-ico">${M.ICON[d.type] || ''}</span><span class="t-name" title="${esc(d.name)}">${esc(d.name)}</span>
-      <span class="t-state">${M.STATE_NAME[d.status]}</span></div>${alertBadges}${subHtml}${bars}</a>`;
+      <span class="t-state">${M.STATE_NAME[d.status]}</span></div>${subHtml}${alertBadges}${bars}</a>`;
   };
 
   const groupDevices = (g) => devs().filter((d) => d.groups.includes(g.id));

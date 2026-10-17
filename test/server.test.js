@@ -1801,26 +1801,28 @@ test('ui theme neon: high-visibility NOC optimizations for tags, status highligh
   assert.match(views, /<span class="sev-badge ok ev-up">/);
 });
 
-test('ui overview: compact device tile height and single non-duplicated AP wireless info', () => {
+test('ui overview: semantic 3-tier device tile layout with dedicated meta row and dynamic metrics zone', () => {
   const fs = require('node:fs');
   const path = require('node:path');
   const vm = require('node:vm');
   const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
   const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
 
-  // 1. CSS optimizations for moderate, compact device tile height & two-margin justification
+  // 1. CSS rules for 3-tier layout: min-height, flex column, two-margin meta row, and auto-fit metrics grid
+  assert.match(css, /\.tile\s*\{[^}]*min-height:\s*76px/);
   assert.match(css, /\.tile\s*\{[^}]*padding:\s*9px\s+12px/);
   assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*font-size:\s*11\.5px/);
   assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*justify-content:\s*space-between/);
-  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*overflow:\s*hidden/);
-  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*text-overflow:\s*ellipsis/);
-  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*white-space:\s*nowrap/);
   assert.match(css, /\.tile\s+\.t-sub-left\s*\{[^}]*overflow:\s*hidden/);
   assert.match(css, /\.tile\s+\.t-sub-right\s*\{[^}]*text-align:\s*right/);
-  assert.match(css, /\.tile\s+\.bars\s*\{[^}]*margin-top:\s*6px/);
+  assert.match(css, /\.tile\s+\.bars,\s*\.tile\s+\.t-metrics\s*\{[^}]*display:\s*grid/);
+  assert.match(css, /\.tile\s+\.bars,\s*\.tile\s+\.t-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(70px,\s*1fr\)\)/);
+  assert.match(css, /\.tile\s+\.bars,\s*\.tile\s+\.t-metrics\s*\{[^}]*gap:\s*8px/);
+  assert.match(css, /\.tile\s+\.bars,\s*\.tile\s+\.t-metrics\s*\{[^}]*margin-top:\s*8px/);
+  assert.match(css, /\.metric-chip\s*\{[^}]*display:\s*inline-flex/);
   assert.match(css, /:root\[data-theme="neon"\]\s+\.tile\s+\.t-sub/);
 
-  // 2. Evaluation of M.tile for AP devices: single non-duplicated line "2 SSID - 1 client"
+  // 2. Evaluation of M.tile across device types (AP, Cisco AP, Printer, Server)
   const M = {
     esc: (s) => String(s || ''),
     $: () => null,
@@ -1828,9 +1830,9 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
     t: (s) => s,
     trData: (s) => s,
     views: {},
-    S: { lang: 'vi', settings: { thresholds: { cpu: 85, ram: 85, disk: 90 } } },
+    S: { lang: 'vi', settings: { thresholds: { cpu: 85, ram: 85, disk: 90, temp: 85 } } },
     statusClass: (d) => d.status || 'up',
-    ICON: { ap: '📡', server: '🖥️' },
+    ICON: { ap: '📡', server: '🖥️', printer: '🖨️' },
     STATE_NAME: { up: 'Online', down: 'Mất kết nối', warning: 'Cảnh báo' },
     fmtDur: () => '2h',
   };
@@ -1844,32 +1846,32 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
   vm.createContext(sandbox);
   vm.runInContext(viewsJs, sandbox);
 
-  // AP with 2 SSID and 1 client (exact user test case)
+  // Case A: AP with 2 SSID and 12 Clients (B1 AP scenario)
   const apHtml = sandbox.M.tile({
     id: 10,
     type: 'ap',
-    name: 'AP-Alcatel',
+    name: 'B1 AP',
     address: '192.168.1.50',
     status: 'up',
     rtt: 2,
     total_ssids: 2,
-    total_clients: 1,
+    total_clients: 12,
     uptime: 3600,
     since: Date.now() - 3600000,
   });
 
-  // Must contain single unified info "2 SSID - 1 client" on left, uptime on right
-  assert.ok(apHtml.includes('2 SSID - 1 client'));
-  assert.ok(apHtml.includes('<span class="t-sub-left">192.168.1.50 · 2 SSID - 1 client</span>'));
+  // Tier 2 (Meta Info) must ONLY contain IP on the left and Uptime on the right (no SSID/Client stuffed in Tier 2)
+  assert.ok(apHtml.includes('<span class="t-sub-left">192.168.1.50</span>'));
   assert.ok(apHtml.includes('<span class="t-sub-right">up 2h</span>'));
-  // Must NOT duplicate with .bar-ap box
-  assert.ok(!apHtml.includes('bar-ap'));
-  assert.ok(!apHtml.includes('class="bars"'));
-  // Must NOT display ping latency (ms) on tile
+  // Tier 3 (Dynamic Metrics Zone) must contain independent chips for SSID and Clients
+  assert.ok(apHtml.includes('class="bars t-metrics"'));
+  assert.ok(apHtml.includes('chip-ssid'));
+  assert.ok(apHtml.includes('2 SSID'));
+  assert.ok(apHtml.includes('chip-clients'));
+  assert.ok(apHtml.includes('12 Clients'));
   assert.ok(!apHtml.includes('2 ms'));
-  assert.ok(!apHtml.includes(' ms'));
 
-  // AP with CPU and RAM (e.g. Cisco/Mikrotik): CPU and RAM bars present, but no bar-ap
+  // Case B: AP with CPU and RAM + 4 SSID & 1 Client
   const apWithCpuHtml = sandbox.M.tile({
     id: 11,
     type: 'ap',
@@ -1878,23 +1880,43 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
     status: 'up',
     rtt: 3,
     total_ssids: 4,
-    total_clients: 25,
+    total_clients: 1,
     cpu: 15,
     ram: 40,
     uptime: 7200,
     since: Date.now() - 7200000,
   });
 
-  assert.ok(apWithCpuHtml.includes('4 SSID - 25 client'));
-  assert.ok(apWithCpuHtml.includes('<span class="t-sub-left">192.168.1.51 · 4 SSID - 25 client</span>'));
+  assert.ok(apWithCpuHtml.includes('<span class="t-sub-left">192.168.1.51</span>'));
   assert.ok(apWithCpuHtml.includes('<span class="t-sub-right">up 2h</span>'));
-  assert.ok(!apWithCpuHtml.includes('bar-ap'));
-  assert.ok(apWithCpuHtml.includes('class="bars"'));
+  assert.ok(apWithCpuHtml.includes('4 SSID'));
+  assert.ok(apWithCpuHtml.includes('1 Client'));
   assert.ok(apWithCpuHtml.includes('CPU 15%'));
   assert.ok(apWithCpuHtml.includes('RAM 40%'));
   assert.ok(!apWithCpuHtml.includes('3 ms'));
 
-  // Standard server device tile: address on left, uptime on right, justified to both margins
+  // Case C: Printer with Drum, Toner, Status, and Page Count chip ("145.958 trang")
+  const printerHtml = sandbox.M.tile({
+    id: 13,
+    type: 'printer',
+    name: 'HP-M404dn',
+    address: '192.168.1.88',
+    status: 'up',
+    drum: 82,
+    toner: 65,
+    printer_status: 'Sẵn sàng',
+    page_count: 145958,
+    uptime: 86400,
+    since: Date.now() - 86400000,
+  });
+  assert.ok(printerHtml.includes('<span class="t-sub-left">192.168.1.88</span>'));
+  assert.ok(printerHtml.includes('<span class="t-sub-right">up 2h</span>'));
+  assert.ok(printerHtml.includes('Drum 82%'));
+  assert.ok(printerHtml.includes('Mực 65%'));
+  assert.ok(printerHtml.includes('chip-pages'));
+  assert.ok(printerHtml.includes('145.958 trang'));
+
+  // Case D: Standard server device tile
   const serverHtml = sandbox.M.tile({
     id: 12,
     type: 'server',
@@ -1904,14 +1926,18 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
     rtt: 1.2,
     cpu: 25,
     ram: 60,
+    disk: 48,
+    temperature: 52,
     uptime: 86400,
     since: Date.now() - 86400000,
   });
-  assert.ok(serverHtml.includes('10.0.0.10 · up 2h'));
   assert.ok(serverHtml.includes('<span class="t-sub-left">10.0.0.10</span>'));
   assert.ok(serverHtml.includes('<span class="t-sub-right">up 2h</span>'));
+  assert.ok(serverHtml.includes('CPU 25%'));
+  assert.ok(serverHtml.includes('RAM 60%'));
+  assert.ok(serverHtml.includes('Disk 48%'));
+  assert.ok(serverHtml.includes('Temp 52°C'));
   assert.ok(!serverHtml.includes('1.2 ms'));
-  assert.ok(!serverHtml.includes(' ms'));
 });
 
 test('ui events: separate message text and standardized .event-actions container for AI and Copy Logs buttons', () => {

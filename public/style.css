@@ -95,7 +95,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 
 /* ---------- tiles ---------- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-.tile { --s: var(--c-unknown); display: block; color: var(--text); background: color-mix(in srgb, var(--s) 9%, var(--panel));
+.tile { --s: var(--c-unknown); display: flex; flex-direction: column; justify-content: flex-start; min-height: 76px; color: var(--text); background: color-mix(in srgb, var(--s) 9%, var(--panel));
   border: 1px solid color-mix(in srgb, var(--s) 55%, var(--border)); border-left: 6px solid var(--s); border-radius: var(--radius);
   padding: 9px 12px; cursor: pointer; position: relative; box-shadow: 0 0 10px color-mix(in srgb, var(--s) 18%, transparent); transition: transform .1s; }
 .tile:hover { transform: translateY(-2px); }
@@ -139,7 +139,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 :root[data-theme="neon"] .tile.tile-drag-clone {
   box-shadow: 0 20px 48px rgba(0, 0, 0, .8), 0 0 28px var(--accent) !important;
 }
-.tile .t-top { display: flex; align-items: center; gap: 6px; }
+.tile .t-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .tile .t-name { font-weight: 700; font-size: 14.5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 .tile .t-state {
   font-size: 11px; font-weight: 700; color: var(--s); text-transform: uppercase; letter-spacing: .4px;
@@ -148,7 +148,7 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
   border: 1px solid color-mix(in srgb, var(--s) 45%, transparent); line-height: 1.25;
 }
 .tile .t-sub {
-  font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 3px;
+  font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 4px;
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -158,11 +158,65 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .tile .t-sub-right {
   flex-shrink: 0; white-space: nowrap; text-align: right; margin-left: auto;
 }
-.tile .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 4px 6px; margin-top: 6px; }
-.bar { font-size: 10.5px; color: var(--muted); line-height: 1.2; }
-.bar i { display: block; height: 4px; border-radius: 2px; background: var(--panel2); margin-top: 2px; overflow: hidden; }
+.tile .bars, .tile .t-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.bar { font-size: 10.5px; color: var(--muted); line-height: 1.25; min-width: 0; }
+.bar i { display: block; height: 4px; border-radius: 2px; background: var(--panel2); margin-top: 3px; overflow: hidden; }
 .bar i b { display: block; height: 100%; background: var(--c-ok); }
 .bar.bar-na { opacity: 0.6; } .bar.bar-na i b { display: none; }
+.metric-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.metric-chip .mc-ico { font-size: 11px; line-height: 1; flex-shrink: 0; }
+.metric-chip .mc-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.metric-chip.chip-ssid {
+  color: var(--c-low);
+  border-color: color-mix(in srgb, var(--c-low) 38%, var(--border));
+  background: color-mix(in srgb, var(--c-low) 10%, var(--panel2));
+}
+.metric-chip.chip-clients {
+  color: var(--c-ok);
+  border-color: color-mix(in srgb, var(--c-ok) 38%, var(--border));
+  background: color-mix(in srgb, var(--c-ok) 10%, var(--panel2));
+}
+.metric-chip.chip-pages {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel2));
+}
+.metric-chip.chip-status {
+  color: var(--muted);
+}
+.metric-chip.chip-reason {
+  grid-column: 1 / -1;
+  color: var(--c-medium);
+  border-color: color-mix(in srgb, var(--c-medium) 42%, var(--border));
+  background: color-mix(in srgb, var(--c-medium) 10%, var(--panel2));
+}
+.tile.down .metric-chip.chip-reason {
+  color: var(--c-critical);
+  border-color: color-mix(in srgb, var(--c-critical) 45%, var(--border));
+  background: color-mix(in srgb, var(--c-critical) 12%, var(--panel2));
+}
 .bar.bar-ap { grid-column: 1 / -1; background: var(--panel2); border: 1px solid var(--border); border-radius: 4px; padding: 3px 8px; font-size: 11px; display: flex; align-items: center; justify-content: space-between; line-height: 18px; }
 .ap-arp-note {
   background: var(--panel2);
@@ -844,6 +898,25 @@ tr.ev-row.has-ai.ai-closed td {
 :root[data-theme="neon"] .tile .t-sub-right {
   color: #a4e5bb;
   font-weight: 700;
+}
+:root[data-theme="neon"] .metric-chip {
+  font-weight: 700;
+  text-shadow: none;
+}
+:root[data-theme="neon"] .metric-chip.chip-ssid {
+  color: #54a0ff;
+  border-color: rgba(59, 158, 255, 0.55);
+  background: rgba(59, 158, 255, 0.14);
+}
+:root[data-theme="neon"] .metric-chip.chip-clients {
+  color: #39ff14;
+  border-color: rgba(57, 255, 20, 0.55);
+  background: rgba(57, 255, 20, 0.12);
+}
+:root[data-theme="neon"] .metric-chip.chip-pages {
+  color: #d2ffe0;
+  border-color: rgba(57, 255, 20, 0.38);
+  background: rgba(57, 255, 20, 0.08);
 }
 
 /* 3. Tiêu đề trạng thái trang chi tiết thiết bị (.hero .h-state) */
