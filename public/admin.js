@@ -325,7 +325,7 @@
             <div class="field">
               <label>${isEn ? 'Bot Token (from @BotFather)' : 'Bot Token (Lấy từ @BotFather)'} ${tg.has_bot_token ? `<span class="ai-badge" style="margin-left:4px">${isEn ? 'Saved' : 'Đã lưu'}</span>` : ''}</label>
               <div class="inp-with-action">
-                <input class="inp" type="password" name="bot_token" id="tg-bot-token" autocomplete="new-password" value="${esc(tg.bot_token || '')}" placeholder="1234567890:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw">
+                <input class="inp" type="password" name="bot_token" id="tg-bot-token" autocomplete="new-password" value="${esc(tg.bot_token || '')}" placeholder="${isEn ? 'Paste your bot token here...' : 'Dán mã Bot Token vào đây...'}">
                 <button type="button" class="btn-eye" id="btn-tg-eye" title="${isEn ? 'Show / Hide Bot Token' : 'Hiện / Ẩn Bot Token'}" aria-label="Toggle Bot Token visibility">👁️</button>
               </div>
               <span class="muted" style="font-size:11.5px;display:block;margin-top:4px">${isEn
