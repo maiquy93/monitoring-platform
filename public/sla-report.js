@@ -200,6 +200,10 @@
         `;
       }).join('');
 
+      const prevFormTop = form.scrollTop;
+      const prevBoxTop = box.scrollTop;
+      const prevBoxLeft = box.scrollLeft;
+
       box.innerHTML = `
         <table class="tbl" style="margin:0">
           <thead>
@@ -218,11 +222,14 @@
           <tbody>${bodyRows}</tbody>
         </table>
       `;
+      box.scrollTop = prevBoxTop;
+      box.scrollLeft = prevBoxLeft;
+      form.scrollTop = prevFormTop;
     };
 
     const loadReport = async () => {
       const box = $('#sla-table-container', form);
-      if (box) {
+      if (box && !currentReport) {
         box.innerHTML = `<div class="muted" style="padding:24px;text-align:center">⏳ ${isEn ? 'Calculating SLA metrics...' : 'Đang tổng hợp dữ liệu SLA...'}</div>`;
       }
       const qs = new URLSearchParams({

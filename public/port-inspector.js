@@ -76,8 +76,54 @@
     const autoChk = $('#pi-auto-chk', form);
     const refreshBtn = $('#pi-refresh-btn', form);
 
+    let isPointerDown = false;
+    let lastScrollAt = 0;
+    form.addEventListener('pointerdown', () => { isPointerDown = true; }, { passive: true });
+    window.addEventListener('pointerup', () => { isPointerDown = false; }, { passive: true });
+    form.addEventListener('scroll', () => { lastScrollAt = Date.now(); }, { capture: true, passive: true });
+
+    const ensureSkeleton = () => {
+      if ($('#pi-kpis-box', bodyEl)) return;
+      bodyEl.innerHTML = `
+        <div class="pi-kpis" id="pi-kpis-box"></div>
+        <div class="pi-faceplate" id="pi-faceplate-box"></div>
+        <div class="pi-tbl-wrap" id="pi-tbl-wrap-box">
+          <table class="tbl" style="margin:0">
+            <thead>
+              <tr>
+                <th>${isEn ? 'Interface / Alias' : 'Cổng / Mô tả'}</th>
+                <th>${isEn ? 'State' : 'Trạng thái'}</th>
+                <th>${isEn ? 'Link Speed' : 'Tốc độ Link'}</th>
+                <th>${isEn ? 'Live Bandwidth (RX / TX)' : 'Băng thông tức thời (RX / TX)'}</th>
+                <th>${isEn ? 'Cumulative Traffic' : 'Tổng lưu lượng (In / Out)'}</th>
+                <th>${isEn ? 'Errors / Flapping' : 'Lỗi gói / Chập chờn'}</th>
+              </tr>
+            </thead>
+            <tbody id="pi-tbody-box"></tbody>
+          </table>
+        </div>
+      `;
+    };
+
     const paint = () => {
       if (!lastData || !bodyEl) return;
+
+      // Capture current scroll positions before any DOM update
+      const prevFormTop = form.scrollTop;
+      const prevFace = $('#pi-faceplate-box', bodyEl);
+      const prevTbl = $('#pi-tbl-wrap-box', bodyEl);
+      const faceTop = prevFace ? prevFace.scrollTop : 0;
+      const faceLeft = prevFace ? prevFace.scrollLeft : 0;
+      const tblTop = prevTbl ? prevTbl.scrollTop : 0;
+      const tblLeft = prevTbl ? prevTbl.scrollLeft : 0;
+
+      ensureSkeleton();
+
+      const kpisBox = $('#pi-kpis-box', bodyEl);
+      const faceBox = $('#pi-faceplate-box', bodyEl);
+      const tblWrapBox = $('#pi-tbl-wrap-box', bodyEl);
+      const tbodyBox = $('#pi-tbody-box', bodyEl);
+
       const ports = Array.isArray(lastData.ports) ? lastData.ports : [];
       const q = searchQuery.toLowerCase().trim();
 
@@ -144,32 +190,29 @@
         </tr>`;
       }).join('');
 
-      bodyEl.innerHTML = `
-        <div class="pi-kpis">
+      if (kpisBox) {
+        kpisBox.innerHTML = `
           <div class="pi-kpi"><div class="pk-lbl">${isEn ? 'Total Ports' : 'Tổng số cổng'}</div><div class="pk-val">${lastData.total_ports}</div></div>
           <div class="pi-kpi"><div class="pk-lbl">${isEn ? 'Active (UP)' : 'Đang kết nối (UP)'}</div><div class="pk-val" style="color:var(--c-ok)">${lastData.up_count}</div></div>
           <div class="pi-kpi"><div class="pk-lbl">${isEn ? 'Link Down' : 'Không cắm (DOWN)'}</div><div class="pk-val">${lastData.down_count}</div></div>
           <div class="pi-kpi"><div class="pk-lbl">${isEn ? 'Errors / Flap' : 'Cổng lỗi / Chập chờn'}</div><div class="pk-val" style="color:${lastData.issue_count > 0 ? 'var(--c-critical)' : 'var(--c-ok)'}">${lastData.issue_count}</div></div>
-        </div>
-        <div class="pi-faceplate">${faceHtml}</div>
-        <div class="pi-tbl-wrap">
-          <table class="tbl" style="margin:0">
-            <thead>
-              <tr>
-                <th>${isEn ? 'Interface / Alias' : 'Cổng / Mô tả'}</th>
-                <th>${isEn ? 'State' : 'Trạng thái'}</th>
-                <th>${isEn ? 'Link Speed' : 'Tốc độ Link'}</th>
-                <th>${isEn ? 'Live Bandwidth (RX / TX)' : 'Băng thông tức thời (RX / TX)'}</th>
-                <th>${isEn ? 'Cumulative Traffic' : 'Tổng lưu lượng (In / Out)'}</th>
-                <th>${isEn ? 'Errors / Flapping' : 'Lỗi gói / Chập chờn'}</th>
-              </tr>
-            </thead>
-            <tbody>${rowsHtml || `<tr><td colspan="6" class="muted" style="text-align:center">${isEn ? 'No matching interfaces' : 'Không có cổng mạng phù hợp'}</td></tr>`}</tbody>
-          </table>
-        </div>
-      `;
+        `;
+      }
+      if (faceBox) {
+        faceBox.innerHTML = faceHtml;
+        faceBox.scrollTop = faceTop;
+        faceBox.scrollLeft = faceLeft;
+      }
+      if (tbodyBox) {
+        tbodyBox.innerHTML = rowsHtml || `<tr><td colspan="6" class="muted" style="text-align:center">${isEn ? 'No matching interfaces' : 'Không có cổng mạng phù hợp'}</td></tr>`;
+      }
+      if (tblWrapBox) {
+        tblWrapBox.scrollTop = tblTop;
+        tblWrapBox.scrollLeft = tblLeft;
+      }
+      form.scrollTop = prevFormTop;
 
-      $$('.pi-port-box', bodyEl).forEach((box) => {
+      $$('.pi-port-box', faceBox).forEach((box) => {
         box.onclick = () => {
           const pName = box.dataset.portName || '';
           searchInp.value = searchInp.value === pName ? '' : pName;
@@ -179,38 +222,43 @@
       });
     };
 
-    const loadPorts = async () => {
+    const loadPorts = async (opts = {}) => {
+      const silent = opts && opts.silent === true;
       if (!document.body.contains(form)) {
         clearInterval(timer);
         return;
       }
-      if (refreshBtn) refreshBtn.disabled = true;
+      // Do not interrupt the user while they are dragging the scrollbar or actively scrolling
+      if (silent && (isPointerDown || Date.now() - lastScrollAt < 1200)) {
+        return;
+      }
+      if (!silent && refreshBtn) refreshBtn.disabled = true;
       try {
         lastData = await M.api('GET', `/api/devices/${d.id}/ports`);
         paint();
         // If this was the first sample (no bandwidth delta yet), schedule one fast follow-up poll in 1.2s
         if (lastData && !lastData.has_rate_sample && !form._secondSampleTriggered) {
           form._secondSampleTriggered = true;
-          setTimeout(() => { if (document.body.contains(form)) loadPorts(); }, 1200);
+          setTimeout(() => { if (document.body.contains(form)) loadPorts({ silent: true }); }, 1200);
         }
       } catch (err) {
         if (bodyEl && !lastData) {
           bodyEl.innerHTML = `<div class="panel err" style="margin:0">⚠️ ${esc(M.trData(err.message))}</div>`;
         }
       } finally {
-        if (refreshBtn) refreshBtn.disabled = false;
+        if (!silent && refreshBtn) refreshBtn.disabled = false;
       }
     };
 
     filterSel.onchange = () => { filterMode = filterSel.value; paint(); };
     searchInp.oninput = () => { searchQuery = searchInp.value; paint(); };
     autoChk.onchange = () => { autoRefresh = autoChk.checked; };
-    refreshBtn.onclick = loadPorts;
+    refreshBtn.onclick = () => loadPorts({ silent: false });
 
-    await loadPorts();
+    await loadPorts({ silent: false });
     timer = setInterval(() => {
       if (!document.body.contains(form)) { clearInterval(timer); return; }
-      if (autoRefresh) loadPorts();
+      if (autoRefresh) loadPorts({ silent: true });
     }, 4000);
   };
 
