@@ -1646,6 +1646,15 @@ test('events & ai tab navigation: router supports #/events and #/events/ai, view
   const htmlReopened = mod.eventsTable([testEvent], true);
   assert.match(htmlReopened, /<tr id="ai-ev-row-101" class="">/);
   assert.doesNotMatch(htmlReopened, /ai-closed/);
+
+  // 4. Verify Copy Logs handler order & card button integration
+  const copyLogIdx = viewsJs.indexOf("const copyLogBtn = ev.target.closest('[data-ai-copy-logs]');");
+  const evRowIdx = viewsJs.indexOf("const evRow = ev.target.closest('tr.ev-row.has-ai');");
+  assert.ok(copyLogIdx !== -1 && evRowIdx !== -1, 'Both copyLogBtn and evRow handlers must exist');
+  assert.ok(copyLogIdx < evRowIdx, 'copyLogBtn handler MUST execute BEFORE evRow handler so event row click guard does not swallow copy logs');
+
+  assert.match(viewsJs, /data-ai-copy-logs="\$\{r\.event_id \|\| ''\}"/);
+  assert.match(viewsJs, /if \(isEligible \|\| hasAi\) \{\s*aiBtns\.push\(`<button type="button" class="ai-badge tech-copy" data-ai-copy-logs="\$\{e\.id\}"/);
 });
 
 test('ai: manual forced incident analysis, down device diagnosis, reasoning models, and error resilience', async () => {

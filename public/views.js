@@ -242,16 +242,23 @@
       ? `<a href="#/device/${r.device_id}"><b>${esc(r.device_name)}</b></a>`
       : `<b>${esc(tr(r.device_name || (isEn ? 'System' : 'Hệ thống')))}</b>`;
 
+    const hasLogTarget = (r.event_id || r.device_id) && !isDaily;
+    const copyLogBtnHtml = hasLogTarget
+      ? `<button type="button" class="btn sm tech-copy" data-ai-copy-logs="${r.event_id || ''}" data-dev-id="${r.device_id || ''}" style="padding:1px 8px;font-size:11px;margin-right:6px" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude / Gemini' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude / Gemini'}">📋 ${isEn ? 'Copy Tech Logs' : 'Copy Logs Kỹ thuật'}</button>`
+      : '';
+
     return `<div class="ai-card ${isDaily ? 'daily' : ''}">
       ${showHeader ? `<div class="ai-card-head">
         ${kindBadge} ${devLink}
         <span class="muted">· ${M.fmtTime(r.ts)}</span>
         <span class="spacer"></span>
+        ${copyLogBtnHtml}
         ${srcBadge}
       </div>` : `<div class="ai-card-head" style="margin-bottom:6px">
         <b>🤖 ${isEn ? 'AI Diagnosis & Remediation' : 'AI Chẩn đoán & Đề xuất xử lý'}</b>
         <span class="muted">· ${M.fmtTime(r.ts)}</span>
         <span class="spacer"></span>
+        ${copyLogBtnHtml}
         ${srcBadge}
         ${r.event_id ? `<button type="button" class="btn sm" data-ai-toggle="${r.event_id}" style="padding:1px 7px;font-size:11px;margin-left:6px" title="${isEn ? 'Collapse AI report' : 'Thu gọn bảng phân tích AI'}">▲ ${isEn ? 'Collapse' : 'Thu gọn'}</button>` : ''}
       </div>`}
@@ -468,23 +475,17 @@
       return;
     }
 
-    const evRow = ev.target.closest('tr.ev-row.has-ai');
-    if (evRow) {
-      if (ev.target.closest('a, button, input, textarea, select')) return;
-      const id = evRow.dataset.evId;
-      toggleAiRow(id);
-      return;
-    }
-
     const copyLogBtn = ev.target.closest('[data-ai-copy-logs]');
     if (copyLogBtn) {
       const id = Number(copyLogBtn.dataset.aiCopyLogs);
       const devId = copyLogBtn.dataset.devId;
-      const origText = copyLogBtn.textContent;
+      const origHtml = copyLogBtn.innerHTML;
       copyLogBtn.disabled = true;
-      copyLogBtn.textContent = isEn ? '⏳ Copying...' : '⏳ Đang lấy logs...';
+      copyLogBtn.innerHTML = isEn ? '⏳ Copying...' : '⏳ Đang lấy logs...';
       try {
-        const q = id ? `event_id=${id}&lang=${M.S.lang}` : `device_id=${devId}&lang=${M.S.lang}`;
+        const q = id
+          ? (devId ? `event_id=${id}&device_id=${devId}&lang=${M.S.lang}` : `event_id=${id}&lang=${M.S.lang}`)
+          : `device_id=${devId}&lang=${M.S.lang}`;
         const res = await M.api('GET', `/api/ai/technical-logs?${q}`);
         try {
           await navigator.clipboard.writeText(res.log_text);
@@ -502,10 +503,11 @@
         M.toast(M.trData(err.message));
       } finally {
         copyLogBtn.disabled = false;
-        copyLogBtn.textContent = origText;
+        copyLogBtn.innerHTML = origHtml;
       }
       return;
     }
+
     const analyzeBtn = ev.target.closest('[data-ai-analyze]');
     if (analyzeBtn) {
       const id = Number(analyzeBtn.dataset.aiAnalyze);
@@ -539,6 +541,15 @@
       } finally {
         analyzeBtn.disabled = false;
       }
+      return;
+    }
+
+    const evRow = ev.target.closest('tr.ev-row.has-ai');
+    if (evRow) {
+      if (ev.target.closest('a, button, input, textarea, select')) return;
+      const id = evRow.dataset.evId;
+      toggleAiRow(id);
+      return;
     }
   });
 

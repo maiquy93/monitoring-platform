@@ -564,12 +564,12 @@ body.tv .dual-main-pinned .kpi.big .val {
 .ai-badge:hover {
   background: color-mix(in srgb, var(--accent) 24%, var(--panel2));
 }
-.ai-badge.tech-copy {
+.ai-badge.tech-copy, .btn.tech-copy {
   background: color-mix(in srgb, var(--c-ok) 12%, var(--panel2));
   color: var(--c-ok);
   border-color: color-mix(in srgb, var(--c-ok) 35%, var(--border));
 }
-.ai-badge.tech-copy:hover {
+.ai-badge.tech-copy:hover, .btn.tech-copy:hover {
   background: color-mix(in srgb, var(--c-ok) 22%, var(--panel2));
 }
 tr.ev-row.has-ai {
