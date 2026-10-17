@@ -350,10 +350,21 @@ function createApp(db, monitor, opts = {}) {
     ctx.res.end(out.text);
   });
 
-  require('./diagnostics').registerRoutes({ route, db, monitor, readBody, send, idOf, bad, HttpError, audit }, opts.diag);
-  require('./discovery').registerRoutes({ route, db, monitor, readBody, send, idOf, bad, HttpError, audit, cleanDevice, insertDevice, setGroups }, opts.discovery);
-  require('./port-inspector').registerRoutes({ route, db, monitor, readBody, send, idOf, bad, HttpError, audit }, opts.ports);
-  require('./sla-report').registerRoutes({ route, db, monitor, send, SEC_HEADERS });
+  for (const [modName, modOpts] of [
+    ['./diagnostics', opts.diag],
+    ['./discovery', opts.discovery],
+    ['./port-inspector', opts.ports],
+    ['./sla-report', opts.sla],
+  ]) {
+    try {
+      require(modName).registerRoutes(
+        { route, db, monitor, readBody, send, idOf, bad, HttpError, audit, cleanDevice, insertDevice, setGroups, SEC_HEADERS },
+        modOpts
+      );
+    } catch (err) {
+      console.error(`[addon] failed to load ${modName}:`, err.message);
+    }
+  }
 
   const RANGES = { '1h': 3600e3, '6h': 6 * 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
   route('GET', '/api/devices/:id/history', 'any', (ctx) => {
