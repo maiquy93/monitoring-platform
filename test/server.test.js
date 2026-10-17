@@ -1913,3 +1913,95 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
   assert.ok(!serverHtml.includes('1.2 ms'));
   assert.ok(!serverHtml.includes(' ms'));
 });
+
+test('ui events: separate message text and standardized .event-actions container for AI and Copy Logs buttons', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
+
+  // 1. CSS rules for event-actions flex container and event-msg
+  assert.match(css, /\.event-msg\s*\{[^}]*line-height/);
+  assert.match(css, /\.event-actions\s*\{[^}]*display:\s*flex/);
+  assert.match(css, /\.event-actions\s*\{[^}]*gap:\s*8px/);
+  assert.match(css, /\.event-actions\s*\{[^}]*align-items:\s*center/);
+  assert.match(css, /\.event-actions\s*\{[^}]*margin-top:\s*6px/);
+  assert.match(css, /\.event-actions\s*\{[^}]*flex-wrap:\s*wrap/);
+  assert.match(css, /\.event-actions\s+\.ai-badge\s*\{[^}]*margin-left:\s*0/);
+
+  // 2. Evaluation of M.eventsTable rendering
+  const M = {
+    esc: (s) => String(s || ''),
+    $: () => null,
+    $$: () => [],
+    t: (s) => s,
+    trData: (s) => s,
+    views: {},
+    S: { lang: 'vi', user: { role: 'admin' }, settings: { thresholds: {} } },
+    fmtTime: () => '10:00:00',
+    isAiEligibleEvent: (e) => e.kind !== 'up' && e.kind !== 'audit',
+    isAiRowHidden: () => true,
+    renderAiReportCard: () => '<div>AI Card</div>',
+  };
+
+  const sandbox = {
+    M,
+    window: { M },
+    document: { addEventListener: () => {}, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [] },
+    localStorage: { getItem: () => null },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(viewsJs, sandbox);
+
+  // Event with action buttons (eligible for AI analyze & copy logs)
+  const critEvent = {
+    id: 101,
+    device_id: 1,
+    device_name: 'Core-Switch',
+    kind: 'dos',
+    severity: 'critical',
+    message: 'Nghi ngờ tấn công Flood/DoS',
+    ts: Date.now(),
+  };
+
+  const tblHtml = sandbox.M.eventsTable([critEvent], true);
+  // Verify message is separated into .event-msg
+  assert.ok(tblHtml.includes('<div class="event-msg">Nghi ngờ tấn công Flood/DoS</div>'));
+  // Verify action buttons are grouped into .event-actions
+  assert.ok(tblHtml.includes('<div class="event-actions">'));
+  assert.ok(tblHtml.includes('data-ai-analyze="101"'));
+  assert.ok(tblHtml.includes('data-ai-copy-logs="101"'));
+
+  // Event with existing AI diagnosis
+  const aiEvent = {
+    id: 102,
+    device_id: 1,
+    device_name: 'Core-Switch',
+    kind: 'down',
+    severity: 'critical',
+    message: 'Mất kết nối ICMP',
+    ts: Date.now(),
+    ai_report: { id: 1, issue: 'Down' },
+  };
+  const aiTblHtml = sandbox.M.eventsTable([aiEvent], false);
+  assert.ok(aiTblHtml.includes('<div class="event-msg">Mất kết nối ICMP</div>'));
+  assert.ok(aiTblHtml.includes('<div class="event-actions">'));
+  assert.ok(aiTblHtml.includes('data-ai-toggle="102"'));
+  assert.ok(aiTblHtml.includes('data-ai-copy-logs="102"'));
+
+  // Event without actions (audit / system)
+  const auditEvent = {
+    id: 103,
+    device_id: 1,
+    device_name: 'Core-Switch',
+    kind: 'audit',
+    severity: 'none',
+    message: 'Khởi động lại hệ thống thành công',
+    ts: Date.now(),
+  };
+  const auditTblHtml = sandbox.M.eventsTable([auditEvent], false);
+  assert.ok(auditTblHtml.includes('<div class="event-msg">Khởi động lại hệ thống thành công</div>'));
+  assert.ok(!auditTblHtml.includes('<div class="event-actions">'));
+});
+

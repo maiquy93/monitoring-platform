@@ -448,11 +448,14 @@
           ? (isEn ? 'Click to show AI diagnosis' : 'Bấm vào sự kiện để hiện bảng phân tích AI')
           : (isEn ? 'Click to hide AI diagnosis' : 'Bấm vào sự kiện để ẩn bảng phân tích AI'))
         : '';
+      const actionsHtml = aiBtns.length
+        ? `<div class="event-actions">${aiBtns.join('')}</div>`
+        : '';
       return `<tr class="ev-row ${hasAi ? 'has-ai' : ''} ${hasAi && isHidden ? 'ai-closed' : ''}" data-ev-id="${e.id}" ${rowTitle ? `title="${rowTitle}"` : ''}>
         <td>${M.fmtTime(e.ts)}</td>
         ${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
         <td><span class="sev-badge ${badge(e)} ev-${e.kind}">${esc(label[e.kind] || e.kind)}</span></td>
-        <td>${esc(tr(e.message))} ${aiBtns.join('')}</td>
+        <td><div class="event-msg">${esc(tr(e.message))}</div>${actionsHtml}</td>
       </tr>
       <tr id="ai-ev-row-${e.id}" class="${isHidden ? 'hidden' : ''}">
         <td colspan="${colSpan}" style="padding-top:0;border-top:none">${hasAi ? M.renderAiReportCard(e.ai_report, false) : ''}</td>

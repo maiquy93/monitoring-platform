@@ -618,6 +618,24 @@ body.tv .dual-main-pinned .kpi.big .val {
 .ai-badge.tech-copy:hover, .btn.tech-copy:hover {
   background: color-mix(in srgb, var(--c-ok) 22%, var(--panel2));
 }
+.event-msg {
+  line-height: 1.45;
+  word-break: break-word;
+}
+.event-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.event-actions .ai-badge {
+  margin-left: 0;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
 tr.ev-row.has-ai {
   cursor: pointer;
   user-select: text;
