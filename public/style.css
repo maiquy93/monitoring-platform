@@ -149,7 +149,14 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 }
 .tile .t-sub {
   font-size: 11.5px; line-height: 1.35; color: var(--muted); margin-top: 3px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tile .t-sub-left {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1;
+}
+.tile .t-sub-right {
+  flex-shrink: 0; white-space: nowrap; text-align: right; margin-left: auto;
 }
 .tile .bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(65px, 1fr)); gap: 4px 6px; margin-top: 6px; }
 .bar { font-size: 10.5px; color: var(--muted); line-height: 1.2; }
@@ -815,6 +822,10 @@ tr.ev-row.has-ai.ai-closed td {
 :root[data-theme="neon"] .tile .t-sub {
   color: #8ed6aa;
   font-weight: 600;
+}
+:root[data-theme="neon"] .tile .t-sub-right {
+  color: #a4e5bb;
+  font-weight: 700;
 }
 
 /* 3. Tiêu đề trạng thái trang chi tiết thiết bị (.hero .h-state) */

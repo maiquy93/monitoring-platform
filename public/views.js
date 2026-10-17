@@ -35,16 +35,23 @@
   M.tile = (d) => {
     const ago = M.fmtDur((Date.now() - d.since) / 1000);
     const numLoc = M.S.lang === 'en' ? 'en-US' : 'vi-VN';
-    let sub;
-    if (d.status === 'down') sub = `${tr(d.reasons[0] || t('Mất kết nối'))} · ${ago}`;
-    else if (d.status === 'maint') sub = t('Đang bảo trì (tắt cảnh báo)');
-    else if (d.status === 'unknown') sub = t('Chưa có dữ liệu');
-    else if (d.type === 'printer') {
+    let subLeft = '';
+    let subRight = '';
+    if (d.status === 'down') {
+      subLeft = d.address ? `${d.address} · ${tr(d.reasons[0] || t('Mất kết nối'))}` : tr(d.reasons[0] || t('Mất kết nối'));
+      subRight = ago;
+    } else if (d.status === 'maint') {
+      subLeft = d.address || '';
+      subRight = t('Đang bảo trì');
+    } else if (d.status === 'unknown') {
+      subLeft = d.address || '';
+      subRight = t('Chưa có dữ liệu');
+    } else if (d.type === 'printer') {
       const parts = [d.address];
       if (d.printer_status) parts.push(tr(d.printer_status));
-      if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString(numLoc)} ${t('trang')}`);
       if (d.printer_errors && d.printer_errors.length && !d.mute_local_alerts) parts.unshift(tr(d.printer_errors[0]));
-      sub = parts.filter(Boolean).join(' · ');
+      subLeft = parts.filter(Boolean).join(' · ');
+      subRight = d.page_count != null ? `${Number(d.page_count).toLocaleString(numLoc)} ${t('trang')}` : (d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '');
     } else if (d.type === 'ap') {
       const parts = [d.address];
       if (d.status === 'warning' && d.reasons && d.reasons.length) parts.push(tr(d.reasons[0]));
@@ -54,10 +61,12 @@
         const wifi = s && c ? `${s} - ${c}` : (s || c);
         if (wifi) parts.push(wifi);
       }
-      if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
-      sub = parts.filter(Boolean).join(' · ');
-    } else if (d.status === 'warning') sub = tr(d.reasons[0]);
-    else {
+      subLeft = parts.filter(Boolean).join(' · ');
+      subRight = d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '';
+    } else if (d.status === 'warning') {
+      subLeft = d.address ? `${d.address} · ${tr(d.reasons[0])}` : tr(d.reasons[0]);
+      subRight = d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '';
+    } else {
       const parts = [d.address];
       if (d.total_ssids != null || d.total_clients != null) {
         const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
@@ -65,8 +74,8 @@
         const wifi = s && c ? `${s} - ${c}` : (s || c);
         if (wifi) parts.push(wifi);
       }
-      if (d.uptime != null) parts.push(`up ${M.fmtDur(d.uptime)}`);
-      sub = parts.filter(Boolean).join(' · ');
+      subLeft = parts.filter(Boolean).join(' · ');
+      subRight = d.uptime != null ? `up ${M.fmtDur(d.uptime)}` : '';
     }
     let bars = '';
     if (d.status === 'up' || d.status === 'warning') {
@@ -158,9 +167,13 @@
         alertBadges = `<div class="t-alert-row">${items.join('')}</div>`;
       }
     }
+    const subTitle = [subLeft, subRight].filter(Boolean).join(' · ');
+    const subHtml = subRight
+      ? `<div class="t-sub" title="${esc(subTitle)}"><span class="t-sub-left">${esc(subLeft)}</span><span class="t-sub-right">${esc(subRight)}</span></div>`
+      : `<div class="t-sub" title="${esc(subTitle)}"><span class="t-sub-left">${esc(subLeft)}</span></div>`;
     return `<a class="tile ${M.statusClass(d)}" href="#/device/${d.id}" data-id="${d.id}" draggable="false">
       <div class="t-top"><span class="t-ico">${M.ICON[d.type] || ''}</span><span class="t-name" title="${esc(d.name)}">${esc(d.name)}</span>
-      <span class="t-state">${M.STATE_NAME[d.status]}</span></div>${alertBadges}<div class="t-sub" title="${esc(sub)}">${esc(sub)}</div>${bars}</a>`;
+      <span class="t-state">${M.STATE_NAME[d.status]}</span></div>${alertBadges}${subHtml}${bars}</a>`;
   };
 
   const groupDevices = (g) => devs().filter((d) => d.groups.includes(g.id));

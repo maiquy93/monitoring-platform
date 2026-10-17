@@ -1808,12 +1808,15 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
   const css = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
   const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
 
-  // 1. CSS optimizations for moderate, compact device tile height
+  // 1. CSS optimizations for moderate, compact device tile height & two-margin justification
   assert.match(css, /\.tile\s*\{[^}]*padding:\s*9px\s+12px/);
   assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*font-size:\s*11\.5px/);
+  assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*justify-content:\s*space-between/);
   assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*overflow:\s*hidden/);
   assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*text-overflow:\s*ellipsis/);
   assert.match(css, /\.tile\s+\.t-sub\s*\{[^}]*white-space:\s*nowrap/);
+  assert.match(css, /\.tile\s+\.t-sub-left\s*\{[^}]*overflow:\s*hidden/);
+  assert.match(css, /\.tile\s+\.t-sub-right\s*\{[^}]*text-align:\s*right/);
   assert.match(css, /\.tile\s+\.bars\s*\{[^}]*margin-top:\s*6px/);
   assert.match(css, /:root\[data-theme="neon"\]\s+\.tile\s+\.t-sub/);
 
@@ -1855,8 +1858,10 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
     since: Date.now() - 3600000,
   });
 
-  // Must contain single unified info "2 SSID - 1 client"
+  // Must contain single unified info "2 SSID - 1 client" on left, uptime on right
   assert.ok(apHtml.includes('2 SSID - 1 client'));
+  assert.ok(apHtml.includes('<span class="t-sub-left">192.168.1.50 · 2 SSID - 1 client</span>'));
+  assert.ok(apHtml.includes('<span class="t-sub-right">up 2h</span>'));
   // Must NOT duplicate with .bar-ap box
   assert.ok(!apHtml.includes('bar-ap'));
   assert.ok(!apHtml.includes('class="bars"'));
@@ -1881,13 +1886,15 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
   });
 
   assert.ok(apWithCpuHtml.includes('4 SSID - 25 client'));
+  assert.ok(apWithCpuHtml.includes('<span class="t-sub-left">192.168.1.51 · 4 SSID - 25 client</span>'));
+  assert.ok(apWithCpuHtml.includes('<span class="t-sub-right">up 2h</span>'));
   assert.ok(!apWithCpuHtml.includes('bar-ap'));
   assert.ok(apWithCpuHtml.includes('class="bars"'));
   assert.ok(apWithCpuHtml.includes('CPU 15%'));
   assert.ok(apWithCpuHtml.includes('RAM 40%'));
   assert.ok(!apWithCpuHtml.includes('3 ms'));
 
-  // Standard server device tile: address and uptime only, no ping latency
+  // Standard server device tile: address on left, uptime on right, justified to both margins
   const serverHtml = sandbox.M.tile({
     id: 12,
     type: 'server',
@@ -1901,6 +1908,8 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
     since: Date.now() - 86400000,
   });
   assert.ok(serverHtml.includes('10.0.0.10 · up 2h'));
+  assert.ok(serverHtml.includes('<span class="t-sub-left">10.0.0.10</span>'));
+  assert.ok(serverHtml.includes('<span class="t-sub-right">up 2h</span>'));
   assert.ok(!serverHtml.includes('1.2 ms'));
   assert.ok(!serverHtml.includes(' ms'));
 });
