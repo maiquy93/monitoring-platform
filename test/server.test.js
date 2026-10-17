@@ -1159,6 +1159,13 @@ test('ai: unified VI/EN templates, JSON parser, and 24h trend pre-calculation', 
   assert.equal(parsedViKeys.issue, 'Ổ đĩa báo lỗi Bad Sector');
   assert.equal(parsedViKeys.prediction, 'Đầy ổ sau 1.7 ngày');
 
+  // Tolerates array-wrapped objects, case insensitivity, and alternative Vietnamese keys
+  const parsedArray = parseAiJsonResponse('[{"ISSUE":"CPU Saturation","ROOT_CAUSE":"Stuck loop","GIAI_PHAP":"Restart service","XU_HUONG":"Stable"}]');
+  assert.equal(parsedArray.issue, 'CPU Saturation');
+  assert.equal(parsedArray.cause, 'Stuck loop');
+  assert.equal(parsedArray.solution, 'Restart service');
+  assert.equal(parsedArray.prediction, 'Stable');
+
   // 4. Server-side 24h linear trend calculation (saves sending raw metric arrays)
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mon-ai-'));
   const db = open(path.join(dir, 'm.db'));
@@ -1250,6 +1257,35 @@ test('ai: end-to-end incident diagnosis, token-saving cache, settings toggle, an
     assert.equal(testEn.body.live_api_called, true);
     assert.match(testEn.body.parsed.issue, /Critical server incident/);
     assert.equal(llmCalls.length, 2);
+
+    // 2b. Verify Gemini provider options (reasoning_effort: none, json_object)
+    const testGemini = await t.api('POST', '/api/ai/test', {
+      lang: 'vi',
+      ai: { provider: 'gemini', model: 'gemini-3.8-flash', api_key: 'test-gemini-key' },
+    });
+    assert.equal(testGemini.status, 200);
+    assert.equal(testGemini.body.live_api_called, true);
+    const geminiCall = llmCalls[llmCalls.length - 1];
+    assert.equal(geminiCall.body.reasoning_effort, 'none');
+    assert.deepEqual(geminiCall.body.response_format, { type: 'json_object' });
+
+    // Truncated token generation (finish_reason = length) surfaces descriptive error
+    const savedFetchFn = t.monitor.ai.fetchFn;
+    t.monitor.ai.fetchFn = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ finish_reason: 'length', message: { content: '{"issue":"Truncated...' } }],
+        usage: { prompt_tokens: 300, completion_tokens: 15 },
+      }),
+    });
+    const testTruncated = await t.api('POST', '/api/ai/test', {
+      lang: 'vi',
+      ai: { provider: 'gemini', model: 'gemini-3.8-flash', api_key: 'test-gemini-key' },
+    });
+    assert.equal(testTruncated.status, 200);
+    assert.match(testTruncated.body.api_error, /finish_reason=length/);
+    t.monitor.ai.fetchFn = savedFetchFn;
 
     // 3. Create a Critical Server & a Low-severity Workstation
     const srvRes = await t.api('POST', '/api/devices', {
@@ -1547,6 +1583,124 @@ test('events & ai tab navigation: router supports #/events and #/events/ai, view
 
   // Verify views.js clears interval before re-scheduling to prevent timer leaks
   assert.match(viewsJs, /clearInterval\(this\.t\);/);
+
+  // Verify event row click-to-toggle AI report and backwards compatibility
+  assert.match(viewsJs, /class="ev-row \$\{hasAi \? 'has-ai' : ''\}"/);
+  assert.match(viewsJs, /const evRow = ev\.target\.closest\('tr\.ev-row\.has-ai'\);/);
+  assert.match(viewsJs, /if \(ev\.target\.closest\('a, button, input, textarea, select'\)\) return;/);
+  assert.match(viewsJs, /const toggleBtn = ev\.target\.closest\('\[data-ai-toggle\]'\);/);
+
+  const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  assert.match(styleCss, /tr\.ev-row\.has-ai\s*\{[^}]*cursor:\s*pointer;/);
 });
+
+test('ai: manual forced incident analysis, down device diagnosis, reasoning models, and error resilience', async () => {
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+
+    // 1. Enable AI with Groq custom provider and reasoning model (e.g. openai/gpt-oss-120b)
+    const llmCalls = [];
+    t.monitor.ai.fetchFn = async (url, opts) => {
+      const body = JSON.parse(opts.body);
+      llmCalls.push({ url, headers: opts.headers, body });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                issue: `AI Diagnosis for ${body.model}`,
+                cause: 'Network saturation or interface down',
+                solution: '1. Check switch port. 2. Restart interface.',
+                prediction: 'Service will stabilize once interface is restored.',
+              }),
+            },
+          }],
+          usage: { prompt_tokens: 350, completion_tokens: 280 },
+        }),
+      };
+    };
+
+    await t.api('PUT', '/api/settings', {
+      ai: {
+        enabled: true,
+        provider: 'custom',
+        api_url: 'https://api.groq.com/openai/v1/chat/completions',
+        api_key: 'gsk_test_key_mock_123',
+        model: 'openai/gpt-oss-120b',
+        max_tokens: 800,
+      },
+    });
+
+    // 2. Create a server device that is currently marked 'down'
+    const createRes = await t.api('POST', '/api/devices', {
+      name: 'srv-down-test',
+      type: 'server',
+      address: '10.0.0.99',
+      check_icmp: 1,
+      severity: 'critical',
+    });
+    const devId = createRes.body.id;
+    const dev = t.monitor.devices.get(devId);
+    const st = t.monitor.state.get(devId);
+    st.status = 'down'; // Simulate device is down right now
+
+    // 3. Insert a critical DoS event and a Down event for this device
+    const now = Date.now();
+    const evDosId = t.monitor.db.prepare(
+      "INSERT INTO events(ts, device_id, device_name, kind, severity, message) VALUES(?, ?, ?, 'dos', 'critical', 'Nghi ngờ tấn công Flood/DoS (15.000 gói/s)')"
+    ).run(now - 60000, devId, 'srv-down-test').lastInsertRowid;
+
+    const evDownId = t.monitor.db.prepare(
+      "INSERT INTO events(ts, device_id, device_name, kind, severity, message) VALUES(?, ?, ?, 'down', 'critical', 'srv-down-test mất kết nối: Không ping được (ICMP)')"
+    ).run(now - 30000, devId, 'srv-down-test').lastInsertRowid;
+
+    // 4. Test "Phân tích AI" on Event in Events Tab for a DoS event even though device is currently DOWN
+    const resDos = await t.api('POST', '/api/ai/analyze', { event_id: Number(evDosId), lang: 'vi' });
+    assert.equal(resDos.status, 200);
+    assert.ok(resDos.body.report, 'Report must NOT be null when analyzing DoS event for down device');
+    assert.equal(resDos.body.report.event_id, Number(evDosId));
+    assert.equal(resDos.body.report.source, 'ai');
+    assert.match(resDos.body.report.issue, /AI Diagnosis for openai\/gpt-oss-120b/);
+
+    // Verify reasoning_effort was passed as 'low' for Groq with reasoning model
+    const lastCall1 = llmCalls[llmCalls.length - 1];
+    assert.equal(lastCall1.body.reasoning_effort, 'low', 'Groq with reasoning model must set reasoning_effort=low');
+    assert.equal(lastCall1.body.response_format.type, 'json_object');
+    assert.ok(lastCall1.body.max_tokens >= 800, 'Effective max_tokens for reasoning model must be at least 800');
+
+    // 5. Test "Phân tích AI" on a Down event
+    const resDown = await t.api('POST', '/api/ai/analyze', { event_id: Number(evDownId), lang: 'vi' });
+    assert.equal(resDown.status, 200);
+    assert.ok(resDown.body.report, 'Report must NOT be null when analyzing Down event');
+    assert.equal(resDown.body.report.event_id, Number(evDownId));
+    assert.equal(resDown.body.report.source, 'ai');
+
+    // 6. Test "Gửi AI Phân tích ngay" from Technical Logs modal (device_id only, no event_id)
+    const resTechModal = await t.api('POST', '/api/ai/analyze', { device_id: devId, lang: 'vi' });
+    assert.equal(resTechModal.status, 200);
+    assert.ok(resTechModal.body.report, 'Report must NOT be null when sending from Technical Logs modal');
+    assert.equal(resTechModal.body.report.device_id, devId);
+
+    // 7. Verify prompt preview in /api/ai/test also includes model and passes
+    const testAiRes = await t.api('POST', '/api/ai/test', {
+      ai: {
+        provider: 'custom',
+        api_url: 'https://api.groq.com/openai/v1/chat/completions',
+        api_key: 'gsk_test_key_mock_123',
+        model: 'openai/gpt-oss-120b',
+        max_tokens: 800,
+      },
+    });
+    assert.equal(testAiRes.status, 200);
+    assert.equal(testAiRes.body.live_api_called, true);
+    assert.equal(testAiRes.body.model, 'openai/gpt-oss-120b');
+  } finally { t.close(); }
+});
+
 
 

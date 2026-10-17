@@ -10,9 +10,9 @@ const PROVIDER_PRESETS = {
     model: 'gpt-4o-mini',
   },
   gemini: {
-    name: 'Google Gemini (gemini-2.0-flash)',
+    name: 'Google Gemini (gemini-3.8-flash)',
     api_url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.8-flash',
   },
   deepseek: {
     name: 'DeepSeek (deepseek-chat)',
@@ -20,9 +20,9 @@ const PROVIDER_PRESETS = {
     model: 'deepseek-chat',
   },
   groq: {
-    name: 'Groq (llama-3.3-70b-versatile)',
+    name: 'Groq (openai/gpt-oss-120b)',
     api_url: 'https://api.groq.com/openai/v1/chat/completions',
-    model: 'llama-3.3-70b-versatile',
+    model: 'openai/gpt-oss-120b',
   },
   ollama: {
     name: 'Local Ollama (qwen2.5 / llama3.2)',
@@ -47,7 +47,7 @@ function buildFingerprint(deviceId, kind, reasons, lang = 'vi') {
 
 // Smart Incident Filter (BA & Dev specification):
 // Strictly filters which incidents genuinely require AI root-cause & predictive analysis.
-// EXCLUDES:
+// EXCLUDES (for automatic background triggers):
 // 1. Disconnection / Ping failure / ICMP / Agent / SNMP reachability loss ('down' or ping/timeout warnings)
 // 2. Printer devices & printer consumables/mechanical events (toner, drum, paper jam, cover open)
 // 3. Recovery ('up' / severity 'ok') and system audit ('audit') events
@@ -63,44 +63,51 @@ function isAiAnalyzableIncident(ctx, opts = {}) {
   const evSev = String(ctx.event_severity || '').toLowerCase();
   const devSev = String(ctx.device_severity || ctx.severity || '').toLowerCase();
 
-  // 1. Never analyze recovery or audit events
+  // 1. Manual on-demand inspection (Force or Live Device Telemetry Analysis)
+  // When an engineer or operator explicitly clicks "Phân tích AI", "Gửi AI phân tích ngay",
+  // or "Chẩn đoán AI", always allow the analysis (unless it is a pure non-technical system audit event).
+  if (force || allowLiveDevice) {
+    if (kind === 'audit') return false;
+    return true;
+  }
+
+  // 2. Never analyze recovery or audit events for automatic background triggers
   if (kind === 'up' || kind === 'audit') return false;
   if (evSev === 'ok' || devSev === 'ok' || devSev === 'none') return false;
   if (/trở lại bình thường|hoạt động bình thường|mức an toàn|có điện lưới trở lại|hoạt động trở lại|recovered|returned to normal/i.test(reason)) {
     return false;
   }
 
-  // 2. Never analyze Printer devices or printer consumable/mechanical alerts (toner, drum, paper jam)
+  // 3. Never analyze Printer devices or printer consumable/mechanical alerts (toner, drum, paper jam)
   if (devType === 'printer') return false;
   if (/hết mực|mực còn|no toner|low toner|drum|trống hình|kẹt giấy|paper jam|cửa máy in|cover open|fuser|waste toner|sự cố máy in/i.test(reason)) {
     return false;
   }
 
-  // 3. Never analyze Disconnection ('down') or pure Ping/ICMP/Agent/SNMP reachability loss
-  if (kind === 'down' || String(ctx.status || '').toLowerCase() === 'down') return false;
+  // 4. Never automatically trigger on Disconnection ('down') or pure Ping/ICMP/Agent/SNMP reachability loss
+  if (kind === 'down' || (!kind && String(ctx.status || '').toLowerCase() === 'down')) return false;
   if (/mất kết nối|không ping được|không phản hồi icmp|icmp.*fail|ping.*timeout|agent không gửi dữ liệu|agent mất kết nối|mất tín hiệu agent|snmp không phản hồi|snmp lỗi/i.test(reason)) {
     const hasTechAlso = /cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|flood|dos|mất điện lưới|on battery/i.test(reason);
     if (!hasTechAlso) return false;
   }
 
-  // 4. For automatic triggers, require the device's configured severity to be 'critical' or 'high'
-  if (!force && devSev !== 'critical' && devSev !== 'high') return false;
+  // 5. For automatic triggers, require the device's configured severity to be 'critical' or 'high'
+  if (devSev !== 'critical' && devSev !== 'high') return false;
 
-  // 5. Positive Technical Whitelist: must be a complex hardware, capacity, thermal, power, or security anomaly
+  // 6. Positive Technical Whitelist: must be a complex hardware, capacity, thermal, power, or security anomaly
   if (['smart', 'dos', 'thermal', 'power'].includes(kind)) return true;
   if (/cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|thermal|overheat|flood|dos|tấn công|mất điện lưới|on battery|chạy pin ups/i.test(reason)) {
     return true;
   }
-  if ((force || allowLiveDevice) && (
+  if (
     (ctx.cpu != null && ctx.cpu >= 80) ||
     (ctx.ram != null && ctx.ram >= 80) ||
     (ctx.disk != null && ctx.disk >= 80) ||
     (ctx.temp != null && ctx.temp >= 75) ||
     (ctx.pkt_rate != null && ctx.pkt_rate >= 5000) ||
     (ctx.smart && ctx.smart.ok === false) ||
-    (ctx.power && ctx.power.on_battery) ||
-    allowLiveDevice
-  )) {
+    (ctx.power && ctx.power.on_battery)
+  ) {
     return true;
   }
 
@@ -436,21 +443,44 @@ Rui_ro_tai_nguyen: ${digest.resource_risks || 'Ổn định'}`,
   };
 }
 
-// Parse JSON returned by LLM safely, tolerating optional markdown code fences.
+// Parse JSON returned by LLM safely, tolerating markdown code fences, array wrappers, and key variations.
 function parseAiJsonResponse(rawText) {
   if (!rawText || typeof rawText !== 'string') return null;
   let cleaned = rawText.trim();
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  cleaned = cleaned.replace(/^```(?:json)?\s*/im, '').replace(/\s*```\s*$/im, '').trim();
   const start = cleaned.indexOf('{');
   const end = cleaned.lastIndexOf('}');
   if (start !== -1 && end > start) cleaned = cleaned.slice(start, end + 1);
   try {
-    const obj = JSON.parse(cleaned);
-    const str = (v) => (typeof v === 'string' ? v.trim() : (v != null ? String(v) : ''));
-    const issue = str(obj.issue || obj.problem || obj.van_de);
-    const cause = str(obj.cause || obj.root_cause || obj.nguyen_nhan);
-    const solution = str(obj.solution || obj.recommendation || obj.giai_phap);
-    const prediction = str(obj.prediction || obj.forecast || obj.du_doan);
+    let obj = JSON.parse(cleaned);
+    if (Array.isArray(obj) && obj.length > 0 && typeof obj[0] === 'object') obj = obj[0];
+    if (!obj || typeof obj !== 'object') return null;
+
+    const normObj = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (k && v != null) {
+        normObj[k.toLowerCase().replace(/[\s_-]+/g, '')] = v;
+      }
+    }
+    const str = (...keys) => {
+      for (const k of keys) {
+        if (obj[k] != null && typeof obj[k] === 'string' && obj[k].trim()) return obj[k].trim();
+        if (obj[k] != null && typeof obj[k] !== 'object') return String(obj[k]).trim();
+        const normKey = k.toLowerCase().replace(/[\s_-]+/g, '');
+        if (normObj[normKey] != null) {
+          const val = normObj[normKey];
+          if (typeof val === 'string' && val.trim()) return val.trim();
+          if (typeof val !== 'object') return String(val).trim();
+        }
+      }
+      return '';
+    };
+
+    const issue = str('issue', 'problem', 'van_de', 'vande', 'su_co', 'suco', 'tinh_trang', 'tinhtrang', 'summary', 'tom_tat', 'tomtat', 'detail', 'mota', 'diagnosis', 'chandoan', 'alert');
+    const cause = str('cause', 'root_cause', 'rootcause', 'nguyen_nhan', 'nguyennhan', 'ly_do', 'lydo', 'nguyennhangocre', 'rootcauseanalysis');
+    const solution = str('solution', 'recommendation', 'remediation', 'action', 'actions', 'steps', 'giai_phap', 'giaiphap', 'khac_phuc', 'khacphuc', 'xu_ly', 'xuly', 'de_xuat', 'dexuat', 'cacbuocxuly');
+    const prediction = str('prediction', 'forecast', 'trend', 'du_doan', 'dudoan', 'du_bao', 'dubao', 'xu_huong', 'xuhuong', 'risk', 'impact', 'ruiro', 'dubaoxuhuong');
+
     if (!issue && !cause && !solution) return null;
     return { issue, cause, solution, prediction };
   } catch {
@@ -651,7 +681,7 @@ class AiService {
   }
 
   // Call external OpenAI-compatible Chat Completions API with ultra-compact prompt
-  async _callLlm(aiConfig, messages, maxTokens = 280) {
+  async _callLlm(aiConfig, messages, maxTokens = 450) {
     const url = aiConfig.api_url || (PROVIDER_PRESETS[aiConfig.provider] && PROVIDER_PRESETS[aiConfig.provider].api_url);
     const model = aiConfig.model || (PROVIDER_PRESETS[aiConfig.provider] && PROVIDER_PRESETS[aiConfig.provider].model) || 'gpt-4o-mini';
     if (!url) throw new Error('Chưa cấu hình URL API AI');
@@ -659,32 +689,103 @@ class AiService {
     const headers = { 'Content-Type': 'application/json' };
     if (aiConfig.api_key) headers.Authorization = `Bearer ${aiConfig.api_key}`;
 
+    const isGroq = aiConfig.provider === 'groq' || (url && url.includes('api.groq.com'));
+    const isGemini = aiConfig.provider === 'gemini'
+      || (url && url.includes('generativelanguage.googleapis.com'))
+      || (model && model.toLowerCase().includes('gemini'));
+    const isReasoning = /(?:gpt-oss|r1|reasoner|o1|o3|thinking|qwq)/i.test(model);
+
+    // Modern reasoning models (e.g. Gemini Flash, openai/gpt-oss-120b on Groq, DeepSeek-R1)
+    // require adequate token headroom for thinking tokens + structured output.
+    const minTokens = (isGemini || isReasoning || isGroq) ? 800 : 450;
+    const effectiveMaxTokens = Math.min(3000, Math.max(100, Number(maxTokens || aiConfig.max_tokens || minTokens)));
+
+    const reqBody = {
+      model,
+      messages: [
+        { role: 'system', content: messages.system },
+        { role: 'user', content: messages.user },
+      ],
+      temperature: 0.2,
+      max_tokens: effectiveMaxTokens,
+    };
+
+    if (isGemini) {
+      // Modern Gemini models enable internal thinking/reasoning by default on Google's OpenAI-compatible endpoint.
+      // Setting reasoning_effort='none' eliminates thinking tokens, delivering 5x faster speed and zero truncation.
+      reqBody.reasoning_effort = 'none';
+      reqBody.response_format = { type: 'json_object' };
+    } else if (isGroq) {
+      if (isReasoning) {
+        // openai/gpt-oss-120b and other OSS reasoning models on Groq generate reasoning tokens that count
+        // towards max_tokens. Setting 'low' minimizes thinking tokens so JSON output is never starved.
+        reqBody.reasoning_effort = 'low';
+      }
+      reqBody.response_format = { type: 'json_object' };
+    } else if (aiConfig.provider === 'openai' || aiConfig.provider === 'deepseek') {
+      reqBody.response_format = { type: 'json_object' };
+    }
+
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), 25000);
     try {
-      const res = await this.fetchFn(url, {
+      let res = await this.fetchFn(url, {
         method: 'POST',
         headers,
         signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          messages: [
-            { role: 'system', content: messages.system },
-            { role: 'user', content: messages.user },
-          ],
-          temperature: 0.2,
-          max_tokens: Math.min(600, Math.max(100, Number(maxTokens || aiConfig.max_tokens || 280))),
-        }),
+        body: JSON.stringify(reqBody),
       });
+
+      // Resilience: If a model rejects reasoning_effort (e.g. non-reasoning Groq model), retry once without it
+      if (!res.ok && reqBody.reasoning_effort && res.status === 400) {
+        const errClone = await res.clone().text().catch(() => '');
+        if (/reasoning_effort/i.test(errClone)) {
+          delete reqBody.reasoning_effort;
+          res = await this.fetchFn(url, {
+            method: 'POST',
+            headers,
+            signal: controller.signal,
+            body: JSON.stringify(reqBody),
+          });
+        }
+      }
+
+      // Resilience: If a custom model rejects response_format, retry once without it
+      if (!res.ok && reqBody.response_format && res.status === 400) {
+        const errClone = await res.clone().text().catch(() => '');
+        if (/response_format/i.test(errClone)) {
+          delete reqBody.response_format;
+          res = await this.fetchFn(url, {
+            method: 'POST',
+            headers,
+            signal: controller.signal,
+            body: JSON.stringify(reqBody),
+          });
+        }
+      }
+
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         throw new Error(`AI HTTP ${res.status}: ${errText.slice(0, 160)}`);
       }
       const data = await res.json();
-      const content = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+      const choice = data && data.choices && data.choices[0];
+      const finishReason = choice && choice.finish_reason;
+      const content = choice && choice.message && choice.message.content;
       const usage = data && data.usage ? data.usage : {};
+
+      if (finishReason === 'length') {
+        throw new Error(`AI response was truncated (finish_reason=length, token budget exhausted). Increase max_tokens in settings or disable thinking. Snippet: ${String(content || '').slice(0, 100)}`);
+      }
+      if (!content || typeof content !== 'string' || !content.trim()) {
+        throw new Error('AI returned an empty response content');
+      }
+
       const parsed = parseAiJsonResponse(content);
-      if (!parsed) throw new Error('AI response did not match JSON template');
+      if (!parsed) {
+        throw new Error(`AI response did not match JSON template: ${String(content).slice(0, 140)}`);
+      }
+
       return {
         ...parsed,
         prompt_tokens: Number(usage.prompt_tokens) || Math.ceil((messages.system.length + messages.user.length) / 4),
@@ -746,11 +847,12 @@ class AiService {
 
       let result = null;
       let source = 'heuristic';
-      if (aiCfg.enabled && hasEndpoint && stats.calls_today < limit) {
+      if (aiCfg.enabled && hasEndpoint && (force || stats.calls_today < limit)) {
         try {
           result = await this._callLlm(aiCfg, prompt, aiCfg.max_tokens);
           source = 'ai';
-        } catch {
+        } catch (err) {
+          console.error('[ai] analyzeIncident external LLM error:', err.message);
           result = null;
         }
       }

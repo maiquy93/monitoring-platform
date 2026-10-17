@@ -297,8 +297,8 @@
             <h4>1. Quick Provider & API Token Setup</h4>
             <ul>
               <li><b>OpenAI:</b> Create an API Key at <code>platform.openai.com/api-keys</code> → Choose preset <b>OpenAI</b> (Endpoint: <code>https://api.openai.com/v1/chat/completions</code>, Recommended ultra-cheap model: <code>gpt-4o-mini</code>).</li>
-              <li><b>Google Gemini (OpenAI-Compatible):</b> Create a key at <code>aistudio.google.com</code> → Choose preset <b>Google Gemini</b> (Model: <code>gemini-2.0-flash</code> — fast & generous free tier).</li>
-              <li><b>DeepSeek / Groq:</b> Choose preset <b>DeepSeek</b> (<code>deepseek-chat</code>) or <b>Groq</b> (<code>llama-3.3-70b-versatile</code>) and paste your API key.</li>
+              <li><b>Google Gemini (OpenAI-Compatible):</b> Create a key at <code>aistudio.google.com</code> → Choose preset <b>Google Gemini</b> (Model: <code>gemini-3.8-flash</code> — fast & generous free tier).</li>
+              <li><b>DeepSeek / Groq:</b> Choose preset <b>DeepSeek</b> (<code>deepseek-chat</code>) or <b>Groq</b> (<code>openai/gpt-oss-120b</code>) and paste your API key.</li>
               <li><b>Local Ollama (100% Free, Offline):</b> Install Ollama locally, run <code>ollama run qwen2.5:7b</code>, choose preset <b>Ollama (Local)</b>. No API token required!</li>
               <li><b>Disable AI Calls Anytime:</b> Uncheck <b>"Enable AI API Calls"</b> to immediately stop all external API requests. The platform still provides instant 0-token diagnostics via the built-in Local Expert Engine.</li>
             </ul>
@@ -335,8 +335,8 @@ DEV:Core-DB(server,10.0.0.12)|SEV:critical|TYPE:disk|ISSUE:Disk 93% >= 90%|METRI
             <h4>1. Hướng dẫn lấy API Token & Cấu hình nhanh</h4>
             <ul>
               <li><b>OpenAI:</b> Tạo khóa tại <code>platform.openai.com/api-keys</code> → Chọn preset <b>OpenAI</b> (Endpoint: <code>https://api.openai.com/v1/chat/completions</code>, Model tiết kiệm khuyến nghị: <code>gpt-4o-mini</code>).</li>
-              <li><b>Google Gemini:</b> Tạo khóa tại <code>aistudio.google.com</code> → Chọn preset <b>Google Gemini</b> (Model: <code>gemini-2.0-flash</code> — tốc độ cao, có gói miễn phí hào phóng).</li>
-              <li><b>DeepSeek / Groq:</b> Chọn preset <b>DeepSeek</b> (<code>deepseek-chat</code>) hoặc <b>Groq</b> (<code>llama-3.3-70b-versatile</code>) và dán API Token tương ứng.</li>
+              <li><b>Google Gemini:</b> Tạo khóa tại <code>aistudio.google.com</code> → Chọn preset <b>Google Gemini</b> (Model: <code>gemini-3.8-flash</code> — tốc độ cao, có gói miễn phí hào phóng).</li>
+              <li><b>DeepSeek / Groq:</b> Chọn preset <b>DeepSeek</b> (<code>deepseek-chat</code>) hoặc <b>Groq</b> (<code>openai/gpt-oss-120b</code>) và dán API Token tương ứng.</li>
               <li><b>Ollama Nội bộ (Miễn phí 100%, Offline):</b> Cài Ollama trên máy chủ nội bộ, chạy <code>ollama run qwen2.5:7b</code>, chọn preset <b>Ollama (Local)</b> — không cần API Token.</li>
               <li><b>Tắt gọi API AI bất cứ lúc nào:</b> Bỏ tích <b>"Bật gọi API AI"</b> để ngắt hoàn toàn kết nối ra ngoài. Hệ thống sẽ tự động chuyển sang <b>Chuyên gia Nội bộ (0 Token)</b> để vẫn hiển thị nguyên nhân & hướng xử lý.</li>
             </ul>

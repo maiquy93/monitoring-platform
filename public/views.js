@@ -224,8 +224,10 @@
   };
 
   M.renderAiReportCard = (r, showHeader = true) => {
-    if (!r) return '';
     const isEn = M.S.lang === 'en';
+    if (!r || typeof r !== 'object') {
+      return `<div class="muted" style="padding:14px;text-align:center">${isEn ? 'No AI diagnosis data available' : 'Chưa có dữ liệu chẩn đoán AI'}</div>`;
+    }
     const isDaily = r.kind === 'daily';
     const tokTotal = (r.prompt_tokens || 0) + (r.completion_tokens || 0);
     const srcBadge = r.cached
@@ -278,17 +280,11 @@
     const k = String(e.kind || '').toLowerCase();
     const msg = String(e.message || '');
     const sev = String(e.severity || '').toLowerCase();
-    if (k === 'up' || k === 'audit' || k === 'down') return false;
+    if (k === 'up' || k === 'audit') return false;
     if (sev === 'ok') return false;
     if (/trở lại bình thường|mức an toàn|hoạt động bình thường|có điện lưới trở lại|hoạt động trở lại|recovered|returned to normal/i.test(msg)) return false;
     if (/mực còn|hết mực|no toner|low toner|drum|kẹt giấy|paper jam|cửa máy in|sự cố máy in/i.test(msg)) return false;
-    if (/không ping được|không phản hồi icmp|icmp.*fail|agent không gửi dữ liệu|agent mất kết nối|mất tín hiệu agent/i.test(msg)) {
-      const hasTechAlso = /cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|flood|dos|mất điện lưới|on battery/i.test(msg);
-      if (!hasTechAlso) return false;
-    }
-    if (['smart', 'dos', 'thermal', 'power'].includes(k)) return true;
-    if (/cpu cao|ram cao|ổ đĩa cao|high cpu|high ram|high disk|smart|bad sector|nhiệt độ|quá nhiệt|thermal|overheat|flood|dos|tấn công|mất điện lưới|on battery/i.test(msg)) return true;
-    return false;
+    return true;
   };
 
   M.showTechnicalLogsModal = (data) => {
@@ -336,6 +332,9 @@
         analyzeBtn.textContent = isEn ? '⏳ Analyzing...' : '⏳ Đang phân tích...';
         try {
           const res = await M.api('POST', '/api/ai/analyze', { event_id: data.event_id, device_id: devId, lang: M.S.lang });
+          if (!res || !res.report) {
+            throw new Error(isEn ? 'AI analysis returned empty result' : 'Không nhận được kết quả chẩn đoán từ AI');
+          }
           M.closeModal();
           M.modal(
             isEn ? '🤖 AI Diagnosis Result' : '🤖 Kết quả Chẩn đoán AI',
@@ -374,7 +373,7 @@
       if (isEligible || hasAi) {
         aiBtns.push(`<button type="button" class="ai-badge tech-copy" data-ai-copy-logs="${e.id}" data-dev-id="${e.device_id || ''}" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude / Gemini' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude / Gemini'}">📋 ${isEn ? 'Copy Tech Logs' : 'Copy Logs Kỹ thuật'}</button>`);
       }
-      return `<tr>
+      return `<tr class="ev-row ${hasAi ? 'has-ai' : ''}" data-ev-id="${e.id}" ${hasAi ? `title="${isEn ? 'Click to hide/show AI diagnosis' : 'Bấm vào sự kiện để ẩn/hiện bảng phân tích AI'}"` : ''}>
         <td>${M.fmtTime(e.ts)}</td>
         ${showDevice ? `<td>${e.device_id ? `<a href="#/device/${e.device_id}">${esc(e.device_name)}</a>` : esc(e.device_name)}</td>` : ''}
         <td><span class="sev-badge ${badge(e)}">${esc(label[e.kind] || e.kind)}</span></td>
@@ -388,18 +387,45 @@
   };
 
   document.addEventListener('click', async (ev) => {
+    const isEn = M.S.lang === 'en';
+    const toggleAiRow = (id) => {
+      const row = document.getElementById(`ai-ev-row-${id}`);
+      if (!row) return;
+      const isHidden = row.classList.toggle('hidden');
+      const evRow = document.querySelector(`tr.ev-row[data-ev-id="${id}"]`);
+      if (evRow) {
+        evRow.classList.toggle('ai-closed', isHidden);
+        evRow.setAttribute('title', isHidden
+          ? (isEn ? 'Click to show AI diagnosis' : 'Bấm vào sự kiện để hiện bảng phân tích AI')
+          : (isEn ? 'Click to hide AI diagnosis' : 'Bấm vào sự kiện để ẩn bảng phân tích AI'));
+      }
+      const toggleBtn = document.querySelector(`button[data-ai-toggle="${id}"]`);
+      if (toggleBtn) {
+        toggleBtn.setAttribute('title', isHidden
+          ? (isEn ? 'Click to show AI diagnosis' : 'Bấm để hiện chẩn đoán AI')
+          : (isEn ? 'Click to hide AI diagnosis' : 'Bấm để ẩn chẩn đoán AI'));
+      }
+    };
+
     const toggleBtn = ev.target.closest('[data-ai-toggle]');
     if (toggleBtn) {
       const id = toggleBtn.dataset.aiToggle;
-      const row = document.getElementById(`ai-ev-row-${id}`);
-      if (row) row.classList.toggle('hidden');
+      toggleAiRow(id);
       return;
     }
+
+    const evRow = ev.target.closest('tr.ev-row.has-ai');
+    if (evRow) {
+      if (ev.target.closest('a, button, input, textarea, select')) return;
+      const id = evRow.dataset.evId;
+      toggleAiRow(id);
+      return;
+    }
+
     const copyLogBtn = ev.target.closest('[data-ai-copy-logs]');
     if (copyLogBtn) {
       const id = Number(copyLogBtn.dataset.aiCopyLogs);
       const devId = copyLogBtn.dataset.devId;
-      const isEn = M.S.lang === 'en';
       const origText = copyLogBtn.textContent;
       copyLogBtn.disabled = true;
       copyLogBtn.textContent = isEn ? '⏳ Copying...' : '⏳ Đang lấy logs...';
@@ -429,20 +455,29 @@
     const analyzeBtn = ev.target.closest('[data-ai-analyze]');
     if (analyzeBtn) {
       const id = Number(analyzeBtn.dataset.aiAnalyze);
-      const isEn = M.S.lang === 'en';
       const origText = analyzeBtn.textContent;
       analyzeBtn.disabled = true;
       analyzeBtn.textContent = isEn ? '⏳ Analyzing...' : '⏳ Đang phân tích...';
       try {
         const res = await M.api('POST', '/api/ai/analyze', { event_id: id, lang: M.S.lang });
+        if (!res || !res.report) {
+          throw new Error(isEn ? 'AI analysis returned empty result' : 'Không nhận được kết quả chẩn đoán từ AI');
+        }
         const row = document.getElementById(`ai-ev-row-${id}`);
-        if (row && res.report) {
+        if (row) {
           row.firstElementChild.innerHTML = M.renderAiReportCard(res.report, false);
           row.classList.remove('hidden');
         }
         analyzeBtn.removeAttribute('data-ai-analyze');
         analyzeBtn.setAttribute('data-ai-toggle', String(id));
         analyzeBtn.textContent = `🤖 ${isEn ? 'AI Diagnosis' : 'AI Chẩn đoán'}`;
+        analyzeBtn.setAttribute('title', isEn ? 'Click to hide AI diagnosis' : 'Bấm để ẩn chẩn đoán AI');
+        const evRow = document.querySelector(`tr.ev-row[data-ev-id="${id}"]`);
+        if (evRow) {
+          evRow.classList.add('has-ai');
+          evRow.classList.remove('ai-closed');
+          evRow.setAttribute('title', isEn ? 'Click to hide AI diagnosis' : 'Bấm vào sự kiện để ẩn bảng phân tích AI');
+        }
       } catch (err) {
         M.toast(M.trData(err.message));
         analyzeBtn.textContent = origText;
@@ -1253,14 +1288,15 @@
         }
         try {
           const res = await M.api('POST', '/api/ai/analyze', { device_id: d.id, lang: M.S.lang });
-          if (res.report) {
-            M.modal(
-              isEn ? '🤖 AI Health & Capacity Diagnosis' : '🤖 Kết quả Chẩn đoán AI & Dự báo Sức khỏe',
-              M.renderAiReportCard(res.report, true),
-              async () => {},
-              { submit: t('Đóng'), noCancel: true, wide: true }
-            );
+          if (!res || !res.report) {
+            throw new Error(isEn ? 'AI analysis returned empty result' : 'Không nhận được kết quả chẩn đoán từ AI');
           }
+          M.modal(
+            isEn ? '🤖 AI Health & Capacity Diagnosis' : '🤖 Kết quả Chẩn đoán AI & Dự báo Sức khỏe',
+            M.renderAiReportCard(res.report, true),
+            async () => {},
+            { submit: t('Đóng'), noCancel: true, wide: true }
+          );
         } catch (err) {
           M.toast(M.trData(err.message));
         } finally {

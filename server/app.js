@@ -523,7 +523,7 @@ function createApp(db, monitor, opts = {}) {
       address: (d && d.address) || '',
       severity: (ev && (ev.severity === 'critical' || ev.severity === 'high')) ? ev.severity : ((v && v.severity) || 'high'),
       event_severity: ev ? ev.severity : null,
-      status: (v && v.status) || (ev && ev.kind) || 'warning',
+      status: ev ? (ev.severity === 'ok' ? 'ok' : (ev.kind === 'down' ? 'down' : 'warning')) : ((v && v.status) || 'warning'),
       kind: (ev && ev.kind) || (v && v.status) || 'warning',
       reason: (ev && ev.message) || (v && v.reasons && v.reasons.join('; ')) || 'Kiểm tra sức khỏe thiết bị',
       event_id: ev ? ev.id : null,
@@ -538,6 +538,9 @@ function createApp(db, monitor, opts = {}) {
       power: v ? v.power : null,
     };
     const report = await monitor.ai.analyzeIncident(incCtx, s, { lang, force: true, allowLiveDevice: true });
+    if (!report) {
+      throw new HttpError(500, 'Không thể tạo báo cáo chẩn đoán AI');
+    }
     monitor.emit('change');
     send(ctx.res, 200, { ok: true, report });
   });
@@ -562,10 +565,10 @@ function createApp(db, monitor, opts = {}) {
       ...s.ai,
       enabled: inAi.enabled !== undefined ? !!inAi.enabled : true,
       provider,
-      api_url: inAi.api_url !== undefined ? String(inAi.api_url).trim() : (s.ai.api_url || preset.api_url),
+      api_url: (inAi.api_url && String(inAi.api_url).trim()) || (provider === s.ai.provider && s.ai.api_url ? s.ai.api_url : preset.api_url),
       api_key: inAi.api_key !== undefined && inAi.api_key !== '' ? String(inAi.api_key).trim() : s.ai.api_key,
-      model: inAi.model !== undefined ? String(inAi.model).trim() : (s.ai.model || preset.model),
-      max_tokens: Number(inAi.max_tokens || s.ai.max_tokens || 280),
+      model: (inAi.model && String(inAi.model).trim()) || (provider === s.ai.provider && s.ai.model ? s.ai.model : preset.model),
+      max_tokens: Number(inAi.max_tokens || s.ai.max_tokens || 500),
     };
     const sampleCtx = {
       device_id: 0,
@@ -584,7 +587,7 @@ function createApp(db, monitor, opts = {}) {
     let source = 'heuristic';
     if (testCfg.enabled && (testCfg.api_key || testCfg.provider === 'ollama' || (testCfg.provider === 'custom' && testCfg.api_url))) {
       try {
-        report = await monitor.ai._callLlm(testCfg, prompt, testCfg.max_tokens || 280);
+        report = await monitor.ai._callLlm(testCfg, prompt, testCfg.max_tokens || 500);
         source = 'ai';
       } catch (err) {
         const { generateLocalExpertFallback } = require('./ai');
@@ -687,15 +690,15 @@ function createApp(db, monitor, opts = {}) {
       const nextAi = {
         enabled: b.ai.enabled !== undefined ? !!b.ai.enabled : !!curAi.enabled,
         provider,
-        api_url: b.ai.api_url !== undefined ? String(b.ai.api_url).trim().slice(0, 300) : (curAi.api_url || preset.api_url),
+        api_url: (b.ai.api_url && String(b.ai.api_url).trim().slice(0, 300)) || (provider === curAi.provider && curAi.api_url ? curAi.api_url : preset.api_url),
         api_key: b.ai.api_key !== undefined ? String(b.ai.api_key).trim().slice(0, 300) : (curAi.api_key || ''),
-        model: b.ai.model !== undefined ? String(b.ai.model).trim().slice(0, 100) : (curAi.model || preset.model),
+        model: (b.ai.model && String(b.ai.model).trim().slice(0, 100)) || (provider === curAi.provider && curAi.model ? curAi.model : preset.model),
         auto_incident: b.ai.auto_incident !== undefined ? !!b.ai.auto_incident : (curAi.auto_incident !== false),
         daily_digest_enabled: b.ai.daily_digest_enabled !== undefined ? !!b.ai.daily_digest_enabled : !!curAi.daily_digest_enabled,
         daily_digest_time: dailyTime,
         cooldown_minutes: Math.min(1440, Math.max(1, Number(b.ai.cooldown_minutes ?? curAi.cooldown_minutes ?? 60))),
         daily_call_limit: Math.min(5000, Math.max(1, Number(b.ai.daily_call_limit ?? curAi.daily_call_limit ?? 50))),
-        max_tokens: Math.min(800, Math.max(100, Number(b.ai.max_tokens ?? curAi.max_tokens ?? 280))),
+        max_tokens: Math.min(2000, Math.max(100, Number(b.ai.max_tokens ?? curAi.max_tokens ?? 350))),
       };
       setSetting(db, 'ai', nextAi);
     }

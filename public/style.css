@@ -572,6 +572,16 @@ body.tv .dual-main-pinned .kpi.big .val {
 .ai-badge.tech-copy:hover {
   background: color-mix(in srgb, var(--c-ok) 22%, var(--panel2));
 }
+tr.ev-row.has-ai {
+  cursor: pointer;
+  user-select: text;
+}
+tr.ev-row.has-ai:hover td {
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel2));
+}
+tr.ev-row.has-ai.ai-closed td {
+  opacity: 0.95;
+}
 .ai-card {
   background: color-mix(in srgb, var(--accent) 5%, var(--panel2));
   border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--border));
