@@ -42,14 +42,12 @@
     else if (d.type === 'printer') {
       const parts = [d.address];
       if (d.printer_status) parts.push(tr(d.printer_status));
-      else if (d.rtt != null) parts.push(`${d.rtt} ms`);
       if (d.page_count != null) parts.push(`${Number(d.page_count).toLocaleString(numLoc)} ${t('trang')}`);
       if (d.printer_errors && d.printer_errors.length && !d.mute_local_alerts) parts.unshift(tr(d.printer_errors[0]));
       sub = parts.filter(Boolean).join(' · ');
     } else if (d.type === 'ap') {
       const parts = [d.address];
       if (d.status === 'warning' && d.reasons && d.reasons.length) parts.push(tr(d.reasons[0]));
-      else if (d.rtt != null) parts.push(`${d.rtt} ms`);
       if (d.total_ssids != null || d.total_clients != null) {
         const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
         const c = d.total_clients != null ? `${d.total_clients} client` : '';
@@ -60,7 +58,7 @@
       sub = parts.filter(Boolean).join(' · ');
     } else if (d.status === 'warning') sub = tr(d.reasons[0]);
     else {
-      const parts = [d.address, d.rtt != null ? `${d.rtt} ms` : null];
+      const parts = [d.address];
       if (d.total_ssids != null || d.total_clients != null) {
         const s = d.total_ssids != null ? `${d.total_ssids} SSID` : '';
         const c = d.total_clients != null ? `${d.total_clients} client` : '';

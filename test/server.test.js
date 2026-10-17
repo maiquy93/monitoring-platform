@@ -1860,6 +1860,9 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
   // Must NOT duplicate with .bar-ap box
   assert.ok(!apHtml.includes('bar-ap'));
   assert.ok(!apHtml.includes('class="bars"'));
+  // Must NOT display ping latency (ms) on tile
+  assert.ok(!apHtml.includes('2 ms'));
+  assert.ok(!apHtml.includes(' ms'));
 
   // AP with CPU and RAM (e.g. Cisco/Mikrotik): CPU and RAM bars present, but no bar-ap
   const apWithCpuHtml = sandbox.M.tile({
@@ -1882,4 +1885,22 @@ test('ui overview: compact device tile height and single non-duplicated AP wirel
   assert.ok(apWithCpuHtml.includes('class="bars"'));
   assert.ok(apWithCpuHtml.includes('CPU 15%'));
   assert.ok(apWithCpuHtml.includes('RAM 40%'));
+  assert.ok(!apWithCpuHtml.includes('3 ms'));
+
+  // Standard server device tile: address and uptime only, no ping latency
+  const serverHtml = sandbox.M.tile({
+    id: 12,
+    type: 'server',
+    name: 'App-Server-01',
+    address: '10.0.0.10',
+    status: 'up',
+    rtt: 1.2,
+    cpu: 25,
+    ram: 60,
+    uptime: 86400,
+    since: Date.now() - 86400000,
+  });
+  assert.ok(serverHtml.includes('10.0.0.10 · up 2h'));
+  assert.ok(!serverHtml.includes('1.2 ms'));
+  assert.ok(!serverHtml.includes(' ms'));
 });
