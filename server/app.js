@@ -84,6 +84,9 @@ function cleanDevice(b, partial = false) {
   for (const k of ['check_icmp', 'check_agent', 'snmp_enabled', 'maintenance', 'mute_local_alerts']) {
     if (!partial || has(k)) out[k] = b[k] ? 1 : 0;
   }
+  if (!partial || has('telegram_enabled')) {
+    out.telegram_enabled = b.telegram_enabled === undefined ? 1 : (b.telegram_enabled ? 1 : 0);
+  }
   if (!partial || has('snmp_community')) {
     const c = String(b.snmp_community ?? 'public');
     if (c.length > 64) throw bad('SNMP community quá dài');
@@ -232,9 +235,9 @@ function createApp(db, monitor, opts = {}) {
     const token = crypto.randomBytes(24).toString('hex');
     const r = db.prepare(
       `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,snmp_profile,severity,
-        location,notes,maintenance,mute_local_alerts,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        location,notes,maintenance,mute_local_alerts,telegram_enabled,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, token, Date.now());
+        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, token, Date.now());
     return { id: Number(r.lastInsertRowid), token };
   };
 
@@ -266,9 +269,9 @@ function createApp(db, monitor, opts = {}) {
     const d = cleanDevice({ ...cur, ...b });
     db.prepare(
       `UPDATE devices SET name=?,type=?,address=?,check_icmp=?,check_agent=?,snmp_enabled=?,snmp_community=?,
-        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,mute_local_alerts=? WHERE id=?`)
+        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,mute_local_alerts=?,telegram_enabled=? WHERE id=?`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, id);
+        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
     monitor.evaluate();
@@ -613,12 +616,120 @@ function createApp(db, monitor, opts = {}) {
     });
   });
 
+  // ---------- telegram alerts ----------
+  const saveTelegramConfig = (inTg) => {
+    const curTg = getSettings(db).telegram || {};
+    const evIn = (inTg.events && typeof inTg.events === 'object') ? inTg.events : {};
+    const notifyDown = inTg.notify_down !== undefined ? !!inTg.notify_down : (evIn.down !== undefined ? !!evIn.down : (curTg.notify_down !== false));
+    const notifyRecovered = inTg.notify_recovered !== undefined ? !!inTg.notify_recovered : (evIn.recovered !== undefined ? !!evIn.recovered : (curTg.notify_recovered !== false));
+    const notifyThreshold = inTg.notify_threshold !== undefined ? !!inTg.notify_threshold : (evIn.threshold !== undefined ? !!evIn.threshold : (curTg.notify_threshold !== false));
+    let nextToken = curTg.bot_token || '';
+    if (inTg.clear_token) {
+      nextToken = '';
+    } else if (inTg.bot_token !== undefined && String(inTg.bot_token).trim() !== '') {
+      nextToken = String(inTg.bot_token).trim().slice(0, 256);
+    } else if (inTg.bot_token === '' && inTg.allow_empty_token) {
+      nextToken = '';
+    }
+    const nextChatId = inTg.chat_id !== undefined ? String(inTg.chat_id || '').trim().slice(0, 128) : (curTg.chat_id || '');
+    const nextAppUrl = inTg.app_url !== undefined ? String(inTg.app_url || '').trim().slice(0, 256) : (curTg.app_url || '');
+    const nextTg = {
+      enabled: inTg.enabled !== undefined ? !!inTg.enabled : !!curTg.enabled,
+      bot_token: nextToken,
+      chat_id: nextChatId,
+      app_url: nextAppUrl,
+      notify_down: notifyDown,
+      notify_recovered: notifyRecovered,
+      notify_threshold: notifyThreshold,
+      events: { down: notifyDown, recovered: notifyRecovered, threshold: notifyThreshold },
+      cooldown_seconds: Math.min(3600, Math.max(0, Number(inTg.cooldown_seconds ?? curTg.cooldown_seconds ?? 30))),
+      max_per_minute: Math.min(300, Math.max(1, Number(inTg.max_per_minute ?? curTg.max_per_minute ?? 20))),
+    };
+    setSetting(db, 'telegram', nextTg);
+    return nextTg;
+  };
+
+  route('GET', '/api/alerts/telegram', 'any', (ctx) => {
+    const s = getSettings(db);
+    const tg = s.telegram || {};
+    const configured = Boolean(tg.enabled && tg.bot_token && tg.chat_id);
+    if (ctx.user.role !== 'admin') {
+      send(ctx.res, 200, { enabled: !!tg.enabled, configured });
+      return;
+    }
+    send(ctx.res, 200, {
+      telegram: {
+        ...tg,
+        has_bot_token: Boolean(tg.bot_token),
+        configured,
+        stats: monitor.telegram ? monitor.telegram.getStats() : null,
+      },
+    });
+  });
+
+  route('PUT', '/api/alerts/telegram', 'admin', async (ctx) => {
+    const b = await readBody(ctx.req, 8192);
+    const inTg = (b.telegram && typeof b.telegram === 'object') ? b.telegram : b;
+    const saved = saveTelegramConfig(inTg);
+    monitor.reload();
+    monitor.emit('change');
+    audit(ctx, `Cập nhật cấu hình cảnh báo Telegram (${saved.enabled ? 'Bật' : 'Tắt'})`);
+    send(ctx.res, 200, {
+      ok: true,
+      telegram: {
+        ...saved,
+        has_bot_token: Boolean(saved.bot_token),
+        configured: Boolean(saved.enabled && saved.bot_token && saved.chat_id),
+      },
+    });
+  });
+
+  route('POST', '/api/alerts/test-telegram', 'admin', async (ctx) => {
+    const b = await readBody(ctx.req, 8192);
+    const s = getSettings(db);
+    const curTg = s.telegram || {};
+    const inTg = (b.telegram && typeof b.telegram === 'object') ? b.telegram : b;
+    const token = (inTg.bot_token !== undefined && String(inTg.bot_token).trim() !== '')
+      ? String(inTg.bot_token).trim()
+      : String(curTg.bot_token || '').trim();
+    const chatId = (inTg.chat_id !== undefined && String(inTg.chat_id).trim() !== '')
+      ? String(inTg.chat_id).trim()
+      : String(curTg.chat_id || '').trim();
+    const hostHeader = ctx.req.headers.host ? `http://${ctx.req.headers.host}` : 'http://localhost:8080';
+    const appUrl = (inTg.app_url && String(inTg.app_url).trim()) || curTg.app_url || hostHeader;
+    const lang = LANGS.includes(b.lang) ? b.lang : (ctx.user.lang || s.default_lang || 'vi');
+
+    if (!token) throw bad('Vui lòng nhập Bot Token trước khi gửi tin thử nghiệm');
+    if (!chatId) throw bad('Vui lòng nhập Chat ID / Group ID trước khi gửi tin thử nghiệm');
+
+    try {
+      const out = await monitor.telegram.sendTestMessage({
+        bot_token: token,
+        chat_id: chatId,
+        app_url: appUrl,
+        lang,
+        org_name: s.org_name || 'Monitoring',
+      });
+      send(ctx.res, 200, {
+        ok: true,
+        message: lang === 'en' ? 'Test message sent to Telegram successfully!' : 'Đã gửi tin nhắn thử nghiệm tới Telegram thành công!',
+        ...out,
+      });
+    } catch (err) {
+      throw new HttpError(err.status === 429 ? 429 : 502, err.message || 'Không gửi được tin nhắn Telegram');
+    }
+  });
+
   // ---------- settings ----------
   route('GET', '/api/settings', 'any', (ctx) => {
     const s = getSettings(db);
+    const tg = s.telegram || {};
+    const tgConfigured = Boolean(tg.enabled && tg.bot_token && tg.chat_id);
     const out = { type_severity: s.type_severity, thresholds: s.thresholds, org_name: s.org_name, default_theme: s.default_theme,
       default_lang: s.default_lang || 'vi',
       ai_enabled: !!(s.ai && s.ai.enabled),
+      telegram_enabled: !!tg.enabled,
+      telegram_configured: tgConfigured,
       types: TYPES, timing: { ping_interval_ms: monitor.o.pingIntervalMs, ping_fail_limit: monitor.o.pingFailLimit,
         agent_timeout_ms: monitor.o.agentTimeoutMs }, version: versionInfo };
     if (ctx.user.role === 'admin') {
@@ -633,6 +744,12 @@ function createApp(db, monitor, opts = {}) {
         api_key: '',
         presets: PROVIDER_PRESETS,
         stats,
+      };
+      out.telegram = {
+        ...tg,
+        has_bot_token: Boolean(tg.bot_token),
+        configured: tgConfigured,
+        stats: monitor.telegram ? monitor.telegram.getStats() : null,
       };
     }
     send(ctx.res, 200, out);
@@ -701,6 +818,9 @@ function createApp(db, monitor, opts = {}) {
         max_tokens: Math.min(2000, Math.max(100, Number(b.ai.max_tokens ?? curAi.max_tokens ?? 350))),
       };
       setSetting(db, 'ai', nextAi);
+    }
+    if (b.telegram && typeof b.telegram === 'object') {
+      saveTelegramConfig(b.telegram);
     }
     monitor.reload();
     monitor.emit('change');

@@ -22,6 +22,18 @@ const DEFAULT_AI_SETTINGS = {
   max_tokens: 280,
 };
 
+const DEFAULT_TELEGRAM_SETTINGS = {
+  enabled: false,
+  bot_token: '',
+  chat_id: '',
+  app_url: '',
+  notify_down: true,
+  notify_recovered: true,
+  notify_threshold: true,
+  cooldown_seconds: 30,
+  max_per_minute: 20,
+};
+
 const DEFAULT_SETTINGS = {
   type_severity: DEFAULT_TYPE_SEVERITY,
   thresholds: { cpu: 90, ram: 90, disk: 90, temp: 85, dos_packet_rate: 10000 },
@@ -30,6 +42,7 @@ const DEFAULT_SETTINGS = {
   default_theme: 'neon',
   default_lang: 'vi',
   ai: DEFAULT_AI_SETTINGS,
+  telegram: DEFAULT_TELEGRAM_SETTINGS,
 };
 
 function open(file) {
@@ -53,7 +66,8 @@ function open(file) {
       check_agent INTEGER NOT NULL DEFAULT 0, snmp_enabled INTEGER NOT NULL DEFAULT 0,
       snmp_community TEXT NOT NULL DEFAULT 'public', snmp_port INTEGER NOT NULL DEFAULT 161,
       severity TEXT, location TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
-      maintenance INTEGER NOT NULL DEFAULT 0, mute_local_alerts INTEGER NOT NULL DEFAULT 0, agent_token TEXT UNIQUE NOT NULL,
+      maintenance INTEGER NOT NULL DEFAULT 0, mute_local_alerts INTEGER NOT NULL DEFAULT 0,
+      telegram_enabled INTEGER NOT NULL DEFAULT 1, agent_token TEXT UNIQUE NOT NULL,
       created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS device_groups(
       device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
@@ -88,6 +102,7 @@ function open(file) {
   const cols = db.prepare('PRAGMA table_info(devices)').all().map((c) => c.name);
   if (!cols.includes('snmp_profile')) db.exec("ALTER TABLE devices ADD COLUMN snmp_profile TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('mute_local_alerts')) db.exec("ALTER TABLE devices ADD COLUMN mute_local_alerts INTEGER NOT NULL DEFAULT 0");
+  if (!cols.includes('telegram_enabled')) db.exec("ALTER TABLE devices ADD COLUMN telegram_enabled INTEGER NOT NULL DEFAULT 1");
   // bandwidth history (bytes per second): net_in = download/rx, net_out = upload/tx
   const mcols = db.prepare('PRAGMA table_info(metrics)').all().map((c) => c.name);
   if (!mcols.includes('net_in')) db.exec('ALTER TABLE metrics ADD COLUMN net_in REAL');
@@ -106,6 +121,7 @@ function getSettings(db) {
   out.type_severity = { ...DEFAULT_TYPE_SEVERITY, ...out.type_severity };
   out.thresholds = { ...DEFAULT_SETTINGS.thresholds, ...out.thresholds };
   out.ai = { ...DEFAULT_AI_SETTINGS, ...(out.ai || {}) };
+  out.telegram = { ...DEFAULT_TELEGRAM_SETTINGS, ...(out.telegram || {}) };
   if (!['vi', 'en'].includes(out.default_lang)) out.default_lang = 'vi';
   return out;
 }
@@ -115,4 +131,4 @@ function setSetting(db, key, value) {
     .run(key, JSON.stringify(value));
 }
 
-module.exports = { open, getSettings, setSetting, DEFAULT_TYPE_SEVERITY, DEFAULT_AI_SETTINGS };
+module.exports = { open, getSettings, setSetting, DEFAULT_TYPE_SEVERITY, DEFAULT_AI_SETTINGS, DEFAULT_TELEGRAM_SETTINGS };

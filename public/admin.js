@@ -10,13 +10,63 @@
   const randKey = () => Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join('');
   const byTypeLabel = (sevKey) => (M.S.lang === 'en' ? `By device type (${M.SEV_NAME[sevKey]})` : `Theo loại thiết bị (${M.SEV_NAME[sevKey]})`);
 
+  M.isTelegramConfigured = () => {
+    const s = M.S.settings || {};
+    if (s.telegram_configured) return true;
+    const tg = s.telegram || {};
+    return Boolean(tg.enabled && (tg.bot_token || tg.has_bot_token) && tg.chat_id);
+  };
+
+  M.showTelegramUnconfiguredPopup = () => {
+    const isEn = M.S.lang === 'en';
+    const existing = document.getElementById('tg-warn-popup');
+    if (existing) existing.remove();
+    const wrap = document.createElement('div');
+    wrap.id = 'tg-warn-popup';
+    wrap.className = 'tg-popup-overlay';
+    wrap.innerHTML = `
+      <div class="tg-popup-card" role="dialog" aria-modal="true">
+        <h3>⚠️ ${isEn ? 'Telegram Bot API Not Configured' : 'Chưa cấu hình kết nối Telegram Bot API'}</h3>
+        <p>${isEn
+          ? 'The system has not been connected to a Telegram Bot API or the Telegram alert channel is currently disabled in <b>General Settings</b>.'
+          : 'Hệ thống chưa có kết nối API Telegram hoặc chưa cấu hình <b>Bot Token / Chat ID</b> tại mục Cài đặt chung.'}</p>
+        <p class="muted">${isEn
+          ? 'Please configure your Bot Token, Chat ID / Group ID, and enable Telegram notifications in <b>Settings → Notifications &amp; Alerts</b> first.'
+          : 'Vui lòng vào <b>Cài đặt → Thông báo &amp; Cảnh báo (Alert Channels)</b> để nhập Bot Token, Chat ID và bật kênh thông báo trước khi kích hoạt cảnh báo cho thiết bị.'}</p>
+        <div class="tg-popup-actions">
+          <button type="button" class="btn" id="tg-popup-close">${isEn ? 'Close' : 'Đóng'}</button>
+          ${isAdmin() ? `<button type="button" class="btn primary" id="tg-popup-goto">⚙️ ${isEn ? 'Go to Telegram Settings' : 'Đi tới Cài đặt Telegram'}</button>` : ''}
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrap);
+    const closePopup = () => wrap.remove();
+    $('#tg-popup-close', wrap).onclick = closePopup;
+    wrap.onclick = (e) => { if (e.target === wrap) closePopup(); };
+    const gotoBtn = $('#tg-popup-goto', wrap);
+    if (gotoBtn) {
+      gotoBtn.onclick = () => {
+        closePopup();
+        M.closeModal();
+        location.hash = '#/settings';
+        setTimeout(() => {
+          const panel = document.getElementById('st-telegram-panel');
+          if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+      };
+    }
+  };
+
   // ---------- device editor ----------
   M.editDevice = async (id) => {
-    const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, mute_local_alerts: false, groups: [] };
+    const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, mute_local_alerts: false, telegram_enabled: true, groups: [] };
     if (!M.S.groups.length) await M.loadGroups();
     if (!M.profiles) M.profiles = await M.api('GET', '/api/snmp/profiles').then((r) => r.profiles).catch(() => []);
     const def = M.S.settings.type_severity;
-    const { form } = M.modal(id ? (M.S.lang === 'en' ? `Edit device: ${d.name}` : `Sửa thiết bị: ${d.name}`) : t('Thêm thiết bị'), `
+    const tgConfigured = M.isTelegramConfigured();
+    const tgChecked = d.telegram_enabled !== false && tgConfigured;
+    const isEn = M.S.lang === 'en';
+    const { form } = M.modal(id ? (isEn ? `Edit device: ${d.name}` : `Sửa thiết bị: ${d.name}`) : t('Thêm thiết bị'), `
       <div class="field-grid">
         <div class="field"><label>${t('Tên thiết bị *')}</label><input class="inp" name="name" maxlength="100" required value="${esc(d.name)}"></div>
         <div class="field"><label>${t('Loại')}</label><select class="sel inp" name="type" id="f-type">${typeOptions(d.type)}</select></div>
@@ -32,9 +82,10 @@
         <div class="field full" style="grid-column:1 / -1"><label>${t('Hồ sơ SNMP')}</label><select class="sel inp" style="width:100%" name="snmp_profile"><option value="">${t('Tự nhận diện (khuyến nghị)')}</option>${(M.profiles || []).map((p) => `<option value="${esc(p.id)}" ${p.id === d.snmp_profile ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
       </div>
       <div class="field"><label>${t('Thuộc nhóm')}</label><div class="row">${M.S.groups.map((g) => `<span class="field inline"><input type="checkbox" name="grp" value="${g.id}" id="g${g.id}" ${d.groups.includes(g.id) ? 'checked' : ''}><label for="g${g.id}">${esc(g.name)}</label></span>`).join('') || `<span class="muted">${t('Chưa có nhóm')}</span>`}</div></div>
-      <div class="row" style="margin-top:6px">
+      <div class="row" style="margin-top:6px;flex-wrap:wrap">
         ${chk('maintenance', t('Chế độ bảo trì (tắt cảnh báo)'), d.maintenance)}
         ${chk('mute_local_alerts', t('Tắt cảnh báo trên thẻ thiết bị (Ẩn huy hiệu local)'), d.mute_local_alerts)}
+        ${chk('telegram_enabled', isEn ? '🔔 Send Telegram alerts (Offline / Recovered / Threshold)' : '🔔 Cảnh báo qua Telegram Bot (Báo khi Mất kết nối & ONLINE trở lại)', tgChecked)}
       </div>
       ${id ? `<div class="field" style="margin-top:10px"><button type="button" class="btn danger" id="f-del">${t('Xóa thiết bị')}</button></div>` : ''}`,
     async (f) => {
@@ -43,13 +94,24 @@
         name: fd.get('name'), type: fd.get('type'), address: fd.get('address'), severity: fd.get('severity') || null,
         location: fd.get('location'), notes: fd.get('notes'), snmp_community: fd.get('snmp_community'), snmp_port: Number(fd.get('snmp_port')), snmp_profile: fd.get('snmp_profile') || '',
         check_icmp: f.check_icmp.checked, check_agent: f.check_agent.checked, snmp_enabled: f.snmp_enabled.checked,
-        maintenance: f.maintenance.checked, mute_local_alerts: f.mute_local_alerts.checked, groups: fd.getAll('grp').map(Number),
+        maintenance: f.maintenance.checked, mute_local_alerts: f.mute_local_alerts.checked,
+        telegram_enabled: f.telegram_enabled ? f.telegram_enabled.checked : true,
+        groups: fd.getAll('grp').map(Number),
       };
       if (id) await M.api('PUT', `/api/devices/${id}`, body); else await M.api('POST', '/api/devices', body);
       await M.loadGroups();
       M.toast(t('Đã lưu thiết bị'));
       if (M.current === M.views.devices) M.views.devices.paint();
     });
+    const tgChk = $('#f-telegram_enabled', form);
+    if (tgChk) {
+      tgChk.onchange = () => {
+        if (tgChk.checked && !M.isTelegramConfigured()) {
+          tgChk.checked = false;
+          M.showTelegramUnconfiguredPopup();
+        }
+      };
+    }
     $('#f-type', form).onchange = (e) => {
       const tp = e.target.value;
       $('#f-sev', form).options[0].text = byTypeLabel(def[tp]);
@@ -188,6 +250,8 @@
         <form id="st-enroll" class="row"><input class="inp" name="key" style="flex:1" value="${esc(s.enroll_key || '')}" placeholder="${t('(đang tắt)')}">
           <button type="button" class="btn" id="st-gen">${t('Tạo ngẫu nhiên')}</button><button class="btn primary">${t('Lưu')}</button></form></div>
 
+      ${this.telegramPanel(s)}
+
       ${this.aiPanel(s)}
 
       <div class="panel" style="margin-top:14px"><h2 style="margin-top:0">${t('Hệ thống')}</h2>${this.systemPanel(s)}</div>
@@ -212,6 +276,7 @@
       $('#st-th').onsubmit = guard((f) => save({ thresholds: Object.fromEntries([...f].map(([k, v]) => [k, Number(v)])) }, t('Đã lưu ngưỡng')));
       $('#st-enroll').onsubmit = guard((f) => save({ enroll_key: f.get('key') }, t('Đã lưu enroll key')));
       $('#st-gen').onclick = () => { $('#st-enroll input').value = randKey(); };
+      this.bindTelegramPanel(el, s, save, guard);
       this.bindAiPanel(el, s, save, guard);
       $('#us-add').onclick = () => this.userForm();
       $('#us-body').onclick = (e) => {
@@ -222,6 +287,227 @@
         else M.confirm(M.S.lang === 'en' ? `Delete user "${u.username}"?` : `Xóa người dùng "${u.username}"?`, async () => { await M.api('DELETE', `/api/users/${u.id}`); this.loadUsers(); });
       };
       this.loadUsers();
+    },
+    telegramPanel(s) {
+      const tg = s.telegram || {};
+      const st = tg.stats || {};
+      const isEn = M.S.lang === 'en';
+      const isActive = Boolean(tg.enabled && (tg.bot_token || tg.has_bot_token) && tg.chat_id);
+      const defaultAppUrl = tg.app_url || (typeof location !== 'undefined' && location.origin ? location.origin : 'http://localhost:8080');
+      return `<div class="panel" id="st-telegram-panel" style="margin-top:14px">
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          <h2 style="margin:0">🔔 ${isEn ? 'Notifications & Alert Channels — Telegram Bot' : 'Thông báo & Cảnh báo (Alert Channels) — Telegram Bot'}</h2>
+          <span class="spacer"></span>
+          <span class="ai-badge ${isActive ? '' : 'cached'}">${isActive
+            ? (isEn ? '🟢 Telegram Active & Connected' : '🟢 Đang bật cảnh báo Telegram')
+            : (isEn ? '⚪ Telegram Disabled / Unconfigured' : '⚪ Đang tắt hoặc chưa cấu hình')}</span>
+        </div>
+        <p class="muted" style="margin:6px 0 12px">${isEn
+          ? 'Automatically pushes real-time HTML notifications (🚨 Offline, ✅ Recovered, ⚠️ High CPU/RAM Threshold) to your Telegram chat or NOC group with built-in anti-spam & flapping protection.'
+          : 'Tự động đẩy tin nhắn cảnh báo định dạng HTML trực quan (🚨 Mất kết nối, ✅ Phục hồi ONLINE trở lại, ⚠️ Cảnh báo ngưỡng CPU/RAM cao) vào nhóm trực NOC qua Telegram Bot kèm cơ chế chống Spam / Flapping.'}</p>
+
+        <div class="ai-stats-bar" style="margin-bottom:12px">
+          <div class="stat">${isEn ? 'Messages Sent Today' : 'Tin nhắn đã gửi hôm nay'}: <b>${st.sent_today || 0}</b></div>
+          <div class="stat">${isEn ? 'Total Sent' : 'Tổng tin đã gửi'}: <b>${st.total_sent || 0}</b></div>
+          <div class="stat">${isEn ? 'Anti-Spam Coalesced Today' : 'Đã chặn Spam/Flapping hôm nay'}: <b>${st.suppressed_today || 0}</b></div>
+        </div>
+
+        <form id="st-telegram">
+          <div class="row" style="margin-bottom:14px;padding:10px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border)">
+            <label class="toggle-switch" for="f-tg_enabled">
+              <input type="checkbox" name="telegram_enabled" id="f-tg_enabled" ${tg.enabled ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+              <span>${isEn ? 'Enable Telegram Bot Notifications' : 'Bật tính năng thông báo cảnh báo qua Telegram Bot'}</span>
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <div class="field">
+              <label>${isEn ? 'Bot Token (from @BotFather)' : 'Bot Token (Lấy từ @BotFather)'} ${tg.has_bot_token ? `<span class="ai-badge" style="margin-left:4px">${isEn ? 'Saved' : 'Đã lưu'}</span>` : ''}</label>
+              <div class="inp-with-action">
+                <input class="inp" type="password" name="bot_token" id="tg-bot-token" autocomplete="new-password" value="${esc(tg.bot_token || '')}" placeholder="1234567890:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw">
+                <button type="button" class="btn-eye" id="btn-tg-eye" title="${isEn ? 'Show / Hide Bot Token' : 'Hiện / Ẩn Bot Token'}" aria-label="Toggle Bot Token visibility">👁️</button>
+              </div>
+              <span class="muted" style="font-size:11.5px;display:block;margin-top:4px">${isEn
+                ? 'Format: <code>123456789:ABCdefGHIjklMNO...</code> (Chat with @BotFather → /newbot)'
+                : 'Định dạng chuẩn: <code>123456789:ABCdefGHIjklMNO...</code> (Tạo bot qua @BotFather → /newbot)'}</span>
+            </div>
+
+            <div class="field">
+              <label>${isEn ? 'Chat ID / Group ID' : 'Chat ID / Group ID (ID cá nhân hoặc Nhóm NOC)'}</label>
+              <input class="inp" type="text" name="chat_id" id="tg-chat-id" value="${esc(tg.chat_id || '')}" placeholder="-1001987654321 hoặc 987654321">
+              <span class="muted" style="font-size:11.5px;display:block;margin-top:4px">${isEn
+                ? '💡 Note: Group IDs start with a minus sign (e.g. <code>-100123456789</code>). Add your bot to the group, send a message, or use <code>@userinfobot</code> / <code>/getUpdates</code> to get the ID.'
+                : '💡 Ghi chú: ID nhóm (Group/Supergroup) bắt đầu bằng dấu trừ <code>-</code> hoặc <code>-100...</code>. Hãy thêm Bot vào nhóm, gõ 1 tin nhắn bất kỳ rồi lấy ID qua <code>@userinfobot</code> hoặc nút Hướng dẫn bên dưới.'}</span>
+            </div>
+
+            <div class="field">
+              <label>${isEn ? 'Dashboard Base URL (for direct device link in message)' : 'Địa chỉ Web hệ thống (Link mở nhanh thiết bị trong tin nhắn)'}</label>
+              <input class="inp" type="text" name="app_url" id="tg-app-url" value="${esc(defaultAppUrl)}" placeholder="http://192.168.1.10:8080">
+            </div>
+
+            <div class="field">
+              <label>${isEn ? 'Anti-Spam / Flapping Debounce Cooldown (seconds)' : 'Thời gian chống Spam / Flapping trên mỗi thiết bị (giây)'}</label>
+              <input class="inp" type="number" min="0" max="3600" name="cooldown_seconds" id="tg-cooldown" value="${tg.cooldown_seconds != null ? tg.cooldown_seconds : 30}">
+            </div>
+          </div>
+
+          <div class="field" style="margin-top:10px">
+            <label>${isEn ? 'Incident Types to Notify' : 'Loại sự cố cần gửi thông báo'}</label>
+            <div class="tg-check-grid">
+              <label class="tg-check-card" for="f-tg_notify_down">
+                <input type="checkbox" name="notify_down" id="f-tg_notify_down" ${tg.notify_down !== false ? 'checked' : ''}>
+                <span>
+                  <span class="tg-chk-title">🚨 ${isEn ? 'Disconnected / Offline' : 'Mất kết nối / Offline'}</span>
+                  <span class="tg-chk-desc">${isEn ? 'Alert immediately when a device stops responding to Ping/SNMP/Agent' : 'Báo ngay khi thiết bị mất kết nối Ping / SNMP / Agent'}</span>
+                </span>
+              </label>
+
+              <label class="tg-check-card" for="f-tg_notify_recovered">
+                <input type="checkbox" name="notify_recovered" id="f-tg_notify_recovered" ${tg.notify_recovered !== false ? 'checked' : ''}>
+                <span>
+                  <span class="tg-chk-title">✅ ${isEn ? 'Recovered / Back Online' : 'Phục hồi / Recovered'}</span>
+                  <span class="tg-chk-desc">${isEn ? 'Send recovery notice when device returns ONLINE after an outage' : 'Gửi tin báo phục hồi khi thiết bị ONLINE trở lại sau sự cố'}</span>
+                </span>
+              </label>
+
+              <label class="tg-check-card" for="f-tg_notify_threshold">
+                <input type="checkbox" name="notify_threshold" id="f-tg_notify_threshold" ${tg.notify_threshold !== false ? 'checked' : ''}>
+                <span>
+                  <span class="tg-chk-title">⚠️ ${isEn ? 'High CPU / RAM / Resource Threshold' : 'Cảnh báo ngưỡng CPU/RAM cao'}</span>
+                  <span class="tg-chk-desc">${isEn ? 'Alert when CPU, RAM, Disk, Thermal or Flood/DoS exceeds threshold' : 'Báo khi CPU, RAM, Ổ đĩa, Nhiệt độ hoặc DoS vượt ngưỡng an toàn'}</span>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:14px;gap:8px;flex-wrap:wrap">
+            <button class="btn primary" type="submit" id="btn-tg-save">💾 ${isEn ? 'Save Configuration' : 'Lưu cấu hình'}</button>
+            <button class="btn" type="button" id="btn-tg-test">📨 ${isEn ? 'Send Test Message (Test Connection)' : 'Gửi tin thử nghiệm'}</button>
+            <button class="btn" type="button" id="btn-tg-guide">📖 ${isEn ? 'Connection Guide' : 'Hướng dẫn kết nối'}</button>
+          </div>
+        </form>
+
+        <div class="tg-guide-box hidden" id="tg-guide-box">
+          <h4>📖 ${isEn ? 'Step-by-Step Guide: Connecting Telegram Bot for NOC Alerts' : 'Tài liệu hướng dẫn: Thiết lập Telegram Bot nhận cảnh báo sự cố NOC'}</h4>
+          ${isEn ? `
+          <ol>
+            <li><b>Create a Bot &amp; get Bot Token:</b> Open Telegram, search for <code>@BotFather</code>, send <code>/newbot</code>, enter a display name and username (ending in <code>bot</code>). Copy the HTTP API <b>Bot Token</b> (e.g. <code>123456789:AAH...</code>) and paste it into the <b>Bot Token</b> field above.</li>
+            <li><b>Get Personal Chat ID:</b> If you want alerts sent to you directly, open your new Bot and click <b>Start</b> (<code>/start</code>), then message <code>@userinfobot</code> to get your numeric <b>Id</b>.</li>
+            <li><b>Get Group Chat ID (Recommended for NOC Teams):</b>
+              <ul>
+                <li>Add your Bot to your Telegram Group and send a test message like <code>/start@YourBotName hello</code> in the group.</li>
+                <li>Open a browser tab and visit: <code>https://api.telegram.org/bot&lt;YOUR_BOT_TOKEN&gt;/getUpdates</code></li>
+                <li>Look for <code>"chat":{"id":-1001234567890,"title":"NOC Alert Group"...}</code>. Copy that negative number (including the <code>-</code> sign) into <b>Chat ID / Group ID</b>.</li>
+              </ul>
+            </li>
+            <li><b>Verify &amp; Save:</b> Click <b>"📨 Send Test Message"</b> to verify your phone/group receives the sample alert, then click <b>"💾 Save Configuration"</b>.</li>
+            <li><b>Per-Device Control:</b> You can toggle Telegram alerts on/off for individual devices inside each Device Detail page (<code>#/device/:id</code>) or Edit Device modal.</li>
+          </ol>` : `
+          <ol>
+            <li><b>Bước 1 — Tạo Bot &amp; lấy Bot Token:</b> Mở ứng dụng Telegram, tìm <code>@BotFather</code> (có tích xanh), gõ lệnh <code>/newbot</code> → Đặt tên hiển thị và username cho Bot (kết thúc bằng chữ <code>bot</code>). Sao chép chuỗi <b>HTTP API Token</b> (dạng <code>123456789:AAH...</code>) dán vào ô <b>Bot Token</b> ở trên.</li>
+            <li><b>Bước 2 — Lấy Chat ID cá nhân:</b> Nếu muốn nhận tin nhắn riêng, hãy bấm <b>Start</b> (<code>/start</code>) trong khung chat với Bot vừa tạo, sau đó nhắn tin cho <code>@userinfobot</code> để lấy mã <b>Id</b> dạng số.</li>
+            <li><b>Bước 3 — Lấy Group ID cho nhóm trực NOC (Khuyến nghị):</b>
+              <ul>
+                <li>Thêm Bot vừa tạo vào nhóm Telegram trực hệ thống và gõ 1 tin nhắn bất kỳ trong nhóm (ví dụ: <code>/start</code>).</li>
+                <li>Mở trình duyệt truy cập đường dẫn: <code>https://api.telegram.org/bot&lt;BOT_TOKEN_CỦA_BẠN&gt;/getUpdates</code></li>
+                <li>Tìm đoạn <code>"chat":{"id":-1001234567890,"title":"Nhóm Trực NOC"...}</code>. Sao chép toàn bộ dãy số ID đó (bao gồm cả dấu trừ <code>-</code> ở đầu) dán vào ô <b>Chat ID / Group ID</b>.</li>
+              </ul>
+            </li>
+            <li><b>Bước 4 — Kiểm tra &amp; Lưu cấu hình:</b> Nhấn nút <b>"📨 Gửi tin thử nghiệm"</b> để kiểm tra tin nhắn mẫu gửi về nhóm Telegram, sau đó bật công tắc thông báo và nhấn <b>"💾 Lưu cấu hình"</b>.</li>
+            <li><b>Bước 5 — Bật/Tắt theo từng thiết bị:</b> Tại trang chi tiết từng thiết bị (<code>#/device/:id</code>) hoặc cửa sổ Sửa thiết bị, bạn có thể bật/tắt nhận cảnh báo Telegram riêng cho thiết bị đó (kể cả thông báo khi thiết bị <b>ONLINE trở lại</b> sau sự cố).</li>
+          </ol>`}
+        </div>
+      </div>`;
+    },
+    bindTelegramPanel(el, s, save, guard) {
+      const form = $('#st-telegram', el);
+      if (!form) return;
+      const tokenInp = $('#tg-bot-token', form);
+      const eyeBtn = $('#btn-tg-eye', form);
+      if (eyeBtn && tokenInp) {
+        eyeBtn.onclick = () => {
+          const isSecret = tokenInp.type === 'password';
+          tokenInp.type = isSecret ? 'text' : 'password';
+          eyeBtn.textContent = isSecret ? '🙈' : '👁️';
+        };
+      }
+      const guideBtn = $('#btn-tg-guide', form);
+      const guideBox = $('#tg-guide-box', el);
+      if (guideBtn && guideBox) {
+        guideBtn.onclick = () => {
+          const hidden = guideBox.classList.toggle('hidden');
+          guideBtn.classList.toggle('primary', !hidden);
+          if (!hidden) guideBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        };
+      }
+      form.onsubmit = guard(async (fd) => {
+        const isEn = M.S.lang === 'en';
+        const enabled = $('#f-tg_enabled', form).checked;
+        const botToken = (fd.get('bot_token') || '').trim();
+        const chatId = (fd.get('chat_id') || '').trim();
+        if (enabled && (!botToken && !(s.telegram && s.telegram.has_bot_token))) {
+          throw new Error(isEn ? 'Please enter a Telegram Bot Token before enabling notifications' : 'Vui lòng nhập Bot Token trước khi bật thông báo Telegram');
+        }
+        if (enabled && !chatId) {
+          throw new Error(isEn ? 'Please enter a Chat ID / Group ID before enabling notifications' : 'Vui lòng nhập Chat ID / Group ID trước khi bật thông báo Telegram');
+        }
+        const tgBody = {
+          enabled,
+          bot_token: botToken,
+          allow_empty_token: true,
+          chat_id: chatId,
+          app_url: (fd.get('app_url') || '').trim(),
+          cooldown_seconds: Number(fd.get('cooldown_seconds') ?? 30),
+          notify_down: $('#f-tg_notify_down', form).checked,
+          notify_recovered: $('#f-tg_notify_recovered', form).checked,
+          notify_threshold: $('#f-tg_notify_threshold', form).checked,
+        };
+        await M.api('PUT', '/api/alerts/telegram', { telegram: tgBody });
+        M.S.settings = { ...M.S.settings, ...(await M.api('GET', '/api/settings')) };
+        M.toast(isEn ? 'Telegram alert settings saved successfully!' : 'Đã lưu cấu hình cảnh báo Telegram thành công!');
+        this.render(el);
+      });
+      const testBtn = $('#btn-tg-test', form);
+      if (testBtn) {
+        testBtn.onclick = async () => {
+          const isEn = M.S.lang === 'en';
+          const fd = new FormData(form);
+          const botToken = (fd.get('bot_token') || '').trim();
+          const chatId = (fd.get('chat_id') || '').trim();
+          const appUrl = (fd.get('app_url') || '').trim();
+          if (!botToken && !(s.telegram && s.telegram.has_bot_token)) {
+            M.toast(isEn ? 'Please enter Bot Token first' : 'Vui lòng nhập Bot Token trước khi gửi thử nghiệm');
+            if (tokenInp) tokenInp.focus();
+            return;
+          }
+          if (!chatId) {
+            M.toast(isEn ? 'Please enter Chat ID / Group ID first' : 'Vui lòng nhập Chat ID / Group ID trước khi gửi thử nghiệm');
+            const chatInp = $('#tg-chat-id', form);
+            if (chatInp) chatInp.focus();
+            return;
+          }
+          const orig = testBtn.textContent;
+          testBtn.disabled = true;
+          testBtn.textContent = isEn ? '⏳ Sending test message...' : '⏳ Đang gửi tin thử nghiệm...';
+          try {
+            const res = await M.api('POST', '/api/alerts/test-telegram', {
+              lang: M.S.lang || 'vi',
+              telegram: {
+                bot_token: botToken,
+                chat_id: chatId,
+                app_url: appUrl,
+              },
+            });
+            M.toast(res.message || (isEn ? 'Test message sent to Telegram!' : 'Đã gửi tin nhắn thử nghiệm tới Telegram thành công!'));
+          } catch (err) {
+            M.toast(err.message);
+          } finally {
+            testBtn.disabled = false;
+            testBtn.textContent = orig;
+          }
+        };
+      }
     },
     aiPanel(s) {
       const ai = s.ai || {};

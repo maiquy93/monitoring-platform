@@ -1365,16 +1365,33 @@
       const sinceWord = isEn ? 'since' : 'từ';
       const isPrinter = d.type === 'printer';
       const canAck = (d.status === 'down' || d.status === 'warning') && !d.acked && role !== 'viewer';
+      const tgReady = typeof M.isTelegramConfigured === 'function' ? M.isTelegramConfigured() : Boolean(M.S.settings && M.S.settings.telegram_configured);
+      const tgActive = d.telegram_enabled !== false && tgReady;
       $('#d-hero').innerHTML = `<div class="hero ${M.statusClass(d)}"><div class="h-ico">${M.ICON[d.type] || ''}</div>
         <div style="flex:1;min-width:0"><h1>${esc(d.name)}</h1><div class="h-state">${M.STATE_NAME[d.status]}
         <span class="muted" style="font-size:14px;text-transform:none"> · ${sinceWord} ${M.fmtTime(d.since)} (${M.fmtDur((Date.now() - d.since) / 1000)})</span></div>
         ${d.reasons.map((r) => `<div class="reason">• ${esc(tr(r))}</div>`).join('')}</div>
         <div class="row">${canAck ? `<button class="btn" id="d-ack">${esc(t('Đã biết'))}</button>` : ''}
         ${!isPrinter ? `<button class="btn" id="d-copy-tech" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude'}">📋 ${esc(t('Copy Logs Kỹ thuật'))}</button>${role !== 'viewer' ? `<button class="btn" id="d-ai-diag" title="${isEn ? 'Run AI technical diagnosis on this device' : 'Chạy chẩn đoán AI kỹ thuật cho thiết bị này'}">✨ ${esc(t('Chẩn đoán AI'))}</button>` : ''}` : ''}
-        ${role === 'admin' ? `<button class="btn" id="d-maint">${esc(d.maintenance ? t('Kết thúc bảo trì') : t('Bảo trì'))}</button><button class="btn" id="d-edit">${esc(t('Sửa'))}</button>` : ''}
+        ${role === 'admin' ? `<button class="btn ${tgActive ? 'tg-on' : ''}" id="d-telegram" title="${isEn ? 'Toggle Telegram alerts for this device (Offline / Recovered)' : 'Bật/tắt cảnh báo Telegram cho thiết bị này (Mất kết nối / Phục hồi)'}">🔔 ${esc(tgActive ? (isEn ? 'Telegram: ON' : 'Telegram: Bật') : (isEn ? 'Telegram: OFF' : 'Telegram: Tắt'))}</button><button class="btn" id="d-maint">${esc(d.maintenance ? t('Kết thúc bảo trì') : t('Bảo trì'))}</button><button class="btn" id="d-edit">${esc(t('Sửa'))}</button>` : ''}
         <button class="btn" id="d-back">${esc(t('← Quay lại'))}</button></div></div>`;
       const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
       on('#d-back', () => history.back());
+      const toggleDeviceTelegram = async () => {
+        const ready = typeof M.isTelegramConfigured === 'function' ? M.isTelegramConfigured() : Boolean(M.S.settings && M.S.settings.telegram_configured);
+        if (!ready) {
+          if (typeof M.showTelegramUnconfiguredPopup === 'function') M.showTelegramUnconfiguredPopup();
+          return;
+        }
+        const nextVal = !(d.telegram_enabled !== false);
+        await M.api('PUT', `/api/devices/${d.id}`, { telegram_enabled: nextVal });
+        d.telegram_enabled = nextVal;
+        M.toast(nextVal
+          ? (isEn ? 'Enabled Telegram alerts for this device' : 'Đã bật cảnh báo Telegram cho thiết bị này')
+          : (isEn ? 'Disabled Telegram alerts for this device' : 'Đã tắt cảnh báo Telegram cho thiết bị này'));
+        this.paint();
+      };
+      on('#d-telegram', toggleDeviceTelegram);
       on('#d-copy-tech', async () => {
         try {
           const res = await M.api('GET', `/api/ai/technical-logs?device_id=${d.id}&lang=${M.S.lang}`);
@@ -1498,8 +1515,20 @@
       const names = d.groups.map((id) => (M.S.groups.find((g) => g.id === id) || {}).name).filter(Boolean);
       const chk = [d.check_icmp && 'ICMP ping', d.check_agent && 'Agent', d.snmp_enabled && 'SNMP'].filter(Boolean).join(', ') || '—';
       const kv = (k, v) => `<dt>${esc(t(k))}</dt><dd>${v == null || v === '' ? '—' : esc(v)}</dd>`;
+      const tgInfoRow = `<dt>${esc(isEn ? 'Telegram Alert' : 'Cảnh báo Telegram')}</dt><dd>
+        <label class="toggle-switch sm" style="vertical-align:middle">
+          <input type="checkbox" id="d-tg-switch" ${tgActive ? 'checked' : ''} ${role === 'admin' ? '' : 'disabled'}>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="muted" style="margin-left:6px;font-size:12px">${esc(tgActive
+          ? (isEn ? 'Active (Notifies on Offline & Recovery)' : 'Đang bật (Gửi tin khi Mất kết nối & Phục hồi)')
+          : (!tgReady
+            ? (isEn ? 'Bot API not configured in Settings' : 'Chưa cấu hình Bot API ở Cài đặt chung')
+            : (isEn ? 'Muted for this device' : 'Đang tắt cho thiết bị này')))}</span>
+      </dd>`;
       let html = `<h2 style="margin:0 0 10px">${esc(t('Thông tin'))}</h2><dl class="kv">${kv('Loại', M.TYPE_NAME[d.type])}${kv('Địa chỉ', d.address)}${kv('Vị trí', d.location)}
         <dt>${esc(t('Mức cảnh báo'))}</dt><dd><span class="sev-badge ${d.severity}">${M.SEV_NAME[d.severity]}</span>${d.severity_override ? '' : ` <span class="muted">${esc(t('(theo loại)'))}</span>`}</dd>
+        ${tgInfoRow}
         ${kv('Nhóm', names.join(', '))}${kv('Kiểm tra', chk)}${kv('Ghi chú', d.notes)}</dl>`;
       if (a) {
         html += `<h2>Agent</h2><dl class="kv">${kv('Hostname', a.hostname)}${kv('Hệ điều hành', a.os)}${kv('IP', a.ip)}${kv('Phiên bản', a.version)}
@@ -1661,6 +1690,18 @@
             }
           };
         }
+      }
+      const tgSw = $('#d-tg-switch');
+      if (tgSw) {
+        tgSw.onchange = async () => {
+          const ready = typeof M.isTelegramConfigured === 'function' ? M.isTelegramConfigured() : Boolean(M.S.settings && M.S.settings.telegram_configured);
+          if (!ready) {
+            tgSw.checked = false;
+            if (typeof M.showTelegramUnconfiguredPopup === 'function') M.showTelegramUnconfiguredPopup();
+            return;
+          }
+          await toggleDeviceTelegram();
+        };
       }
       const rg = $('#d-regen');
       if (rg) rg.onclick = () => M.confirm('Tạo token mới? Agent đang dùng token cũ sẽ bị từ chối.', async () => {

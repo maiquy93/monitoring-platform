@@ -128,7 +128,9 @@ class Monitor extends EventEmitter {
       ...opts,
     };
     const { AiService } = require('./ai');
+    const { TelegramService } = require('./telegram');
     this.ai = new AiService(db, { fetchFn: opts.aiFetchFn });
+    this.telegram = new TelegramService(db, { fetchFn: opts.telegramFetchFn });
     this.devices = new Map();   // id -> row (+ groups)
     this.state = new Map();     // id -> runtime state
     this.settings = getSettings(db);
@@ -471,15 +473,58 @@ class Monitor extends EventEmitter {
       if (st.alerts) st.alerts.dos = false;
     }
     if (sev !== 'none') {
-      if (next === 'down') this._event(d, 'down', sev, `${d.name} mất kết nối: ${st.reasons.join(', ')}`);
-      else if (next === 'warning') this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), `${d.name}: ${st.reasons.join('; ')}`);
-      else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
-        this._event(d, 'up', 'ok', `${d.name} hoạt động trở lại sau ${dur}s`);
+      if (next === 'down') {
+        const msg = `${d.name} mất kết nối: ${st.reasons.join(', ')}`;
+        this._event(d, 'down', sev, msg);
+        this._triggerTelegramAlert(d, st, 'down', msg, now);
+      } else if (next === 'warning') {
+        const msg = `${d.name}: ${st.reasons.join('; ')}`;
+        this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), msg);
+        this._triggerTelegramAlert(d, st, 'warning', msg, now);
+      } else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
+        const msg = `${d.name} hoạt động trở lại sau ${dur}s`;
+        this._event(d, 'up', 'ok', msg);
+        this._triggerTelegramAlert(d, st, 'up', msg, now);
       }
     }
     st.status = next;
     st.since = now;
     st.acked = false;
+  }
+
+  _triggerTelegramAlert(d, st, kind, reason, now = Date.now()) {
+    if (!this.telegram || !d || !d.id || d.maintenance) return;
+    if (this.severityOf(d) === 'none') return;
+    if (d.telegram_enabled === 0 || d.telegram_enabled === false) return;
+    const tg = this.settings && this.settings.telegram;
+    if (!tg || !tg.enabled || !tg.bot_token || !tg.chat_id) return;
+
+    const agentFresh = st && st.agent.lastAt != null && now - st.agent.lastAt <= this.o.agentTimeoutMs;
+    const res = st ? this._resources(st, agentFresh) : null;
+    const temp = (agentFresh && st.agent.data && st.agent.data.temperature != null)
+      ? st.agent.data.temperature
+      : (st && st.snmp.ok && st.snmp.info && st.snmp.info.temperature != null ? st.snmp.info.temperature : null);
+
+    const ctx = {
+      device_id: d.id,
+      device_name: d.name,
+      device_type: d.type,
+      address: d.address,
+      location: d.location,
+      telegram_enabled: d.telegram_enabled !== 0,
+      kind,
+      reason,
+      cpu: res ? res.cpu : null,
+      ram: res ? res.ram : null,
+      disk: res ? res.disk : null,
+      temp,
+      ts: now,
+    };
+
+    this.telegram.notifyDeviceEvent(ctx, this.settings, {
+      now,
+      lang: (this.settings && this.settings.default_lang) || 'vi',
+    }).catch(() => {});
   }
 
   _event(d, kind, severity, message) {
@@ -662,7 +707,9 @@ class Monitor extends EventEmitter {
     const net = this._net(st, Date.now(), !stale && a != null);
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
-      maintenance: !!d.maintenance, mute_local_alerts: !!d.mute_local_alerts, severity: this.severityOf(d), groups: d.groups,
+      maintenance: !!d.maintenance, mute_local_alerts: !!d.mute_local_alerts,
+      telegram_enabled: d.telegram_enabled !== 0,
+      severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,
       rtt: st.icmp.rtt,
       net_in: net ? Math.round(net.in) : null,

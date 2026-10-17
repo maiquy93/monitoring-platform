@@ -2031,3 +2031,199 @@ test('ui events: separate message text and standardized .event-actions container
   assert.ok(!auditTblHtml.includes('<div class="event-actions">'));
 });
 
+test('telegram alerts: config CRUD, test-telegram endpoint, HTML formatting, state transitions (down/up/threshold), per-device toggle, and anti-spam debounce', async () => {
+  const tgCalls = [];
+  const aiCalls = [];
+  const t = await boot({
+    pingIntervalMs: 1000,
+    pingFailLimit: 2,
+    breachMs: 5000,
+    telegramFetchFn: async (url, init) => {
+      const payload = JSON.parse(init.body);
+      tgCalls.push({ url, payload });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ ok: true, result: { message_id: tgCalls.length } }),
+      };
+    },
+    aiFetchFn: async (url, init) => {
+      aiCalls.push({ url, body: JSON.parse(init.body) });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify({ issue: 'CPU cao', cause: 'Quá tải', solution: 'Kiểm tra tiến trình', prediction: 'Ổn định' }) } }],
+          usage: { prompt_tokens: 50, completion_tokens: 30 },
+        }),
+      };
+    },
+  });
+  try {
+    await loginAdmin(t);
+
+    // 1. Test POST /api/alerts/test-telegram validation when missing token/chat_id
+    const badTest = await t.api('POST', '/api/alerts/test-telegram', { bot_token: '', chat_id: '' });
+    assert.equal(badTest.status, 400);
+
+    // 2. Test POST /api/alerts/test-telegram with valid token & chat_id before saving
+    const testRes = await t.api('POST', '/api/alerts/test-telegram', {
+      bot_token: '123456789:AAH_TEST_TOKEN',
+      chat_id: '-100987654321',
+      app_url: 'http://10.0.0.5:8080',
+    });
+    assert.equal(testRes.status, 200);
+    assert.equal(testRes.body.ok, true);
+    assert.equal(tgCalls.length, 1);
+    assert.equal(tgCalls[0].url, 'https://api.telegram.org/bot123456789:AAH_TEST_TOKEN/sendMessage');
+    assert.equal(tgCalls[0].payload.chat_id, '-100987654321');
+    assert.equal(tgCalls[0].payload.parse_mode, 'HTML');
+    assert.ok(tgCalls[0].payload.text.includes('🔔'));
+    assert.ok(tgCalls[0].payload.text.includes('http://10.0.0.5:8080/#/'));
+
+    // 3. Save Telegram config via PUT /api/alerts/telegram & enable AI to verify zero conflict
+    const saveRes = await t.api('PUT', '/api/alerts/telegram', {
+      telegram: {
+        enabled: true,
+        bot_token: '123456789:AAH_TEST_TOKEN',
+        chat_id: '-100987654321',
+        app_url: 'http://10.0.0.5:8080',
+        notify_down: true,
+        notify_recovered: true,
+        notify_threshold: true,
+        cooldown_seconds: 30,
+      },
+    });
+    assert.equal(saveRes.status, 200);
+    assert.equal(saveRes.body.telegram.configured, true);
+
+    await t.api('PUT', '/api/settings', {
+      ai: { enabled: true, provider: 'openai', api_key: 'sk-test-ai', model: 'gpt-4o-mini', auto_incident: true },
+    });
+
+    // Verify GET /api/alerts/telegram and GET /api/settings expose telegram config
+    const getTg = await t.api('GET', '/api/alerts/telegram');
+    assert.equal(getTg.status, 200);
+    assert.equal(getTg.body.telegram.enabled, true);
+    assert.equal(getTg.body.telegram.chat_id, '-100987654321');
+
+    // 4. Create 2 devices: dev1 with telegram_enabled=true, dev2 with telegram_enabled=false
+    t.alive.add('10.0.0.11');
+    t.alive.add('10.0.0.12');
+    const d1 = await t.api('POST', '/api/devices', {
+      name: 'Core-Router-01',
+      type: 'router',
+      address: '10.0.0.11',
+      check_icmp: true,
+      telegram_enabled: true,
+    });
+    const d2 = await t.api('POST', '/api/devices', {
+      name: 'Muted-Switch-02',
+      type: 'switch',
+      address: '10.0.0.12',
+      check_icmp: true,
+      telegram_enabled: false,
+    });
+    const id1 = d1.body.id;
+    const id2 = d2.body.id;
+
+    // Initial ping brings both UP from UNKNOWN (should NOT send recovery alert on initial boot)
+    let now = Date.now();
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+    await t.monitor._ping(t.monitor.devices.get(id2), t.monitor.state.get(id2), now);
+    assert.equal(tgCalls.length, 1); // still only the test message
+
+    // 5. Trigger DOWN on both devices (dev1 should send 🚨 OFFLINE, dev2 is muted so no message)
+    t.alive.delete('10.0.0.11');
+    t.alive.delete('10.0.0.12');
+    now += 2000;
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+    await t.monitor._ping(t.monitor.devices.get(id2), t.monitor.state.get(id2), now);
+    now += 2000;
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+    await t.monitor._ping(t.monitor.devices.get(id2), t.monitor.state.get(id2), now);
+
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(tgCalls.length, 2, 'Only dev1 should trigger Telegram DOWN alert');
+    const downMsg = tgCalls[1].payload.text;
+    assert.ok(downMsg.includes('🚨'), 'DOWN message must include 🚨 icon');
+    assert.ok(downMsg.includes('Core-Router-01'), 'DOWN message must include device name');
+    assert.ok(downMsg.includes('10.0.0.11'), 'DOWN message must include IP');
+    assert.ok(downMsg.includes(`http://10.0.0.5:8080/#/device/${id1}`), 'DOWN message must include direct device link');
+
+    // 6. Trigger RECOVERY (ONLINE) on dev1 -> should send ✅ RECOVERED message
+    t.alive.add('10.0.0.11');
+    now += 5000;
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(tgCalls.length, 3, 'dev1 recovery should trigger Telegram UP alert');
+    const upMsg = tgCalls[2].payload.text;
+    assert.ok(upMsg.includes('✅'), 'Recovery message must include ✅ icon');
+    assert.ok(upMsg.includes('Core-Router-01'));
+    assert.ok(upMsg.includes('ONLINE'));
+
+    // 7. Flapping protection (debounce): if dev1 immediately goes DOWN again within 30s cooldown, it is debounced
+    t.alive.delete('10.0.0.11');
+    now += 2000;
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+    now += 2000;
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(tgCalls.length, 3, 'Rapid flapping DOWN within 30s cooldown must be debounced');
+    assert.equal(t.monitor.telegram.getStats(now).suppressed_today, 1);
+
+    // 8. Bring dev1 back UP after cooldown and trigger High CPU/RAM Threshold warning -> both Telegram AND AI run without conflict
+    now += 35000;
+    t.alive.add('10.0.0.11');
+    await t.monitor._ping(t.monitor.devices.get(id1), t.monitor.state.get(id1), now);
+    t.monitor.ingestAgent(id1, { hostname: 'router-01', cpu: { percent: 96 }, memory: { percent: 94 }, disks: [] }, now);
+    t.monitor.evaluate(now);
+    now += 6000; // sustain CPU/RAM > 90% past breachMs (5s)
+    t.monitor.ingestAgent(id1, { hostname: 'router-01', cpu: { percent: 96 }, memory: { percent: 94 }, disks: [] }, now);
+    t.monitor.evaluate(now);
+
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(tgCalls.length, 5, 'Should have sent recovery + threshold warning to Telegram');
+    const warnMsg = tgCalls[4].payload.text;
+    assert.ok(warnMsg.includes('⚠️'), 'Threshold alert must include ⚠️ icon');
+    assert.ok(warnMsg.includes('CPU cao: 96%'), 'Threshold alert must include CPU breach details');
+    assert.ok(aiCalls.length >= 1, 'AI auto-incident analysis must also run without conflict');
+  } finally { t.close(); }
+});
+
+test('ui settings & device detail: Telegram Alert Channels card, toggle switch, eye icon, guide box, and unconfigured popup warning', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const adminJs = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
+  const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
+  const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+
+  // Verify Settings Telegram card elements
+  assert.ok(adminJs.includes('id="st-telegram-panel"'));
+  assert.ok(adminJs.includes('id="f-tg_enabled"'));
+  assert.ok(adminJs.includes('id="tg-bot-token"'));
+  assert.ok(adminJs.includes('id="btn-tg-eye"'));
+  assert.ok(adminJs.includes('id="tg-chat-id"'));
+  assert.ok(adminJs.includes('id="f-tg_notify_down"'));
+  assert.ok(adminJs.includes('id="f-tg_notify_recovered"'));
+  assert.ok(adminJs.includes('id="f-tg_notify_threshold"'));
+  assert.ok(adminJs.includes('id="btn-tg-test"'));
+  assert.ok(adminJs.includes('id="btn-tg-save"'));
+  assert.ok(adminJs.includes('id="btn-tg-guide"'));
+  assert.ok(adminJs.includes('id="tg-guide-box"'));
+
+  // Verify popup warning when Telegram API is not configured in General Settings
+  assert.ok(adminJs.includes('M.showTelegramUnconfiguredPopup'));
+  assert.ok(viewsJs.includes('id="d-telegram"'));
+  assert.ok(viewsJs.includes('id="d-tg-switch"'));
+  assert.ok(viewsJs.includes('showTelegramUnconfiguredPopup'));
+
+  // Verify CSS classes for toggle switch, eye button, guide box, and popup overlay
+  assert.match(styleCss, /\.toggle-switch\s*\{/);
+  assert.match(styleCss, /\.toggle-slider\s*\{/);
+  assert.match(styleCss, /\.btn-eye\s*\{/);
+  assert.match(styleCss, /\.tg-guide-box\s*\{/);
+  assert.match(styleCss, /\.tg-popup-overlay\s*\{/);
+});
+
