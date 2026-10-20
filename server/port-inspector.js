@@ -67,10 +67,40 @@ function classifyIfType(ifType, name) {
   const n = String(name || '').toLowerCase();
   if (ifType === 24 || /^lo\b|loopback/i.test(n)) return 'loopback';
   if (ifType === 135 || ifType === 136 || /^vlan|br\d|bridge/i.test(n)) return 'vlan';
-  if (ifType === 161 || /^po\d|bond|lag|ae\d/i.test(n)) return 'lag';
+  if (ifType === 161 || /^po\d|bond|lag|ae\d|port-channel|portchannel/i.test(n)) return 'lag';
   if (ifType === 131 || /^tun|wg|vpn|gre|ipsec|pppoe|ovpn/i.test(n)) return 'tunnel';
-  if (VIRTUAL_IF_TYPES.has(ifType)) return 'virtual';
+  if (/^null\b|null\d*/i.test(n) || /^cpu\b|control-plane/i.test(n)) return 'virtual';
+  if (VIRTUAL_IF_TYPES.has(ifType) || ifType === 1) return 'virtual';
   return 'physical';
+}
+
+const ETHERNET_PHYSICAL_TYPES = new Set([6, 62, 69, 117]);
+
+function isPhysicalPort(ifType, name, descr = '') {
+  const n = String(name || '').trim();
+  const d = String(descr || '').trim();
+  const combined = `${n} ${d}`.toLowerCase();
+
+  // 1. Loại bỏ các ifType ảo đã biết
+  if (VIRTUAL_IF_TYPES.has(ifType) || ifType === 24 || ifType === 1) return false;
+
+  // 2. Loại bỏ các sub-interface ảo (vd: Gi0/1.100, eth0.50)
+  if (/^[a-z0-9\-_/]+\.\d+$/i.test(n)) return false;
+
+  // 3. Lọc bỏ các interface có tên hoặc mô tả chứa từ khóa rác
+  if (/(loopback|\blo\d*\b|null|vlan|\bvl\d+\b|tunnel|\btun\d*\b|gre|ipsec|pppoe|ovpn|wireguard|\bwg\d*\b|cpu|control-plane|bridge|\bbr\d*\b|bvi|port-channel|portchannel|\bpo\d+\b|bond|\blag\d*\b|\bae\d+\b|stack-port|eoip)/i.test(combined)) {
+    return false;
+  }
+
+  // 4. Lọc theo tiền tố tên ảo phổ biến
+  if (/^(lo\d*|null\d*|vl\d+|vlan\d*|tun\d*|tunnel\d*|gre\d*|po\d+|bond\d*|br\d*|bvi\d*|cpu|stack)/i.test(n)) {
+    return false;
+  }
+
+  // 5. Nhận diện các cổng Ethernet chuẩn
+  const isEthType = ETHERNET_PHYSICAL_TYPES.has(ifType);
+  const isEthName = /^(eth|gi|fa|te|ge|xe|sfp|cổng|port|lan|wan|ethernet)/i.test(n);
+  return isEthType || isEthName;
 }
 
 class PortInspectorService {
@@ -83,7 +113,9 @@ class PortInspectorService {
     host,
     port = 161,
     community = 'public',
-    maxPorts = 96,
+    maxPorts = 48,
+    configuredPortCount = null,
+    includeVirtual = false,
     timeoutMs = 2000,
     walkColumnsFn = snmp.walkColumns,
     snmpGetFn = snmp.snmpGet,
@@ -132,6 +164,10 @@ class PortInspectorService {
       const ifName = String(x[IFX_COLS.name] || descr || `Port ${idx}`).trim();
       const alias = String(x[IFX_COLS.alias] || '').trim();
       const ifType = num(r[PORT_COLS.type]) || 6;
+      const isPhysical = isPhysicalPort(ifType, ifName, descr);
+      if (!includeVirtual && !isPhysical) {
+        continue; // Lọc bỏ rác: loopback, null, vlan, tunnel, cpu, bridge, port-channel...
+      }
       const category = classifyIfType(ifType, ifName);
       const adminCode = num(r[PORT_COLS.admin]) ?? 1;
       const operCode = num(r[PORT_COLS.oper]) ?? 2;
@@ -234,21 +270,24 @@ class PortInspectorService {
 
     ports.sort((a, b) => Number(a.index) - Number(b.index));
 
-    const nonLoopback = ports.filter((p) => p.category !== 'loopback');
-    const upPorts = nonLoopback.filter((p) => p.oper_status === 'up');
-    const downPorts = nonLoopback.filter((p) => p.oper_status !== 'up' && p.admin_status === 'up');
-    const adminDownPorts = nonLoopback.filter((p) => p.admin_status !== 'up');
-    const issuePorts = nonLoopback.filter((p) => p.total_errors > 0 || p.flapping || (p.utilization_pct !== null && p.utilization_pct >= 80));
+    // Giới hạn số cổng theo cấu hình thực tế thiết bị (VD Switch 24/48, Router 4/8/16)
+    const portLimit = (configuredPortCount && configuredPortCount > 0) ? configuredPortCount : (maxPorts || 48);
+    const finalPorts = ports.slice(0, portLimit);
+
+    const upPorts = finalPorts.filter((p) => p.oper_status === 'up');
+    const downPorts = finalPorts.filter((p) => p.oper_status !== 'up' && p.admin_status === 'up');
+    const adminDownPorts = finalPorts.filter((p) => p.admin_status !== 'up');
+    const issuePorts = finalPorts.filter((p) => p.total_errors > 0 || p.flapping || (p.utilization_pct !== null && p.utilization_pct >= 80));
 
     return {
-      total_ports: nonLoopback.length,
+      total_ports: finalPorts.length,
       up_count: upPorts.length,
       down_count: downPorts.length,
       admin_down_count: adminDownPorts.length,
       issue_count: issuePorts.length,
       has_rate_sample: dtSec >= 0.5,
       sample_interval_sec: dtSec > 0 ? Math.round(dtSec * 10) / 10 : null,
-      ports: nonLoopback,
+      ports: finalPorts,
     };
   }
 }
@@ -262,12 +301,20 @@ function registerRoutes({ route, monitor, send, idOf, bad, HttpError }, opts = {
     if (!d) throw new HttpError(404, 'Không tìm thấy thiết bị');
     if (!d.address) throw bad('Thiết bị chưa có địa chỉ IP');
 
+    const includeVirtual = ctx.query.get('include_virtual') === '1' || ctx.query.get('include_all') === '1';
+    const configuredPortCount = (d.port_count && d.port_count > 0)
+      ? d.port_count
+      : (d.type === 'switch' ? 48 : (['router', 'firewall'].includes(d.type) ? 16 : 48));
+
     try {
       const data = await inspector.inspectDevice({
         deviceKey: d.id,
         host: d.address,
         port: d.snmp_port || 161,
         community: d.snmp_community || 'public',
+        maxPorts: configuredPortCount,
+        configuredPortCount,
+        includeVirtual,
         walkColumnsFn: opts.walkColumnsFn,
         snmpGetFn: opts.snmpGetFn,
       });
@@ -290,6 +337,7 @@ module.exports = {
   IFX_COLS,
   formatSpeedLabel,
   classifyIfType,
+  isPhysicalPort,
   PortInspectorService,
   registerRoutes,
 };

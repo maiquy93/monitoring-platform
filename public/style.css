@@ -454,6 +454,48 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
 .m-label rect { fill: transparent; stroke: var(--border); stroke-dasharray: 4 4; }
 .edit-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 
+/* ---------- Topology Port Badges & Straight Wire Routing ---------- */
+.m-port-badge {
+  cursor: pointer;
+  pointer-events: all;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+.m-port-badge:hover {
+  transform: scale(1.15);
+  filter: drop-shadow(0 0 5px var(--accent));
+}
+.m-port-badge-bg {
+  fill: var(--panel);
+  stroke: var(--c-ok);
+  stroke-width: 1.5;
+}
+.m-port-badge-bg.down {
+  stroke: var(--c-critical);
+  animation: portblink 1s ease-in-out infinite alternate;
+}
+.m-port-badge-bg.warning {
+  stroke: var(--c-medium);
+}
+.m-port-active-summary {
+  font-family: inherit;
+  pointer-events: none;
+}
+.m-port-inspect-btn {
+  cursor: pointer;
+  pointer-events: all;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.m-port-inspect-btn:hover {
+  opacity: 1;
+  transform: scale(1.08);
+}
+.m-port-inspect-btn rect {
+  fill: color-mix(in srgb, var(--panel2) 80%, var(--bg));
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
 /* ---------- Topology Port Matrix Grid ---------- */
 .m-port-grid { pointer-events: all; }
 .m-port {

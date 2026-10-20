@@ -187,3 +187,25 @@ test('port-inspector UI isolation: index.html loads /port-inspector.js and defin
   assert.ok(piJs.includes('M.openPortInspectorModal'));
   assert.ok(piJs.includes('/ports'));
 });
+
+test('port-inspector filter: isPhysicalPort strips virtual interfaces and junk keywords', () => {
+  const { isPhysicalPort } = require('../server/port-inspector');
+  // Physical ports: OK
+  assert.equal(isPhysicalPort(6, 'Gi1/0/1', 'GigabitEthernet1/0/1'), true);
+  assert.equal(isPhysicalPort(6, 'ether1', 'ether1-WAN'), true);
+  assert.equal(isPhysicalPort(62, 'Fa0/1', 'FastEthernet0/1'), true);
+  assert.equal(isPhysicalPort(117, 'ge-0/0/0', 'GigabitEthernet'), true);
+
+  // Virtual & Junk ports: Stripped out
+  assert.equal(isPhysicalPort(24, 'lo', 'Loopback0'), false);
+  assert.equal(isPhysicalPort(6, 'Loopback0', 'Virtual Loopback'), false);
+  assert.equal(isPhysicalPort(135, 'Vlan1', 'Vlan 1'), false);
+  assert.equal(isPhysicalPort(6, 'VLAN 100', 'Vlan Interface'), false);
+  assert.equal(isPhysicalPort(6, 'Null0', 'Null Interface'), false);
+  assert.equal(isPhysicalPort(131, 'Tunnel0', 'GRE Tunnel'), false);
+  assert.equal(isPhysicalPort(6, 'CPU', 'Control Plane Interface'), false);
+  assert.equal(isPhysicalPort(209, 'bridge0', 'Bridge interface'), false);
+  assert.equal(isPhysicalPort(161, 'Port-channel1', 'LAG Trunk'), false);
+  assert.equal(isPhysicalPort(6, 'Port-Channel 1', 'Bond trunk'), false);
+  assert.equal(isPhysicalPort(6, 'Gi0/1.100', 'VLAN sub-interface'), false);
+});

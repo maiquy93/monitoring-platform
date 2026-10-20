@@ -173,23 +173,20 @@ test('API & cleanMap: preserves from_port and to_port in topology map links', as
   }
 });
 
-test('frontend static assets: map.js and style.css contain port matrix logic and theme styles', () => {
+test('frontend static assets: map.js and style.css contain clean wire routing and port badge styles', () => {
   const mapJs = fs.readFileSync(path.join(__dirname, '../public/map.js'), 'utf8');
-  assert.ok(mapJs.includes('getPortLayout'), 'map.js must define getPortLayout');
-  assert.ok(mapJs.includes('getPortRect'), 'map.js must define getPortRect');
-  assert.ok(mapJs.includes('getWireEndpoint'), 'map.js must calculate wire endpoints from ports');
+  assert.ok(mapJs.includes('getEdgeEndpoints'), 'map.js must define getEdgeEndpoints for straight wire routing');
+  assert.ok(mapJs.includes('getBadgeCoords'), 'map.js must define getBadgeCoords for port badges');
   assert.ok(mapJs.includes('openLinkConfigModal'), 'map.js must support wire port config modal');
-  assert.ok(mapJs.includes('openDevicePortsModal'), 'map.js must support device ports count modal');
-  assert.ok(mapJs.includes('m-port-unused'), 'map.js must render unused port status');
-  assert.ok(mapJs.includes('m-port-up'), 'map.js must render up port status');
-  assert.ok(mapJs.includes('m-port-down'), 'map.js must render down port status');
+  assert.ok(mapJs.includes('m-port-badge'), 'map.js must render port badges on cable ends');
+  assert.ok(mapJs.includes('m-port-active-summary'), 'map.js must summarize active ports on card');
+  assert.ok(mapJs.includes('m-port-inspect-btn'), 'map.js must include port inspector trigger');
 
   const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
-  assert.ok(styleCss.includes('.m-port'), 'style.css must style .m-port');
-  assert.ok(styleCss.includes('.m-port.m-port-unused'), 'style.css must style unused port');
-  assert.ok(styleCss.includes('.m-port.m-port-up'), 'style.css must style up port');
-  assert.ok(styleCss.includes('.m-port.m-port-down'), 'style.css must style down port');
-  assert.ok(styleCss.includes('.m-wire-drag'), 'style.css must style wire drag line');
+  assert.ok(styleCss.includes('.m-port-badge'), 'style.css must style .m-port-badge');
+  assert.ok(styleCss.includes('.m-port-badge-bg'), 'style.css must style badge background');
+  assert.ok(styleCss.includes('.m-port-active-summary'), 'style.css must style active summary');
+  assert.ok(styleCss.includes('.m-port-inspect-btn'), 'style.css must style port inspect button');
 
   const adminJs = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
   assert.ok(adminJs.includes('port_count'), 'admin.js must support port_count in device modal');
