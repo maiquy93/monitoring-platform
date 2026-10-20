@@ -454,41 +454,16 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
 .m-label rect { fill: transparent; stroke: var(--border); stroke-dasharray: 4 4; }
 .edit-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 
-/* ---------- Topology Port Badges & Straight Wire Routing ---------- */
-.m-port-badge {
-  cursor: pointer;
-  pointer-events: all;
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-.m-port-badge:hover {
-  transform: scale(1.15);
-  filter: drop-shadow(0 0 5px var(--accent));
-}
-.m-port-badge-bg {
-  fill: var(--panel);
-  stroke: var(--c-ok);
-  stroke-width: 1.5;
-}
-.m-port-badge-bg.down {
-  stroke: var(--c-critical);
-  animation: portblink 1s ease-in-out infinite alternate;
-}
-.m-port-badge-bg.warning {
-  stroke: var(--c-medium);
-}
-.m-port-active-summary {
-  font-family: inherit;
-  pointer-events: none;
-}
+/* ---------- Topology Straight Wire Routing & Port Inspection ---------- */
 .m-port-inspect-btn {
   cursor: pointer;
   pointer-events: all;
-  opacity: 0.75;
+  opacity: 0.8;
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 .m-port-inspect-btn:hover {
   opacity: 1;
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 .m-port-inspect-btn rect {
   fill: color-mix(in srgb, var(--panel2) 80%, var(--bg));
@@ -501,7 +476,7 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
 .m-port {
   cursor: pointer;
   pointer-events: all;
-  transition: transform 0.12s ease, stroke-width 0.12s ease, filter 0.12s ease;
+  transition: opacity 0.12s ease, stroke 0.12s ease;
 }
 .m-port.m-port-unused {
   fill: color-mix(in srgb, var(--panel) 82%, var(--border));
@@ -519,14 +494,11 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
   fill: var(--c-critical);
   stroke: color-mix(in srgb, var(--c-critical) 35%, #fff);
   stroke-width: 0.8;
-  filter: drop-shadow(0 0 2px var(--c-critical));
-  animation: portblink 1s ease-in-out infinite alternate;
 }
 .m-port.m-port-warning {
   fill: var(--c-medium);
   stroke: color-mix(in srgb, var(--c-medium) 35%, #fff);
   stroke-width: 0.8;
-  filter: drop-shadow(0 0 2px var(--c-medium));
 }
 .m-port.m-port-unknown {
   fill: var(--c-unknown);
@@ -534,9 +506,8 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
   stroke-width: 0.8;
 }
 .m-port:hover {
-  stroke: #fff !important;
-  stroke-width: 1.6 !important;
-  filter: drop-shadow(0 0 4px var(--accent)) !important;
+  stroke: var(--accent) !important;
+  stroke-width: 1.2 !important;
   opacity: 1 !important;
 }
 .m-port.sel-port {

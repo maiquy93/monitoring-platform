@@ -1,8 +1,8 @@
 'use strict';
-// Topology maps: live status view + straight wire routing + active port badges + integrated Port Inspector.
+// Topology maps: live status view + top-down clean link routing + integrated Port Inspector.
 (() => {
   const { esc, $, t } = M;
-  const W = 1600, H = 900, NW = 180, NH = 62;
+  const W = 1600, H = 900, NW = 180, NH = 60;
   const canEdit = () => M.S.user && M.S.user.role !== 'viewer';
   const COL = {
     critical: 'var(--c-critical)',
@@ -15,58 +15,24 @@
   };
   const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
 
-  // Calculate clean edge anchor endpoints between Node A and Node B so wires run straight
-  function getEdgeEndpoints(a, b) {
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    let ptA, ptB, sideA, sideB;
-
-    if (Math.abs(dx) >= Math.abs(dy)) {
-      // Horizontal dominant
-      if (dx >= 0) {
-        ptA = { x: a.x + NW / 2, y: a.y };
-        ptB = { x: b.x - NW / 2, y: b.y };
-        sideA = 'R'; sideB = 'L';
-      } else {
-        ptA = { x: a.x - NW / 2, y: a.y };
-        ptB = { x: b.x + NW / 2, y: b.y };
-        sideA = 'L'; sideB = 'R';
-      }
+  // Chuẩn hóa vị trí neo: Luôn xuất phát từ cạnh dưới (đáy) của card phía trên
+  // và cắm thẳng vào cạnh trên (đỉnh) của card phía dưới (chuẩn sơ đồ cây phân cấp)
+  function getLinkEndpoints(a, b) {
+    if (a.y <= b.y) {
+      return {
+        x1: a.x,
+        y1: a.y + NH / 2, // Cạnh dưới (đáy) của card phía trên (a)
+        x2: b.x,
+        y2: b.y - NH / 2, // Cạnh trên (đỉnh) của card phía dưới (b)
+      };
     } else {
-      // Vertical dominant
-      if (dy >= 0) {
-        ptA = { x: a.x, y: a.y + NH / 2 };
-        ptB = { x: b.x, y: b.y - NH / 2 };
-        sideA = 'B'; sideB = 'T';
-      } else {
-        ptA = { x: a.x, y: a.y - NH / 2 };
-        ptB = { x: b.x, y: b.y + NH / 2 };
-        sideA = 'T'; sideB = 'B';
-      }
+      return {
+        x1: a.x,
+        y1: a.y - NH / 2, // Cạnh trên (đỉnh) của card phía dưới (a)
+        x2: b.x,
+        y2: b.y + NH / 2, // Cạnh dưới (đáy) của card phía trên (b)
+      };
     }
-    return { ptA, ptB, sideA, sideB };
-  }
-
-  // Calculate badge center position near the edge endpoint along the cable direction
-  function getBadgeCoords(pt, side) {
-    const offset = 18;
-    switch (side) {
-      case 'R': return { x: pt.x + offset, y: pt.y };
-      case 'L': return { x: pt.x - offset, y: pt.y };
-      case 'B': return { x: pt.x, y: pt.y + offset };
-      case 'T': return { x: pt.x, y: pt.y - offset };
-      default: return { x: pt.x, y: pt.y };
-    }
-  }
-
-  // Shorten port label (e.g., '1' -> 'P1', 'ether1' -> 'eth1', 'gi0/1' -> 'Gi1')
-  function formatPortBadgeLabel(raw) {
-    if (!raw) return '';
-    const str = String(raw).trim();
-    if (/^\d+$/.test(str)) return `P${str}`;
-    if (/^ether(\d+)$/i.test(str)) return `eth${RegExp.$1}`;
-    if (/^(gi|fa|te|ge)(\d+.*)$/i.test(str)) return `${RegExp.$1.toUpperCase()}${RegExp.$2}`;
-    return str.length > 5 ? str.slice(0, 4) : str;
   }
 
   // Determine physical port count configured for device (default 48 for switches)
@@ -356,7 +322,8 @@
       $('#mp-box').classList.toggle('editing', this.edit);
       const score = (r) => (SEV_RANK[r] ? 10 + SEV_RANK[r] : r === 'up' ? 1 : 0);
 
-      // Render Straight Edge-to-Edge Links with Clean Port Badges
+      // Render Clean Top-Down Links: Gom xuất phát từ cạnh đáy card phía trên cắm vào cạnh đỉnh card phía dưới
+      // TUYỆT ĐỐI KHÔNG sinh text label hay badge nổi gây rối mắt
       const linksHtml = m.links.map((l, i) => {
         const a = nodes.get(l.from), b = nodes.get(l.to);
         if (!a || !b) return '';
@@ -365,47 +332,23 @@
         const bad = SEV_RANK[r];
         const sel = this.sel && this.sel.type === 'link' && this.sel.index === i;
 
-        // Straight edge-to-edge calculation
-        const { ptA, ptB, sideA, sideB } = getEdgeEndpoints(a, b);
+        // Chuẩn hóa neo: Cạnh dưới của card phía trên cắm vào cạnh trên của card phía dưới
+        const { x1, y1, x2, y2 } = getLinkEndpoints(a, b);
 
-        // Port Badges at cable ends if configured
-        let badgesHtml = '';
-        const bw = 32, bh = 17;
-
-        if (l.from_port) {
-          const bCoordA = getBadgeCoords(ptA, sideA);
-          const pLblA = formatPortBadgeLabel(l.from_port);
-          badgesHtml += `
-            <g class="m-port-badge" transform="translate(${bCoordA.x - bw / 2}, ${bCoordA.y - bh / 2})">
-              <rect width="${bw}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
-              <text x="${bw / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblA)}</text>
-              <title>${esc(t('Cổng'))}: ${esc(l.from_port)} (${esc(ia ? ia.name : '')})</title>
-            </g>
-          `;
-        }
-
-        if (l.to_port) {
-          const bCoordB = getBadgeCoords(ptB, sideB);
-          const pLblB = formatPortBadgeLabel(l.to_port);
-          badgesHtml += `
-            <g class="m-port-badge" transform="translate(${bCoordB.x - bw / 2}, ${bCoordB.y - bh / 2})">
-              <rect width="${bw}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
-              <text x="${bw / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblB)}</text>
-              <title>${esc(t('Cổng'))}: ${esc(l.to_port)} (${esc(ib ? ib.name : '')})</title>
-            </g>
-          `;
-        }
+        // Tooltip gọn gàng gốc SVG chỉ hiện khi người dùng rê chuột vào đường dây
+        const tooltip = `${ia ? ia.name : ''}${l.from_port ? ` [Port ${l.from_port}]` : ''} ➔ ${ib ? ib.name : ''}${l.to_port ? ` [Port ${l.to_port}]` : ''}`;
 
         return `
-          <line class="m-link ${bad ? 'down' : ''}" style="stroke:${COL[r]}${sel ? ';stroke-width:7;filter:drop-shadow(0 0 5px var(--accent))' : ''}" x1="${ptA.x}" y1="${ptA.y}" x2="${ptB.x}" y2="${ptB.y}"/>
-          ${this.edit ? `<line data-link="${i}" stroke="transparent" stroke-width="20" x1="${ptA.x}" y1="${ptA.y}" x2="${ptB.x}" y2="${ptB.y}" style="cursor:pointer"/>` : ''}
-          ${badgesHtml}
+          <line class="m-link ${bad ? 'down' : ''}" style="stroke:${COL[r]}${sel ? ';stroke-width:7;filter:drop-shadow(0 0 5px var(--accent))' : ''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">
+            <title>${esc(tooltip)}</title>
+          </line>
+          ${this.edit ? `<line data-link="${i}" stroke="transparent" stroke-width="20" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="cursor:pointer"/>` : ''}
         `;
       }).join('');
 
       const trunc = (s, n) => (s && s.length > n ? `${s.slice(0, n - 1)}…` : s || '');
 
-      // Render Node Cards cleanly (NO crowded 24/48 matrix on small cards)
+      // Render Node Cards sạch sẽ, thanh lịch (Không vẽ nhãn cáp hay lưới ô port thừa lên card)
       const nodeSvg = m.nodes.map((n) => {
         const i = infos.get(n.id) || { name: '', sub: '', cls: '', icon: '' };
         const sel = (this.sel && this.sel.type === 'node' && this.sel.id === n.id) || this.linkFrom === n.id;
@@ -415,19 +358,9 @@
             <rect width="${NW}" height="44" rx="8"/><text x="${NW / 2}" y="28" text-anchor="middle" font-size="16" font-weight="700">${esc(trunc(i.name, 22))}</text></g>`;
         }
 
-        // Active connected ports list for this node
-        const activePorts = m.links
-          .map((lk) => (lk.from === n.id && lk.from_port ? lk.from_port : (lk.to === n.id && lk.to_port ? lk.to_port : null)))
-          .filter(Boolean);
-
-        const hasActivePorts = activePorts.length > 0;
-        const portSummaryText = hasActivePorts
-          ? `🔌 Cáp: ${activePorts.slice(0, 3).map((p) => formatPortBadgeLabel(p)).join(', ')}${activePorts.length > 3 ? '…' : ''}`
-          : '';
-
         const isNetDevice = n.kind === 'device' && i.rawDevice && (i.rawDevice.snmp_enabled || ['switch', 'router', 'firewall'].includes(i.rawDevice.type));
 
-        // Integrated Port Inspector button on the top-right of the card
+        // Nút mở Port Inspector chi tiết ở góc trên phải nếu là thiết bị mạng
         const inspectBtnHtml = isNetDevice ? `
           <g class="m-port-inspect-btn" data-inspect-ref="${n.ref}">
             <rect x="${NW - 28}" y="8" width="20" height="18" rx="4"/>
@@ -439,10 +372,9 @@
         return `
           <g class="m-node ${i.cls} ${sel ? 'sel' : ''}" data-id="${n.id}" transform="translate(${n.x - NW / 2},${n.y - NH / 2})">
             <rect width="${NW}" height="${NH}" rx="10"/>
-            <text x="12" y="32" font-size="22">${i.icon}</text>
-            <text x="42" y="26" font-size="15" font-weight="700">${esc(trunc(i.name, isNetDevice ? 14 : 17))}</text>
-            <text class="m-sub" x="42" y="${hasActivePorts ? 42 : 46}">${esc(trunc(i.sub, 18))}</text>
-            ${hasActivePorts ? `<text class="m-port-active-summary" x="42" y="55" font-size="10" font-weight="600" fill="var(--c-ok)">${esc(portSummaryText)}</text>` : ''}
+            <text x="12" y="37" font-size="22">${i.icon}</text>
+            <text x="42" y="27" font-size="15" font-weight="700">${esc(trunc(i.name, isNetDevice ? 14 : 17))}</text>
+            <text class="m-sub" x="42" y="47">${esc(trunc(i.sub, 18))}</text>
             ${inspectBtnHtml}
           </g>
         `;
@@ -518,15 +450,12 @@
       svg.addEventListener('pointerup', end);
       svg.addEventListener('pointercancel', end);
 
-      // Double-click to configure wire ports
+      // Double-click on link to configure wire ports
       svg.addEventListener('dblclick', (e) => {
         if (!this.edit || !this.m) return;
         const lk = e.target.closest('[data-link]');
-        const badge = e.target.closest('.m-port-badge');
         if (lk) {
           this.openLinkConfigModal(Number(lk.dataset.link));
-        } else if (badge && this.sel && this.sel.type === 'link') {
-          this.openLinkConfigModal(this.sel.index);
         }
       });
 
@@ -544,7 +473,7 @@
     },
   };
 
-  // Reusable lightweight SVG map renderer
+  // Reusable lightweight SVG map renderer (dashboard, secondary views)
   M.renderMapSvg = (svg, m) => {
     if (!svg || !m) return;
     const nodes = new Map((m.nodes || []).map((n) => [n.id, n]));
@@ -558,36 +487,13 @@
       const r = score(ia ? ia.rank : 'unknown') >= score(ib ? ib.rank : 'unknown') ? (ia ? ia.rank : 'unknown') : (ib ? ib.rank : 'unknown');
       const bad = SEV_RANK[r];
 
-      const { ptA, ptB, sideA, sideB } = getEdgeEndpoints(a, b);
-
-      let badgesHtml = '';
-      const bw = 32, bh = 17;
-
-      if (l.from_port) {
-        const bCoordA = getBadgeCoords(ptA, sideA);
-        const pLblA = formatPortBadgeLabel(l.from_port);
-        badgesHtml += `
-          <g class="m-port-badge" transform="translate(${bCoordA.x - bw / 2}, ${bCoordA.y - bh / 2})">
-            <rect width="${bw}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
-            <text x="${bw / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblA)}</text>
-          </g>
-        `;
-      }
-
-      if (l.to_port) {
-        const bCoordB = getBadgeCoords(ptB, sideB);
-        const pLblB = formatPortBadgeLabel(l.to_port);
-        badgesHtml += `
-          <g class="m-port-badge" transform="translate(${bCoordB.x - bw / 2}, ${bCoordB.y - bh / 2})">
-            <rect width="${bw}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
-            <text x="${bw / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblB)}</text>
-          </g>
-        `;
-      }
+      const { x1, y1, x2, y2 } = getLinkEndpoints(a, b);
+      const tooltip = `${ia ? ia.name : ''}${l.from_port ? ` [Port ${l.from_port}]` : ''} ➔ ${ib ? ib.name : ''}${l.to_port ? ` [Port ${l.to_port}]` : ''}`;
 
       return `
-        <line class="m-link ${bad ? 'down' : ''}" style="stroke:${COL[r] || 'var(--c-ok)'}" x1="${ptA.x}" y1="${ptA.y}" x2="${ptB.x}" y2="${ptB.y}"/>
-        ${badgesHtml}
+        <line class="m-link ${bad ? 'down' : ''}" style="stroke:${COL[r] || 'var(--c-ok)'}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">
+          <title>${esc(tooltip)}</title>
+        </line>
       `;
     }).join('');
 
@@ -599,22 +505,12 @@
           <rect width="${NW}" height="44" rx="8"/><text x="${NW / 2}" y="28" text-anchor="middle" font-size="16" font-weight="700">${esc(trunc(i.name, 22))}</text></g>`;
       }
 
-      const activePorts = (m.links || [])
-        .map((lk) => (lk.from === n.id && lk.from_port ? lk.from_port : (lk.to === n.id && lk.to_port ? lk.to_port : null)))
-        .filter(Boolean);
-
-      const hasActivePorts = activePorts.length > 0;
-      const portSummaryText = hasActivePorts
-        ? `🔌 ${activePorts.slice(0, 3).map((p) => formatPortBadgeLabel(p)).join(', ')}`
-        : '';
-
       return `
         <g class="m-node ${i.cls}" data-id="${n.id}" data-href="${i.href || ''}" style="cursor:pointer" transform="translate(${n.x - NW / 2},${n.y - NH / 2})">
           <rect width="${NW}" height="${NH}" rx="10"/>
-          <text x="12" y="32" font-size="22">${i.icon}</text>
-          <text x="42" y="26" font-size="15" font-weight="700">${esc(trunc(i.name, 17))}</text>
-          <text class="m-sub" x="42" y="${hasActivePorts ? 42 : 46}">${esc(trunc(i.sub, 18))}</text>
-          ${hasActivePorts ? `<text class="m-port-active-summary" x="42" y="55" font-size="10" font-weight="600" fill="var(--c-ok)">${esc(portSummaryText)}</text>` : ''}
+          <text x="12" y="37" font-size="22">${i.icon}</text>
+          <text x="42" y="27" font-size="15" font-weight="700">${esc(trunc(i.name, 17))}</text>
+          <text class="m-sub" x="42" y="47">${esc(trunc(i.sub, 18))}</text>
         </g>
       `;
     }).join('');

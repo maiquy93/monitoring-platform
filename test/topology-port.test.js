@@ -173,20 +173,20 @@ test('API & cleanMap: preserves from_port and to_port in topology map links', as
   }
 });
 
-test('frontend static assets: map.js and style.css contain clean wire routing and port badge styles', () => {
+test('frontend static assets: map.js and style.css enforce clean UI without floating cable badges', () => {
   const mapJs = fs.readFileSync(path.join(__dirname, '../public/map.js'), 'utf8');
-  assert.ok(mapJs.includes('getEdgeEndpoints'), 'map.js must define getEdgeEndpoints for straight wire routing');
-  assert.ok(mapJs.includes('getBadgeCoords'), 'map.js must define getBadgeCoords for port badges');
+  assert.ok(mapJs.includes('getLinkEndpoints'), 'map.js must define getLinkEndpoints for top-to-bottom wire routing');
   assert.ok(mapJs.includes('openLinkConfigModal'), 'map.js must support wire port config modal');
-  assert.ok(mapJs.includes('m-port-badge'), 'map.js must render port badges on cable ends');
-  assert.ok(mapJs.includes('m-port-active-summary'), 'map.js must summarize active ports on card');
   assert.ok(mapJs.includes('m-port-inspect-btn'), 'map.js must include port inspector trigger');
 
+  // Verify cable label clutter has been completely removed
+  assert.ok(!mapJs.includes('m-port-badge'), 'map.js must NOT render floating cable badges on links');
+  assert.ok(!mapJs.includes('m-port-active-summary'), 'map.js must NOT render clutter text labels on node card');
+
   const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
-  assert.ok(styleCss.includes('.m-port-badge'), 'style.css must style .m-port-badge');
-  assert.ok(styleCss.includes('.m-port-badge-bg'), 'style.css must style badge background');
-  assert.ok(styleCss.includes('.m-port-active-summary'), 'style.css must style active summary');
   assert.ok(styleCss.includes('.m-port-inspect-btn'), 'style.css must style port inspect button');
+  assert.ok(!styleCss.includes('.m-port-badge'), 'style.css must NOT have leftover .m-port-badge styles');
+  assert.ok(!styleCss.includes('.m-port-active-summary'), 'style.css must NOT have leftover .m-port-active-summary styles');
 
   const adminJs = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
   assert.ok(adminJs.includes('port_count'), 'admin.js must support port_count in device modal');
