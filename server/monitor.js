@@ -1095,6 +1095,7 @@ class Monitor extends EventEmitter {
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
       parent_id: d.parent_id || null,
+      port_count: d.port_count !== undefined && d.port_count !== null && d.port_count > 0 ? d.port_count : (d.type === 'switch' ? 24 : (['router', 'firewall'].includes(d.type) ? 8 : 0)),
       maintenance: this.isDeviceInMaintenance(d),
       maintenance_until: d.maintenance_until || 0,
       mute_local_alerts: !!d.mute_local_alerts,
@@ -1145,6 +1146,7 @@ class Monitor extends EventEmitter {
       v.check_icmp = !!d.check_icmp; v.check_agent = !!d.check_agent;
       v.snmp_enabled = !!d.snmp_enabled; v.snmp_port = d.snmp_port;
       v.severity_override = d.severity || '';
+      v.port_count = d.port_count || 0;
       v.agent = a; v.snmp = st.snmp.info;
       v.printer = st.snmp.info ? st.snmp.info.printer : null;
       v.ap = st.snmp.info ? st.snmp.info.ap : null;

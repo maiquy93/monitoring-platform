@@ -131,6 +131,15 @@ function cleanDevice(b, partial = false) {
     }
     out.parent_id = pid;
   }
+  if (!partial || has('port_count')) {
+    let pc = b.port_count;
+    if (pc === null || pc === undefined || pc === '') pc = 0;
+    else {
+      pc = Number(pc);
+      if (!Number.isInteger(pc) || pc < 0 || pc > 128) throw bad('Số cổng không hợp lệ (0 - 128)');
+    }
+    out.port_count = pc;
+  }
   if ((out.check_icmp || out.snmp_enabled) && out.address === '') throw bad('Cần địa chỉ IP để ping/SNMP');
   return out;
 }
@@ -147,8 +156,17 @@ function cleanMap(data) {
     x: n(x.x), y: n(x.y),
   })).filter((x) => x.id);
   const ids = new Set(cn.map((x) => x.id));
-  const cl = links.map((l) => ({ from: String(l.from || ''), to: String(l.to || '') }))
-    .filter((l) => ids.has(l.from) && ids.has(l.to) && l.from !== l.to);
+  const cleanPort = (p) => {
+    if (p === undefined || p === null) return null;
+    const s = String(p).trim();
+    return s ? s.slice(0, 32) : null;
+  };
+  const cl = links.map((l) => ({
+    from: String(l.from || ''),
+    to: String(l.to || ''),
+    from_port: cleanPort(l.from_port),
+    to_port: cleanPort(l.to_port),
+  })).filter((l) => ids.has(l.from) && ids.has(l.to) && l.from !== l.to);
   return { nodes: cn, links: cl };
 }
 
@@ -254,9 +272,9 @@ function createApp(db, monitor, opts = {}) {
     const token = crypto.randomBytes(24).toString('hex');
     const r = db.prepare(
       `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,snmp_profile,severity,
-        location,notes,maintenance,maintenance_until,mute_local_alerts,telegram_enabled,parent_id,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        location,notes,maintenance,maintenance_until,mute_local_alerts,telegram_enabled,parent_id,port_count,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.maintenance_until || 0, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, token, Date.now());
+        d.severity, d.location, d.notes, d.maintenance, d.maintenance_until || 0, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, d.port_count || 0, token, Date.now());
     return { id: Number(r.lastInsertRowid), token };
   };
 
@@ -289,9 +307,9 @@ function createApp(db, monitor, opts = {}) {
     if (d.parent_id === id) throw bad('Thiết bị không thể tự làm cha chính nó');
     db.prepare(
       `UPDATE devices SET name=?,type=?,address=?,check_icmp=?,check_agent=?,snmp_enabled=?,snmp_community=?,
-        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,maintenance_until=?,mute_local_alerts=?,telegram_enabled=?,parent_id=? WHERE id=?`)
+        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,maintenance_until=?,mute_local_alerts=?,telegram_enabled=?,parent_id=?,port_count=? WHERE id=?`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.maintenance_until || 0, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, id);
+        d.severity, d.location, d.notes, d.maintenance, d.maintenance_until || 0, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, d.port_count || 0, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
     monitor.evaluate();

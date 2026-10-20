@@ -454,6 +454,71 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
 .m-label rect { fill: transparent; stroke: var(--border); stroke-dasharray: 4 4; }
 .edit-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 
+/* ---------- Topology Port Matrix Grid ---------- */
+.m-port-grid { pointer-events: all; }
+.m-port {
+  cursor: pointer;
+  pointer-events: all;
+  transition: transform 0.12s ease, stroke-width 0.12s ease, filter 0.12s ease;
+}
+.m-port.m-port-unused {
+  fill: color-mix(in srgb, var(--panel) 82%, var(--border));
+  stroke: color-mix(in srgb, var(--border) 60%, transparent);
+  stroke-width: 0.8;
+  opacity: 0.65;
+}
+.m-port.m-port-up {
+  fill: var(--c-ok);
+  stroke: color-mix(in srgb, var(--c-ok) 35%, #fff);
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 2px var(--c-ok));
+}
+.m-port.m-port-down {
+  fill: var(--c-critical);
+  stroke: color-mix(in srgb, var(--c-critical) 35%, #fff);
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 2px var(--c-critical));
+  animation: portblink 1s ease-in-out infinite alternate;
+}
+.m-port.m-port-warning {
+  fill: var(--c-medium);
+  stroke: color-mix(in srgb, var(--c-medium) 35%, #fff);
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 2px var(--c-medium));
+}
+.m-port.m-port-unknown {
+  fill: var(--c-unknown);
+  stroke: var(--border);
+  stroke-width: 0.8;
+}
+.m-port:hover {
+  stroke: #fff !important;
+  stroke-width: 1.6 !important;
+  filter: drop-shadow(0 0 4px var(--accent)) !important;
+  opacity: 1 !important;
+}
+.m-port.sel-port {
+  stroke: var(--accent) !important;
+  stroke-width: 2 !important;
+  filter: drop-shadow(0 0 6px var(--accent)) !important;
+  animation: selpulse 0.7s infinite alternate;
+}
+@keyframes portblink {
+  from { opacity: 0.45; }
+  to { opacity: 1; }
+}
+@keyframes selpulse {
+  from { stroke-width: 1.5; filter: drop-shadow(0 0 2px var(--accent)); }
+  to { stroke-width: 2.8; filter: drop-shadow(0 0 8px var(--accent)); }
+}
+.m-wire-drag {
+  stroke: var(--accent);
+  stroke-width: 3.5;
+  stroke-dasharray: 6 4;
+  animation: dash 0.6s linear infinite;
+  pointer-events: none;
+}
+
 /* ---------- TV / wall display mode ---------- */
 body.tv header.top nav.main, body.tv .tools .hide-tv { display: none; }
 body.tv header.top { padding: 6px 18px; }
