@@ -448,6 +448,7 @@ M.trData = (str) => {
     .replace(/Máy in đã hoạt động bình thường/g, 'Printer returned to normal')
     .replace(/Tốc độ gói tin đã trở lại bình thường/g, 'Packet rate returned to normal')
     .replace(/mất kết nối:/g, 'disconnected:')
+    .replace(/\[Suppressed - Do sập nguồn từ:\s*([^\]]+)\]/g, '[Suppressed - Upstream failure from: $1]')
     .replace(/hoạt động trở lại sau (\d+)s/g, 'recovered after $1s')
     .replace(/Thêm thiết bị/g, 'Added device')
     .replace(/Xóa thiết bị/g, 'Deleted device')

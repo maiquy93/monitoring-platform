@@ -104,6 +104,22 @@ function updatePktSlot(slot, pkt, now) {
   }
 }
 
+const DEVICE_TIERS = {
+  firewall: 4,
+  router: 4,
+  gateway: 4,
+  switch: 3,
+  server: 2,
+  vm: 2,
+  nas: 2,
+  storage: 2,
+  ups: 2,
+  ap: 1,
+  printer: 1,
+  camera: 1,
+  pc: 1,
+};
+
 class Monitor extends EventEmitter {
   constructor(db, opts = {}) {
     super();
@@ -141,10 +157,12 @@ class Monitor extends EventEmitter {
     this.lastDiskCheck = 0;
     this.lastAiCheck = 0;
     this.diskLow = false;
+    this._topoCache = null;
     this.reload();
   }
 
   reload() {
+    this._topoCache = null;
     this.settings = getSettings(this.db);
     const rows = this.db.prepare('SELECT * FROM devices').all();
     const gm = new Map();
@@ -175,6 +193,7 @@ class Monitor extends EventEmitter {
     const last = this.db.prepare('SELECT MAX(ts) t FROM metrics WHERE device_id = ? AND cpu IS NOT NULL').get(id);
     return {
       status: 'unknown', reasons: [], since: Date.now(), acked: false,
+      suppressed: false, rootCauseDevice: null,
       icmp: { ok: null, fails: 0, rtt: null, nextAt: 0, busy: false },
       snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null, net: { base: null, rate: null }, pkt: { base: null, rate: null } },
       agent: { lastAt: last && last.t ? last.t : null, data: null, net: { base: null, rate: null } },
@@ -320,7 +339,17 @@ class Monitor extends EventEmitter {
     let changed = false;
     const inGrace = now - this.startedAt < this.o.agentTimeoutMs + 5000;
     const th = this.settings.thresholds;
-    for (const [id, d] of this.devices) {
+    const parentMap = this._getTopologyGraph(now);
+    const depths = (this._topoCache && this._topoCache.depths) || this._computeDeviceDepths(parentMap);
+    const sortedDevices = [...this.devices.entries()].sort((a, b) => {
+      const depthA = depths.get(a[0]) || 0;
+      const depthB = depths.get(b[0]) || 0;
+      if (depthA !== depthB) return depthA - depthB;
+      const tierA = DEVICE_TIERS[a[1].type] || 2;
+      const tierB = DEVICE_TIERS[b[1].type] || 2;
+      return tierB - tierA;
+    });
+    for (const [id, d] of sortedDevices) {
       const st = this.state.get(id);
       if (!st.alerts) st.alerts = { dos: false, smart: false, thermal: false, ups: false, printer: false };
       const reasons = [];
@@ -474,17 +503,36 @@ class Monitor extends EventEmitter {
     }
     if (sev !== 'none') {
       if (next === 'down') {
-        const msg = `${d.name} mất kết nối: ${st.reasons.join(', ')}`;
-        this._event(d, 'down', sev, msg);
-        this._triggerTelegramAlert(d, st, 'down', msg, now);
+        const sup = this.isParentDown(d.id);
+        let msg = `${d.name} mất kết nối: ${st.reasons.join(', ')}`;
+        if (sup && sup.suppressed && sup.rootCauseDevice) {
+          const rootName = sup.rootCauseDevice.name || `Thiết bị #${sup.rootCauseDevice.id}`;
+          const isVi = (this.settings && this.settings.default_lang) !== 'en';
+          const supTag = isVi
+            ? `[Suppressed - Do sập nguồn từ: ${rootName}]`
+            : `[Suppressed - Upstream failure from: ${rootName}]`;
+          msg = `${msg} ${supTag}`;
+          st.suppressed = true;
+          st.rootCauseDevice = sup.rootCauseDevice;
+          this._event(d, 'down', sev, msg, true);
+        } else {
+          st.suppressed = false;
+          st.rootCauseDevice = null;
+          this._event(d, 'down', sev, msg, false);
+          this._triggerTelegramAlert(d, st, 'down', msg, now);
+        }
       } else if (next === 'warning') {
         const msg = `${d.name}: ${st.reasons.join('; ')}`;
-        this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), msg);
+        this._event(d, 'warning', hasCritAlert ? 'critical' : (sev === 'low' ? 'low' : 'medium'), msg, false);
         this._triggerTelegramAlert(d, st, 'warning', msg, now);
       } else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
         const msg = `${d.name} hoạt động trở lại sau ${dur}s`;
-        this._event(d, 'up', 'ok', msg);
-        this._triggerTelegramAlert(d, st, 'up', msg, now);
+        this._event(d, 'up', 'ok', msg, false);
+        if (!st.suppressed) {
+          this._triggerTelegramAlert(d, st, 'up', msg, now);
+        }
+        st.suppressed = false;
+        st.rootCauseDevice = null;
       }
     }
     st.status = next;
@@ -493,6 +541,7 @@ class Monitor extends EventEmitter {
   }
 
   _triggerTelegramAlert(d, st, kind, reason, now = Date.now()) {
+    if (st && st.suppressed) return;
     if (!this.telegram || !d || !d.id || d.maintenance) return;
     if (this.severityOf(d) === 'none') return;
     if (d.telegram_enabled === 0 || d.telegram_enabled === false) return;
@@ -527,28 +576,31 @@ class Monitor extends EventEmitter {
     }).catch(() => {});
   }
 
-  _event(d, kind, severity, message) {
+  _event(d, kind, severity, message, isSuppressed = false) {
     const devSev = d && d.id ? this.severityOf(d) : severity;
     if (devSev === 'none' && kind !== 'audit') return null;
     const now = Date.now();
     const info = this.db.prepare('INSERT INTO events(ts,device_id,device_name,kind,severity,message) VALUES(?,?,?,?,?,?)')
       .run(now, d.id, d.name, kind, severity, message);
     const eventId = Number(info.lastInsertRowid);
-    this.emit('event', { id: eventId, device_id: d.id, kind, severity, message });
+    this.emit('event', { id: eventId, device_id: d.id, kind, severity, message, suppressed: !!isSuppressed });
 
     // Smart Incident Filter: never trigger AI on disconnect/ping, printer, or recovery/audit
-    const { isAiAnalyzableIncident } = require('./ai');
-    if (d && d.id && isAiAnalyzableIncident({
-      device_id: d.id,
-      device_type: d.type,
-      device_severity: devSev,
-      event_severity: severity,
-      kind,
-      reason: message,
-      status: kind,
-    })) {
-      const aiSev = (severity === 'critical' || severity === 'high') ? severity : devSev;
-      this._triggerAiIncident(d, kind, aiSev, message, eventId, now);
+    // If suppressed by topology dependency, strictly skip AI trigger to save tokens and prevent alert storm
+    if (!isSuppressed) {
+      const { isAiAnalyzableIncident } = require('./ai');
+      if (d && d.id && isAiAnalyzableIncident({
+        device_id: d.id,
+        device_type: d.type,
+        device_severity: devSev,
+        event_severity: severity,
+        kind,
+        reason: message,
+        status: kind,
+      })) {
+        const aiSev = (severity === 'critical' || severity === 'high') ? severity : devSev;
+        this._triggerAiIncident(d, kind, aiSev, message, eventId, now);
+      }
     }
     return eventId;
   }
@@ -701,6 +753,141 @@ class Monitor extends EventEmitter {
     return true;
   }
 
+  // ---- topology dependency graph & alert storm suppression -----------
+  _getTopologyGraph(now = Date.now(), force = false) {
+    if (!force && this._topoCache && (now - this._topoCache.at < 5000)) {
+      return this._topoCache.parentMap;
+    }
+    const parentMap = new Map();
+    let rows = [];
+    try {
+      rows = this.db.prepare('SELECT data FROM maps').all();
+    } catch {
+      rows = [];
+    }
+    for (const row of rows) {
+      if (!row || !row.data) continue;
+      let mapData;
+      try {
+        mapData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      } catch {
+        continue;
+      }
+      if (!mapData || !Array.isArray(mapData.nodes) || !Array.isArray(mapData.links)) continue;
+
+      const nodeToDev = new Map();
+      for (const n of mapData.nodes) {
+        if (n && n.kind === 'device' && Number.isInteger(n.ref)) {
+          nodeToDev.set(n.id, n.ref);
+        }
+      }
+
+      for (const link of mapData.links) {
+        if (!link || !link.from || !link.to) continue;
+        const devA = nodeToDev.get(link.from);
+        const devB = nodeToDev.get(link.to);
+        if (!devA || !devB || devA === devB) continue;
+
+        const objA = this.devices.get(devA);
+        const objB = this.devices.get(devB);
+        const tierA = (objA && DEVICE_TIERS[objA.type]) || 2;
+        const tierB = (objB && DEVICE_TIERS[objB.type]) || 2;
+
+        let parentId, childId;
+        if (tierA > tierB) {
+          parentId = devA;
+          childId = devB;
+        } else if (tierB > tierA) {
+          parentId = devB;
+          childId = devA;
+        } else {
+          parentId = devA;
+          childId = devB;
+        }
+
+        if (!parentMap.has(childId)) {
+          parentMap.set(childId, new Set());
+        }
+        parentMap.get(childId).add(parentId);
+      }
+    }
+
+    const depths = this._computeDeviceDepths(parentMap);
+    this._topoCache = { at: now, parentMap, depths };
+    return parentMap;
+  }
+
+  _computeDeviceDepths(parentMap) {
+    const depths = new Map();
+    const getDepth = (id, stack = new Set()) => {
+      if (depths.has(id)) return depths.get(id);
+      if (stack.has(id)) return 0; // cycle detected
+      const parents = parentMap.get(id);
+      if (!parents || parents.size === 0) {
+        depths.set(id, 0);
+        return 0;
+      }
+      stack.add(id);
+      let maxP = 0;
+      for (const pid of parents) {
+        maxP = Math.max(maxP, 1 + getDepth(pid, stack));
+      }
+      stack.delete(id);
+      depths.set(id, maxP);
+      return maxP;
+    };
+    for (const id of this.devices.keys()) {
+      getDepth(id);
+    }
+    return depths;
+  }
+
+  isParentDown(deviceId, visited = new Set()) {
+    if (!deviceId) return { suppressed: false, rootCauseDevice: null };
+    const parentMap = this._getTopologyGraph(Date.now(), true);
+    return this._checkParentDownWithGraph(deviceId, parentMap, visited);
+  }
+
+  _checkParentDownWithGraph(deviceId, parentMap, visited = new Set()) {
+    visited.add(deviceId);
+    const parents = parentMap.get(deviceId);
+    if (!parents || parents.size === 0) {
+      return { suppressed: false, rootCauseDevice: null };
+    }
+
+    // Step 1: Check if any direct parent is DOWN
+    for (const parentId of parents) {
+      if (visited.has(parentId)) continue; // cycle guard
+
+      const pState = this.state.get(parentId);
+      const isDown = pState && pState.status === 'down';
+
+      if (isDown) {
+        // Find if this parent itself has an upstream root cause that is also down
+        const upstream = this._checkParentDownWithGraph(parentId, parentMap, new Set(visited));
+        const rootCause = (upstream.suppressed && upstream.rootCauseDevice)
+          ? upstream.rootCauseDevice
+          : (this.devices.get(parentId) || { id: parentId, name: `Thiết bị #${parentId}` });
+
+        return {
+          suppressed: true,
+          rootCauseDevice: rootCause,
+        };
+      }
+    }
+
+    // Step 2: Check if any indirect parent is DOWN
+    for (const parentId of parents) {
+      if (visited.has(parentId)) continue;
+      const upstream = this._checkParentDownWithGraph(parentId, parentMap, new Set(visited));
+      if (upstream.suppressed) {
+        return upstream;
+      }
+    }
+
+    return { suppressed: false, rootCauseDevice: null };
+  }
+
   // ---- views ----------------------------------------------------------
   view(d, detailed = false) {
     const st = this.state.get(d.id);
@@ -714,6 +901,8 @@ class Monitor extends EventEmitter {
       telegram_enabled: d.telegram_enabled !== 0,
       severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,
+      suppressed: !!st.suppressed,
+      root_cause_device: st.rootCauseDevice ? { id: st.rootCauseDevice.id, name: st.rootCauseDevice.name } : null,
       rtt: st.icmp.rtt,
       net_in: net ? Math.round(net.in) : null,
       net_out: net ? Math.round(net.out) : null,

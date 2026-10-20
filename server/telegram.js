@@ -248,6 +248,11 @@ class TelegramService {
       return { sent: false, reason: 'disabled_or_unconfigured' };
     }
 
+    // Skip suppressed events (topology dependency alert storm prevention)
+    if (ctx.suppressed || /\[suppressed/i.test(ctx.reason || '')) {
+      return { sent: false, reason: 'suppressed_by_topology' };
+    }
+
     // Check per-device toggle
     if (ctx.telegram_enabled === false || ctx.telegram_enabled === 0) {
       return { sent: false, reason: 'device_muted' };

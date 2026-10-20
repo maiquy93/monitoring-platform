@@ -71,8 +71,9 @@ function isAiAnalyzableIncident(ctx, opts = {}) {
     return true;
   }
 
-  // 2. Never analyze recovery or audit events for automatic background triggers
+  // 2. Never analyze recovery, suppressed, or audit events for automatic background triggers
   if (kind === 'up' || kind === 'audit') return false;
+  if (!force && (ctx.suppressed || /\[suppressed/i.test(reason))) return false;
   if (evSev === 'ok' || devSev === 'ok' || devSev === 'none') return false;
   if (/trở lại bình thường|hoạt động bình thường|mức an toàn|có điện lưới trở lại|hoạt động trở lại|recovered|returned to normal/i.test(reason)) {
     return false;
