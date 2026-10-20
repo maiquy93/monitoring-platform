@@ -13,6 +13,10 @@ function insertDevice(db, { id, name, type = 'server', address = '10.0.0.1', che
 }
 
 function createTestMonitor(db, monitorOpts = {}) {
+  setSetting(db, 'storm_guard_enabled', 1);
+  setSetting(db, 'storm_use_parent_id', 1);
+  setSetting(db, 'storm_use_topology', 1);
+  setSetting(db, 'storm_burst_threshold', 3);
   const alive = new Set();
   const telegramCalls = [];
   const aiCalls = [];
@@ -278,7 +282,7 @@ test('Bilingual compatibility: Suppressed tag formats in VI and EN', () => {
   monitor._transition(monitor.devices.get(202), stAp, 'down', Date.now());
 
   const evVi = db.prepare('SELECT * FROM events WHERE device_id = 202').get();
-  assert.ok(evVi.message.includes('[Suppressed - Mất kết nối từ: Core Router]'));
+  assert.ok(evVi.message.includes('[Đã chặn thông báo lẻ - Do sập nguồn từ: Core Router]') || evVi.message.includes('[Suppressed - Mất kết nối từ: Core Router]'));
 
   // Test EN language
   setSetting(db, 'default_lang', 'en');

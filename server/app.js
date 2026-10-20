@@ -809,6 +809,16 @@ function createApp(db, monitor, opts = {}) {
       ai_enabled: !!(s.ai && s.ai.enabled),
       telegram_enabled: !!tg.enabled,
       telegram_configured: tgConfigured,
+      storm_guard_enabled: Number(s.storm_guard_enabled || 0),
+      storm_use_parent_id: Number(s.storm_use_parent_id ?? 1),
+      storm_use_topology: Number(s.storm_use_topology || 0),
+      storm_burst_threshold: Number(s.storm_burst_threshold ?? 3),
+      storm_guard: {
+        enabled: Number(s.storm_guard_enabled || 0),
+        use_parent_id: Number(s.storm_use_parent_id ?? 1),
+        use_topology: Number(s.storm_use_topology || 0),
+        burst_threshold: Number(s.storm_burst_threshold ?? 3),
+      },
       types: TYPES, timing: { ping_interval_ms: monitor.o.pingIntervalMs, ping_fail_limit: monitor.o.pingFailLimit,
         agent_timeout_ms: monitor.o.agentTimeoutMs }, version: versionInfo };
     if (ctx.user.role === 'admin') {
@@ -900,6 +910,22 @@ function createApp(db, monitor, opts = {}) {
     }
     if (b.telegram && typeof b.telegram === 'object') {
       saveTelegramConfig(b.telegram);
+    }
+    if (b.storm_guard_enabled !== undefined) setSetting(db, 'storm_guard_enabled', (b.storm_guard_enabled === 1 || b.storm_guard_enabled === true || b.storm_guard_enabled === '1') ? 1 : 0);
+    if (b.storm_use_parent_id !== undefined) setSetting(db, 'storm_use_parent_id', (b.storm_use_parent_id === 1 || b.storm_use_parent_id === true || b.storm_use_parent_id === '1') ? 1 : 0);
+    if (b.storm_use_topology !== undefined) setSetting(db, 'storm_use_topology', (b.storm_use_topology === 1 || b.storm_use_topology === true || b.storm_use_topology === '1') ? 1 : 0);
+    if (b.storm_burst_threshold !== undefined) {
+      const v = Number(b.storm_burst_threshold);
+      if (Number.isFinite(v) && v >= 0 && v <= 100) setSetting(db, 'storm_burst_threshold', Math.round(v));
+    }
+    if (b.storm_guard && typeof b.storm_guard === 'object') {
+      if (b.storm_guard.enabled !== undefined) setSetting(db, 'storm_guard_enabled', (b.storm_guard.enabled === 1 || b.storm_guard.enabled === true || b.storm_guard.enabled === '1') ? 1 : 0);
+      if (b.storm_guard.use_parent_id !== undefined) setSetting(db, 'storm_use_parent_id', (b.storm_guard.use_parent_id === 1 || b.storm_guard.use_parent_id === true || b.storm_guard.use_parent_id === '1') ? 1 : 0);
+      if (b.storm_guard.use_topology !== undefined) setSetting(db, 'storm_use_topology', (b.storm_guard.use_topology === 1 || b.storm_guard.use_topology === true || b.storm_guard.use_topology === '1') ? 1 : 0);
+      if (b.storm_guard.burst_threshold !== undefined) {
+        const v = Number(b.storm_guard.burst_threshold);
+        if (Number.isFinite(v) && v >= 0 && v <= 100) setSetting(db, 'storm_burst_threshold', Math.round(v));
+      }
     }
     monitor.reload();
     monitor.emit('change');

@@ -264,6 +264,8 @@
 
       ${this.telegramPanel(s)}
 
+      ${this.stormGuardPanel(s)}
+
       ${this.aiPanel(s)}
 
       <div class="panel" style="margin-top:14px"><h2 style="margin-top:0">${t('Hệ thống')}</h2>${this.systemPanel(s)}</div>
@@ -289,6 +291,7 @@
       $('#st-enroll').onsubmit = guard((f) => save({ enroll_key: f.get('key') }, t('Đã lưu enroll key')));
       $('#st-gen').onclick = () => { $('#st-enroll input').value = randKey(); };
       this.bindTelegramPanel(el, s, save, guard);
+      this.bindStormGuardPanel(el, s, save, guard);
       this.bindAiPanel(el, s, save, guard);
       $('#us-add').onclick = () => this.userForm();
       $('#us-body').onclick = (e) => {
@@ -520,6 +523,96 @@
           }
         };
       }
+    },
+    stormGuardPanel(s) {
+      const isEn = M.S.lang === 'en';
+      const sg = s.storm_guard || {
+        enabled: s.storm_guard_enabled || 0,
+        use_parent_id: s.storm_use_parent_id ?? 1,
+        use_topology: s.storm_use_topology || 0,
+        burst_threshold: s.storm_burst_threshold ?? 3,
+      };
+      const isActive = Boolean(sg.enabled);
+      return `<div class="panel" id="st-storm-panel" style="margin-top:14px">
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          <h2 style="margin:0">🛡️ ${isEn ? 'Alert Storm Guard Module' : 'Module Chống bão cảnh báo (Alert Storm Guard)'}</h2>
+          <span class="spacer"></span>
+          <span class="ai-badge ${isActive ? '' : 'cached'}">${isActive
+            ? (isEn ? '🟢 Storm Guard Active' : '🟢 Đang kích hoạt Chống bão')
+            : (isEn ? '⚪ Guard Disabled (Original Flow)' : '⚪ Đang tắt (Luồng cảnh báo nguyên bản)')}</span>
+        </div>
+        <p class="muted" style="margin:6px 0 12px">${isEn
+          ? 'Pluggable module to eliminate alert storms and optimize AI tokens during cascading switch/power outages or link drops. When turned OFF, monitoring and alert flows operate 100% in original mode.'
+          : 'Module độc lập ngăn chặn ngập tràn thông báo và tối ưu token AI khi sập nguồn hoặc mất uplink diện rộng. Khi TẮT, hệ thống hoạt động 100% theo luồng cảnh báo nguyên bản.'}</p>
+
+        <form id="st-storm-guard">
+          <div class="row" style="margin-bottom:14px;padding:10px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border)">
+            <label class="toggle-switch" for="f-sg_enabled">
+              <input type="checkbox" name="storm_guard_enabled" id="f-sg_enabled" ${sg.enabled ? 'checked' : ''}>
+              <span class="toggle-slider"></span>
+              <span><b>${isEn ? 'Enable Alert Storm Guard (Master Switch)' : 'Bật Module Chống bão cảnh báo (Công tắc tổng)'}</b></span>
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <div class="field" style="background:var(--panel2);padding:10px;border-radius:6px;border:1px solid var(--border)">
+              <label class="toggle-switch" for="f-sg_parent_id">
+                <input type="checkbox" name="storm_use_parent_id" id="f-sg_parent_id" ${sg.use_parent_id ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+                <span>${isEn ? 'Layer 1: Suppress by explicit Uplink/Parent ID' : 'Lớp 1: Chặn theo Thiết bị Uplink/Cha chỉ định'}</span>
+              </label>
+              <span class="muted" style="font-size:11.5px;display:block;margin-top:6px">${isEn
+                ? 'Suppresses downstream child devices when their parent is offline, tracing the root cause upstream with circular loop detection.'
+                : 'Chặn thông báo thiết bị con khi node cha mất mạng, tự động truy vết thiết bị gốc với cơ chế chống lặp vòng an toàn.'}</span>
+            </div>
+
+            <div class="field" style="background:var(--panel2);padding:10px;border-radius:6px;border:1px solid var(--border)">
+              <label class="toggle-switch" for="f-sg_topology">
+                <input type="checkbox" name="storm_use_topology" id="f-sg_topology" ${sg.use_topology ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+                <span>${isEn ? 'Layer 2: Infer dependencies from Topology Map' : 'Lớp 2: Tự suy luận từ Sơ đồ mạng Topology'}</span>
+              </label>
+              <span class="muted" style="font-size:11.5px;display:block;margin-top:6px">${isEn
+                ? 'Resolves upstream hierarchy via Role Weight (Firewall > Switch > Server/AP) and Dual-Homing redundancy (suppresses only if ALL parents fail).'
+                : 'Suy luận quan hệ theo Bậc vai trò (Firewall > Switch > Server/AP) và hỗ trợ đấu nối dự phòng Dual-Homing (chỉ chặn khi TẤT CẢ đường cha sập).'}</span>
+            </div>
+
+            <div class="field" style="background:var(--panel2);padding:10px;border-radius:6px;border:1px solid var(--border)">
+              <label for="f-sg_burst">${isEn ? 'Layer 3: Mass Outage Burst Threshold (0 = disabled)' : 'Lớp 3: Ngưỡng gom sự cố sập đồng thời (0 = Tắt gom)'}</label>
+              <input class="inp" type="number" min="0" max="50" name="storm_burst_threshold" id="f-sg_burst" value="${sg.burst_threshold != null ? sg.burst_threshold : 3}">
+              <span class="muted" style="font-size:11.5px;display:block;margin-top:6px">${isEn
+                ? 'When ≥ N unsuppressed devices go down simultaneously, aggregates into a single mass outage alert and calls AI at most once.'
+                : 'Khi có ≥ N thiết bị cùng sập trong 1 chu kỳ, tự động gom vào 1 thông báo sự cố diện rộng và chỉ gọi AI tối đa 1 lần.'}</span>
+            </div>
+          </div>
+
+          <div style="margin-top:14px">
+            <button class="btn primary">${isEn ? '💾 Save Storm Guard Settings' : '💾 Lưu cấu hình chống bão'}</button>
+          </div>
+        </form>
+      </div>`;
+    },
+    bindStormGuardPanel(el, s, save, guard) {
+      const form = $('#st-storm-guard', el);
+      if (!form) return;
+      form.onsubmit = guard(async (fd) => {
+        const isEn = M.S.lang === 'en';
+        const enabled = $('#f-sg_enabled', form).checked ? 1 : 0;
+        const useParentId = $('#f-sg_parent_id', form).checked ? 1 : 0;
+        const useTopology = $('#f-sg_topology', form).checked ? 1 : 0;
+        const burstThreshold = Math.max(0, Number(fd.get('storm_burst_threshold') || 0));
+
+        await M.api('PUT', '/api/settings', {
+          storm_guard_enabled: enabled,
+          storm_use_parent_id: useParentId,
+          storm_use_topology: useTopology,
+          storm_burst_threshold: burstThreshold,
+        });
+
+        M.S.settings = { ...M.S.settings, ...(await M.api('GET', '/api/settings')) };
+        M.toast(isEn ? 'Storm guard settings saved successfully!' : 'Đã lưu cấu hình chống bão thành công!');
+        this.render(el);
+      });
     },
     aiPanel(s) {
       const ai = s.ai || {};

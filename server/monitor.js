@@ -532,7 +532,7 @@ class Monitor extends EventEmitter {
           const rootName = root.name || `Thiết bị #${root.id}`;
           const isVi = (this.settings && this.settings.default_lang) !== 'en';
           const supTag = isVi
-            ? `[Suppressed - Mất kết nối từ: ${rootName}]`
+            ? `[Đã chặn thông báo lẻ - Do sập nguồn từ: ${rootName}]`
             : `[Suppressed - Upstream failure from: ${rootName}]`;
           msg = `${msg} ${supTag}`;
           st.suppressed = true;
@@ -542,7 +542,21 @@ class Monitor extends EventEmitter {
           st.suppressed = false;
           st.rootCauseDevice = null;
           this._event(d, 'down', sev, msg, false);
-          this._queueUnsuppressedDown(d, st, msg, now);
+          const sgEnabled = Boolean(
+            this.settings.storm_guard_enabled === 1 ||
+            this.settings.storm_guard_enabled === true ||
+            (this.settings.storm_guard && this.settings.storm_guard.enabled)
+          );
+          const burstTh = Number(
+            this.settings.storm_burst_threshold ??
+            (this.settings.storm_guard && this.settings.storm_guard.burst_threshold) ??
+            3
+          );
+          if (sgEnabled && burstTh > 0) {
+            this._queueUnsuppressedDown(d, st, msg, now);
+          } else {
+            this._triggerTelegramAlert(d, st, 'down', msg, now);
+          }
         }
       } else if (next === 'warning') {
         const msg = `${d.name}: ${st.reasons.join('; ')}`;
@@ -912,46 +926,53 @@ class Monitor extends EventEmitter {
     return parents ? Array.from(parents) : [];
   }
 
-  // Lớp 2: Logic kiểm tra isSuppressedByParent (hỗ trợ Dual-homing và Cycle detection)
-  isSuppressedByParent(deviceId, visited = new Set()) {
-    if (!deviceId) return { suppressed: false, rootCause: null, rootCauseDevice: null };
-    if (visited.has(deviceId)) return { suppressed: false, rootCause: null, rootCauseDevice: null };
-    visited.add(deviceId);
-
-    const parents = this.getUpstreamParents(deviceId);
-    if (!parents || parents.length === 0) {
-      return { suppressed: false, rootCause: null, rootCauseDevice: null };
+  _getTopologyLinks() {
+    let rows = [];
+    try {
+      rows = this.db.prepare('SELECT data FROM maps').all();
+    } catch {
+      rows = [];
     }
-
-    // Dual-homing / Redundant parents:
-    // Chỉ trả về suppressed: true khi TẤT CẢ các node cha trực tiếp đều đang ở trạng thái Offline/Down
-    const allParentsDown = parents.every((pid) => {
-      const st = this.state.get(pid);
-      return st && st.status === 'down';
-    });
-
-    if (!allParentsDown) {
-      return { suppressed: false, rootCause: null, rootCauseDevice: null };
-    }
-
-    // Tất cả node cha đều Down -> Truy vết tìm node cha gốc (root cause)
-    let rootCause = null;
-    for (const pid of parents) {
-      const upstream = this.isSuppressedByParent(pid, new Set(visited));
-      if (upstream.suppressed && upstream.rootCause) {
-        rootCause = upstream.rootCause;
-        break;
+    const allLinks = [];
+    for (const row of rows) {
+      if (!row || !row.data) continue;
+      let mapData;
+      try {
+        mapData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+      } catch { continue; }
+      if (!mapData || !Array.isArray(mapData.nodes) || !Array.isArray(mapData.links)) continue;
+      const nodeToDev = new Map();
+      for (const n of mapData.nodes) {
+        if (n && n.kind === 'device' && Number.isInteger(n.ref)) {
+          nodeToDev.set(n.id, n.ref);
+        }
+      }
+      for (const link of mapData.links) {
+        if (!link || !link.from || !link.to) continue;
+        const devA = nodeToDev.get(link.from);
+        const devB = nodeToDev.get(link.to);
+        if (devA && devB && devA !== devB) {
+          allLinks.push({ from: devA, to: devB });
+        }
       }
     }
-    if (!rootCause) {
-      const primaryPid = parents[0];
-      rootCause = this.devices.get(primaryPid) || { id: primaryPid, name: `Thiết bị #${primaryPid}` };
-    }
+    return allLinks;
+  }
 
+  // Lớp 2: Logic kiểm tra isSuppressedByParent (ủy quyền cho module storm-guard)
+  isSuppressedByParent(deviceId, visited = new Set()) {
+    if (!deviceId) return { suppressed: false, rootCause: null, rootCauseDevice: null };
+    const dev = this.devices.get(deviceId);
+    if (!dev) return { suppressed: false, rootCause: null, rootCauseDevice: null };
+
+    const { evaluateStormGuard } = require('./storm-guard');
+    const topoLinks = this._getTopologyLinks();
+    const res = evaluateStormGuard(dev, this.devices, topoLinks, this.settings, this.state);
     return {
-      suppressed: true,
-      rootCause,
-      rootCauseDevice: rootCause,
+      suppressed: !!res.suppressed,
+      rootCause: res.rootCause,
+      rootCauseDevice: res.rootCause,
+      burstGroup: !!res.burstGroup,
     };
   }
 
@@ -970,6 +991,26 @@ class Monitor extends EventEmitter {
     const batch = this._pendingDownAlerts;
     this._pendingDownAlerts = [];
 
+    const sgEnabled = Boolean(
+      this.settings.storm_guard_enabled === 1 ||
+      this.settings.storm_guard_enabled === true ||
+      (this.settings.storm_guard && this.settings.storm_guard.enabled)
+    );
+    const burstTh = Number(
+      this.settings.storm_burst_threshold ??
+      (this.settings.storm_guard && this.settings.storm_guard.burst_threshold) ??
+      3
+    );
+
+    if (!sgEnabled || burstTh <= 0) {
+      for (const item of batch) {
+        if (!item.st.suppressed && !item.st.inMassOutage) {
+          this._triggerTelegramAlert(item.d, item.st, 'down', item.msg, item.now);
+        }
+      }
+      return;
+    }
+
     // Duy trì cửa sổ trượt 10 giây gom sự cố
     if (!this._downBurstWindow) this._downBurstWindow = [];
     this._downBurstWindow = this._downBurstWindow.filter((e) => now - e.now <= 10000);
@@ -982,8 +1023,8 @@ class Monitor extends EventEmitter {
     }
     this._downBurstWindow = Array.from(distinctMap.values());
 
-    // Phát hiện từ 3 thiết bị riêng biệt trở lên cùng chuyển sang trạng thái Down trong 10s
-    if (distinctMap.size >= 3) {
+    // Phát hiện từ burstTh thiết bị riêng biệt trở lên cùng chuyển sang trạng thái Down trong 10s
+    if (distinctMap.size >= burstTh) {
       const distinctItems = Array.from(distinctMap.values());
       const allDown = distinctItems.map((e) => e.d);
       for (const e of distinctItems) {

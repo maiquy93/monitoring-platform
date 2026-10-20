@@ -43,6 +43,10 @@ const DEFAULT_SETTINGS = {
   default_lang: 'vi',
   ai: DEFAULT_AI_SETTINGS,
   telegram: DEFAULT_TELEGRAM_SETTINGS,
+  storm_guard_enabled: 0,
+  storm_use_parent_id: 1,
+  storm_use_topology: 0,
+  storm_burst_threshold: 3,
 };
 
 function open(file) {
@@ -137,6 +141,10 @@ function getSettings(db) {
   out.thresholds = { ...DEFAULT_SETTINGS.thresholds, ...out.thresholds };
   out.ai = { ...DEFAULT_AI_SETTINGS, ...(out.ai || {}) };
   out.telegram = { ...DEFAULT_TELEGRAM_SETTINGS, ...(out.telegram || {}) };
+  out.storm_guard_enabled = Number(out.storm_guard_enabled ?? 0);
+  out.storm_use_parent_id = Number(out.storm_use_parent_id ?? 1);
+  out.storm_use_topology = Number(out.storm_use_topology ?? 0);
+  out.storm_burst_threshold = Number(out.storm_burst_threshold ?? 3);
   if (!['vi', 'en'].includes(out.default_lang)) out.default_lang = 'vi';
   return out;
 }
