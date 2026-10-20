@@ -471,6 +471,32 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
   stroke-width: 1;
 }
 
+/* ---------- Topology Cable Port Badges ---------- */
+.m-port-badge {
+  cursor: pointer;
+  pointer-events: all;
+}
+.m-port-badge-bg {
+  fill: var(--panel);
+  stroke: var(--c-ok);
+  stroke-width: 1.5;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+.m-port-badge-bg.down {
+  stroke: var(--c-critical);
+}
+.m-port-badge-bg.warning {
+  stroke: var(--c-medium);
+}
+.m-port-badge:hover .m-port-badge-bg {
+  stroke: var(--accent);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 5px var(--accent));
+}
+.m-port-badge:hover text {
+  fill: var(--accent);
+}
+
 /* ---------- Topology Port Matrix Grid ---------- */
 .m-port-grid { pointer-events: all; }
 .m-port {

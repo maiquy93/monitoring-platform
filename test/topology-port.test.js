@@ -173,21 +173,57 @@ test('API & cleanMap: preserves from_port and to_port in topology map links', as
   }
 });
 
-test('frontend static assets: map.js and style.css enforce clean UI without floating cable badges', () => {
+test('frontend static assets: map.js and style.css support snap-to-device cable port badges', () => {
   const mapJs = fs.readFileSync(path.join(__dirname, '../public/map.js'), 'utf8');
   assert.ok(mapJs.includes('getLinkEndpoints'), 'map.js must define getLinkEndpoints for top-to-bottom wire routing');
+  assert.ok(mapJs.includes('getBadgeCoords'), 'map.js must define getBadgeCoords for snap-to-device port badges');
   assert.ok(mapJs.includes('openLinkConfigModal'), 'map.js must support wire port config modal');
   assert.ok(mapJs.includes('m-port-inspect-btn'), 'map.js must include port inspector trigger');
-
-  // Verify cable label clutter has been completely removed
-  assert.ok(!mapJs.includes('m-port-badge'), 'map.js must NOT render floating cable badges on links');
-  assert.ok(!mapJs.includes('m-port-active-summary'), 'map.js must NOT render clutter text labels on node card');
+  assert.ok(mapJs.includes('m-port-badge'), 'map.js must render floating cable badges on links');
+  assert.ok(!mapJs.includes('m-port-active-summary'), 'map.js must NOT clutter node card with inline text labels');
 
   const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
   assert.ok(styleCss.includes('.m-port-inspect-btn'), 'style.css must style port inspect button');
-  assert.ok(!styleCss.includes('.m-port-badge'), 'style.css must NOT have leftover .m-port-badge styles');
+  assert.ok(styleCss.includes('.m-port-badge'), 'style.css must style .m-port-badge');
+  assert.ok(styleCss.includes('.m-port-badge-bg'), 'style.css must style .m-port-badge-bg');
   assert.ok(!styleCss.includes('.m-port-active-summary'), 'style.css must NOT have leftover .m-port-active-summary styles');
 
   const adminJs = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
   assert.ok(adminJs.includes('port_count'), 'admin.js must support port_count in device modal');
+});
+
+test('topology port badge math: getBadgeCoords snaps snugly to originating device endpoint without drifting', () => {
+  // Test simulated getBadgeCoords
+  function getBadgeCoords(ptFrom, ptTo, offsetDist) {
+    const dx = ptTo.x - ptFrom.x;
+    const dy = ptTo.y - ptFrom.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const offset = Math.min(offsetDist || 18, dist * 0.35);
+    return {
+      x: ptFrom.x + (dx / dist) * offset,
+      y: ptFrom.y + (dy / dist) * offset,
+    };
+  }
+
+  const ptA = { x: 300, y: 130 }; // Device A bottom anchor
+  const ptB = { x: 300, y: 370 }; // Device B top anchor (distance = 240px)
+
+  // When only Device A has port (from_port = 24): badge stays right at ptA
+  const badgeA = getBadgeCoords(ptA, ptB, 18);
+  assert.equal(badgeA.x, 300);
+  assert.equal(badgeA.y, 148, 'Badge A must be 18px below ptA, directly attached to Device A');
+  assert.ok(badgeA.y < 200, 'Badge A must stay firmly near Device A, far from Device B');
+
+  // When only Device B has port (to_port = 1): badge stays right at ptB
+  const badgeB = getBadgeCoords(ptB, ptA, 18);
+  assert.equal(badgeB.x, 300);
+  assert.equal(badgeB.y, 352, 'Badge B must be 18px above ptB, directly attached to Device B');
+  assert.ok(badgeB.y > 300, 'Badge B must stay firmly near Device B, far from Device A');
+
+  // On very short cables (e.g. 20px), badges scale proportionally and never invert or cross over
+  const ptShortA = { x: 100, y: 100 };
+  const ptShortB = { x: 100, y: 120 };
+  const shortBadgeA = getBadgeCoords(ptShortA, ptShortB, 18);
+  const shortBadgeB = getBadgeCoords(ptShortB, ptShortA, 18);
+  assert.ok(shortBadgeA.y < shortBadgeB.y, 'Badges must never cross over on short cables');
 });

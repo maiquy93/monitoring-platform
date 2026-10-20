@@ -15,9 +15,16 @@
   };
   const SEV_RANK = { critical: 4, high: 3, medium: 2, low: 1, none: 0 };
 
-  // Chuẩn hóa vị trí neo: Luôn xuất phát từ cạnh dưới (đáy) của card phía trên
+  // Chuẩn hóa vị trí neo: Xuất phát từ cạnh dưới (đáy) của card phía trên
   // và cắm thẳng vào cạnh trên (đỉnh) của card phía dưới (chuẩn sơ đồ cây phân cấp)
+  // Nếu 2 thiết bị nằm ngang cùng hàng, neo từ cạnh trái sang cạnh phải.
   function getLinkEndpoints(a, b) {
+    if (Math.abs(a.y - b.y) <= 25) {
+      if (a.x <= b.x) {
+        return { x1: a.x + NW / 2, y1: a.y, x2: b.x - NW / 2, y2: b.y };
+      }
+      return { x1: a.x - NW / 2, y1: a.y, x2: b.x + NW / 2, y2: b.y };
+    }
     if (a.y <= b.y) {
       return {
         x1: a.x,
@@ -33,6 +40,31 @@
         y2: b.y + NH / 2, // Cạnh dưới (đáy) của card phía trên (b)
       };
     }
+  }
+
+  const getEdgeEndpoints = getLinkEndpoints;
+
+  // Tính tọa độ trung tâm cho badge cổng bám dọc theo đường dây, nằm sát ngay điểm neo của thiết bị
+  function getBadgeCoords(ptFrom, ptTo, offsetDist) {
+    const dx = ptTo.x - ptFrom.x;
+    const dy = ptTo.y - ptFrom.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    // Đảm bảo không bao giờ trôi quá 35% chiều dài dây và luôn bám sát thiết bị xuất phát
+    const offset = Math.min(offsetDist || 18, dist * 0.35);
+    return {
+      x: ptFrom.x + (dx / dist) * offset,
+      y: ptFrom.y + (dy / dist) * offset,
+    };
+  }
+
+  // Định dạng rút gọn tên cổng hiển thị trên badge nổi (vd: 1 -> P1, ether1 -> eth1, Gi1/0/24 -> Gi1/0/24)
+  function formatPortBadgeLabel(raw) {
+    if (!raw) return '';
+    const str = String(raw).trim();
+    if (/^\d+$/.test(str)) return `P${str}`;
+    if (/^ether(\d+)$/i.test(str)) return `eth${RegExp.$1}`;
+    if (/^(gi|fa|te|ge)(\d+.*)$/i.test(str)) return `${RegExp.$1.toUpperCase()}${RegExp.$2}`;
+    return str.length > 7 ? str.slice(0, 6) : str;
   }
 
   // Determine physical port count configured for device (default 48 for switches)
@@ -322,8 +354,7 @@
       $('#mp-box').classList.toggle('editing', this.edit);
       const score = (r) => (SEV_RANK[r] ? 10 + SEV_RANK[r] : r === 'up' ? 1 : 0);
 
-      // Render Clean Top-Down Links: Gom xuất phát từ cạnh đáy card phía trên cắm vào cạnh đỉnh card phía dưới
-      // TUYỆT ĐỐI KHÔNG sinh text label hay badge nổi gây rối mắt
+      // Render Clean Top-Down Links with Snap-to-Device Port Badges
       const linksHtml = m.links.map((l, i) => {
         const a = nodes.get(l.from), b = nodes.get(l.to);
         if (!a || !b) return '';
@@ -332,8 +363,41 @@
         const bad = SEV_RANK[r];
         const sel = this.sel && this.sel.type === 'link' && this.sel.index === i;
 
-        // Chuẩn hóa neo: Cạnh dưới của card phía trên cắm vào cạnh trên của card phía dưới
+        // Chuẩn hóa neo đường dây
         const { x1, y1, x2, y2 } = getLinkEndpoints(a, b);
+        const ptA = { x: x1, y: y1 };
+        const ptB = { x: x2, y: y2 };
+
+        // Badge nổi bám dọc theo đường dây: Hiển thị SÁT ĐÚNG THIẾT BỊ của nó
+        // Nếu đầu kia không cấu hình port, đầu đó sẽ không có badge và không làm lệch vị trí badge của đầu có port
+        let badgesHtml = '';
+        const bh = 17;
+
+        if (l.from_port) {
+          const bCoordA = getBadgeCoords(ptA, ptB, 18);
+          const pLblA = formatPortBadgeLabel(l.from_port);
+          const bwA = Math.max(28, Math.min(64, pLblA.length * 7 + 10));
+          badgesHtml += `
+            <g class="m-port-badge" data-link="${i}" transform="translate(${bCoordA.x - bwA / 2}, ${bCoordA.y - bh / 2})">
+              <rect width="${bwA}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
+              <text x="${bwA / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblA)}</text>
+              <title>${esc(t('Cổng'))}: ${esc(l.from_port)} (${esc(ia ? ia.name : '')})</title>
+            </g>
+          `;
+        }
+
+        if (l.to_port) {
+          const bCoordB = getBadgeCoords(ptB, ptA, 18);
+          const pLblB = formatPortBadgeLabel(l.to_port);
+          const bwB = Math.max(28, Math.min(64, pLblB.length * 7 + 10));
+          badgesHtml += `
+            <g class="m-port-badge" data-link="${i}" transform="translate(${bCoordB.x - bwB / 2}, ${bCoordB.y - bh / 2})">
+              <rect width="${bwB}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
+              <text x="${bwB / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblB)}</text>
+              <title>${esc(t('Cổng'))}: ${esc(l.to_port)} (${esc(ib ? ib.name : '')})</title>
+            </g>
+          `;
+        }
 
         // Tooltip gọn gàng gốc SVG chỉ hiện khi người dùng rê chuột vào đường dây
         const tooltip = `${ia ? ia.name : ''}${l.from_port ? ` [Port ${l.from_port}]` : ''} ➔ ${ib ? ib.name : ''}${l.to_port ? ` [Port ${l.to_port}]` : ''}`;
@@ -343,6 +407,7 @@
             <title>${esc(tooltip)}</title>
           </line>
           ${this.edit ? `<line data-link="${i}" stroke="transparent" stroke-width="20" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="cursor:pointer"/>` : ''}
+          ${badgesHtml}
         `;
       }).join('');
 
@@ -488,12 +553,43 @@
       const bad = SEV_RANK[r];
 
       const { x1, y1, x2, y2 } = getLinkEndpoints(a, b);
+      const ptA = { x: x1, y: y1 };
+      const ptB = { x: x2, y: y2 };
+
+      let badgesHtml = '';
+      const bh = 17;
+
+      if (l.from_port) {
+        const bCoordA = getBadgeCoords(ptA, ptB, 18);
+        const pLblA = formatPortBadgeLabel(l.from_port);
+        const bwA = Math.max(28, Math.min(64, pLblA.length * 7 + 10));
+        badgesHtml += `
+          <g class="m-port-badge" transform="translate(${bCoordA.x - bwA / 2}, ${bCoordA.y - bh / 2})">
+            <rect width="${bwA}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
+            <text x="${bwA / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblA)}</text>
+          </g>
+        `;
+      }
+
+      if (l.to_port) {
+        const bCoordB = getBadgeCoords(ptB, ptA, 18);
+        const pLblB = formatPortBadgeLabel(l.to_port);
+        const bwB = Math.max(28, Math.min(64, pLblB.length * 7 + 10));
+        badgesHtml += `
+          <g class="m-port-badge" transform="translate(${bCoordB.x - bwB / 2}, ${bCoordB.y - bh / 2})">
+            <rect width="${bwB}" height="${bh}" rx="4" class="m-port-badge-bg ${bad ? 'down' : 'up'}"/>
+            <text x="${bwB / 2}" y="${bh / 2 + 3.5}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--text)">${esc(pLblB)}</text>
+          </g>
+        `;
+      }
+
       const tooltip = `${ia ? ia.name : ''}${l.from_port ? ` [Port ${l.from_port}]` : ''} ➔ ${ib ? ib.name : ''}${l.to_port ? ` [Port ${l.to_port}]` : ''}`;
 
       return `
         <line class="m-link ${bad ? 'down' : ''}" style="stroke:${COL[r] || 'var(--c-ok)'}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">
           <title>${esc(tooltip)}</title>
         </line>
+        ${badgesHtml}
       `;
     }).join('');
 
