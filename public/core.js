@@ -323,6 +323,8 @@ const I18N_EN = {
   'Xem chi tiết →': 'Details →',
 
   // Topology Maps
+  'Thiết bị Uplink / Cha': 'Uplink / Parent Device',
+  '(Không có / Tự động nhận diện)': '(None / Auto-detect)',
   'Sơ đồ topology': 'Topology Maps',
   '+ Tạo sơ đồ': '+ Create Map',
   'Chưa có sơ đồ nào.': 'No topology maps yet.',
@@ -448,7 +450,7 @@ M.trData = (str) => {
     .replace(/Máy in đã hoạt động bình thường/g, 'Printer returned to normal')
     .replace(/Tốc độ gói tin đã trở lại bình thường/g, 'Packet rate returned to normal')
     .replace(/mất kết nối:/g, 'disconnected:')
-    .replace(/\[Suppressed - Do sập nguồn từ:\s*([^\]]+)\]/g, '[Suppressed - Upstream failure from: $1]')
+    .replace(/\[Suppressed - (?:Mất kết nối từ|Do sập nguồn từ):\s*([^\]]+)\]/g, '[Suppressed - Upstream failure from: $1]')
     .replace(/hoạt động trở lại sau (\d+)s/g, 'recovered after $1s')
     .replace(/Thêm thiết bị/g, 'Added device')
     .replace(/Xóa thiết bị/g, 'Deleted device')

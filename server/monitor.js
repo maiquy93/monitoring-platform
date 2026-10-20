@@ -120,6 +120,23 @@ const DEVICE_TIERS = {
   pc: 1,
 };
 
+const ROLE_WEIGHT = {
+  firewall: 1,
+  router: 1,
+  gateway: 1,
+  switch: 2,
+  server: 3,
+  vm: 3,
+  nas: 3,
+  storage: 3,
+  ups: 3,
+  ap: 3,
+  printer: 3,
+  camera: 3,
+  pc: 3,
+};
+const getRoleWeight = (type) => ROLE_WEIGHT[String(type || '').toLowerCase()] || 3;
+
 class Monitor extends EventEmitter {
   constructor(db, opts = {}) {
     super();
@@ -158,6 +175,10 @@ class Monitor extends EventEmitter {
     this.lastAiCheck = 0;
     this.diskLow = false;
     this._topoCache = null;
+    this._pendingDownAlerts = [];
+    this._downBurstWindow = [];
+    this._lastMassOutageTg = 0;
+    this._lastMassOutageAi = 0;
     this.reload();
   }
 
@@ -193,7 +214,7 @@ class Monitor extends EventEmitter {
     const last = this.db.prepare('SELECT MAX(ts) t FROM metrics WHERE device_id = ? AND cpu IS NOT NULL').get(id);
     return {
       status: 'unknown', reasons: [], since: Date.now(), acked: false,
-      suppressed: false, rootCauseDevice: null,
+      suppressed: false, rootCauseDevice: null, inMassOutage: false,
       icmp: { ok: null, fails: 0, rtt: null, nextAt: 0, busy: false },
       snmp: { ok: null, fails: 0, nextAt: 0, busy: false, info: null, error: null, net: { base: null, rate: null }, pkt: { base: null, rate: null } },
       agent: { lastAt: last && last.t ? last.t : null, data: null, net: { base: null, rate: null } },
@@ -488,6 +509,7 @@ class Monitor extends EventEmitter {
       if (this._maybeStoreMetric(d, st, now, agentFresh)) { /* stored */ }
     }
     if (changed) this.emit('change');
+    this._flushDownAlerts(now);
     return changed;
   }
 
@@ -503,23 +525,24 @@ class Monitor extends EventEmitter {
     }
     if (sev !== 'none') {
       if (next === 'down') {
-        const sup = this.isParentDown(d.id);
+        const sup = this.isSuppressedByParent(d.id);
         let msg = `${d.name} mất kết nối: ${st.reasons.join(', ')}`;
-        if (sup && sup.suppressed && sup.rootCauseDevice) {
-          const rootName = sup.rootCauseDevice.name || `Thiết bị #${sup.rootCauseDevice.id}`;
+        if (sup && sup.suppressed && (sup.rootCause || sup.rootCauseDevice)) {
+          const root = sup.rootCause || sup.rootCauseDevice;
+          const rootName = root.name || `Thiết bị #${root.id}`;
           const isVi = (this.settings && this.settings.default_lang) !== 'en';
           const supTag = isVi
-            ? `[Suppressed - Do sập nguồn từ: ${rootName}]`
+            ? `[Suppressed - Mất kết nối từ: ${rootName}]`
             : `[Suppressed - Upstream failure from: ${rootName}]`;
           msg = `${msg} ${supTag}`;
           st.suppressed = true;
-          st.rootCauseDevice = sup.rootCauseDevice;
+          st.rootCauseDevice = root;
           this._event(d, 'down', sev, msg, true);
         } else {
           st.suppressed = false;
           st.rootCauseDevice = null;
           this._event(d, 'down', sev, msg, false);
-          this._triggerTelegramAlert(d, st, 'down', msg, now);
+          this._queueUnsuppressedDown(d, st, msg, now);
         }
       } else if (next === 'warning') {
         const msg = `${d.name}: ${st.reasons.join('; ')}`;
@@ -528,11 +551,15 @@ class Monitor extends EventEmitter {
       } else if (next === 'up' && (prev === 'down' || prev === 'warning')) {
         const msg = `${d.name} hoạt động trở lại sau ${dur}s`;
         this._event(d, 'up', 'ok', msg, false);
-        if (!st.suppressed) {
+        if (!st.suppressed && !st.inMassOutage) {
           this._triggerTelegramAlert(d, st, 'up', msg, now);
         }
         st.suppressed = false;
+        st.inMassOutage = false;
         st.rootCauseDevice = null;
+        if (this._downBurstWindow) {
+          this._downBurstWindow = this._downBurstWindow.filter((e) => e.d.id !== d.id);
+        }
       }
     }
     st.status = next;
@@ -541,7 +568,7 @@ class Monitor extends EventEmitter {
   }
 
   _triggerTelegramAlert(d, st, kind, reason, now = Date.now()) {
-    if (st && st.suppressed) return;
+    if (st && (st.suppressed || st.inMassOutage)) return;
     if (!this.telegram || !d || !d.id || d.maintenance) return;
     if (this.severityOf(d) === 'none') return;
     if (d.telegram_enabled === 0 || d.telegram_enabled === false) return;
@@ -753,12 +780,22 @@ class Monitor extends EventEmitter {
     return true;
   }
 
-  // ---- topology dependency graph & alert storm suppression -----------
+  // ---- topology dependency graph & hybrid alert storm suppression -----------
   _getTopologyGraph(now = Date.now(), force = false) {
     if (!force && this._topoCache && (now - this._topoCache.at < 5000)) {
       return this._topoCache.parentMap;
     }
     const parentMap = new Map();
+
+    // Priority 1: Explicit parent_id on device
+    for (const [id, dev] of this.devices) {
+      if (dev.parent_id && Number.isInteger(dev.parent_id) && dev.parent_id !== id && this.devices.has(dev.parent_id)) {
+        if (!parentMap.has(id)) parentMap.set(id, new Set());
+        parentMap.get(id).add(dev.parent_id);
+      }
+    }
+
+    // Priority 2: Topology Map links for devices where parent_id is not configured
     let rows = [];
     try {
       rows = this.db.prepare('SELECT data FROM maps').all();
@@ -790,25 +827,36 @@ class Monitor extends EventEmitter {
 
         const objA = this.devices.get(devA);
         const objB = this.devices.get(devB);
-        const tierA = (objA && DEVICE_TIERS[objA.type]) || 2;
-        const tierB = (objB && DEVICE_TIERS[objB.type]) || 2;
+        if (!objA || !objB) continue;
 
-        let parentId, childId;
-        if (tierA > tierB) {
+        const weightA = getRoleWeight(objA.type);
+        const weightB = getRoleWeight(objB.type);
+
+        // Role Weight: firewall/router (1) > switch (2) > server/ap/printer/other (3)
+        // Only consider the other node as parent if its priority is higher or equal (weight <= child weight)
+        let parentId = null;
+        let childId = null;
+
+        if (weightA < weightB) {
           parentId = devA;
           childId = devB;
-        } else if (tierB > tierA) {
+        } else if (weightB < weightA) {
           parentId = devB;
           childId = devA;
         } else {
+          // Same priority: link direction from -> to defines parent -> child
           parentId = devA;
           childId = devB;
         }
 
-        if (!parentMap.has(childId)) {
-          parentMap.set(childId, new Set());
+        // Only add from topology map if child does NOT have an explicit parent_id
+        const childDev = this.devices.get(childId);
+        if (childDev && (!childDev.parent_id || !this.devices.has(childDev.parent_id))) {
+          if (!parentMap.has(childId)) {
+            parentMap.set(childId, new Set());
+          }
+          parentMap.get(childId).add(parentId);
         }
-        parentMap.get(childId).add(parentId);
       }
     }
 
@@ -842,50 +890,152 @@ class Monitor extends EventEmitter {
     return depths;
   }
 
-  isParentDown(deviceId, visited = new Set()) {
-    if (!deviceId) return { suppressed: false, rootCauseDevice: null };
+  // Lớp 1: Xác định quan hệ Cha - Con (Upstream Dependency) an toàn
+  getUpstreamParents(deviceId, visited = new Set()) {
+    if (!deviceId) return [];
+    if (visited.has(deviceId)) return [];
+    visited.add(deviceId);
+
+    const dev = this.devices.get(deviceId);
+    if (!dev) return [];
+
+    // Ưu tiên 1: Cấu hình parent_id rõ ràng
+    if (dev.parent_id && Number.isInteger(dev.parent_id) && dev.parent_id !== deviceId) {
+      if (this.devices.has(dev.parent_id)) {
+        return [dev.parent_id];
+      }
+    }
+
+    // Ưu tiên 2: Tra cứu các đường nối (links) trong bảng Topology Map
     const parentMap = this._getTopologyGraph(Date.now(), true);
-    return this._checkParentDownWithGraph(deviceId, parentMap, visited);
+    const parents = parentMap.get(deviceId);
+    return parents ? Array.from(parents) : [];
   }
 
-  _checkParentDownWithGraph(deviceId, parentMap, visited = new Set()) {
+  // Lớp 2: Logic kiểm tra isSuppressedByParent (hỗ trợ Dual-homing và Cycle detection)
+  isSuppressedByParent(deviceId, visited = new Set()) {
+    if (!deviceId) return { suppressed: false, rootCause: null, rootCauseDevice: null };
+    if (visited.has(deviceId)) return { suppressed: false, rootCause: null, rootCauseDevice: null };
     visited.add(deviceId);
-    const parents = parentMap.get(deviceId);
-    if (!parents || parents.size === 0) {
-      return { suppressed: false, rootCauseDevice: null };
+
+    const parents = this.getUpstreamParents(deviceId);
+    if (!parents || parents.length === 0) {
+      return { suppressed: false, rootCause: null, rootCauseDevice: null };
     }
 
-    // Step 1: Check if any direct parent is DOWN
-    for (const parentId of parents) {
-      if (visited.has(parentId)) continue; // cycle guard
+    // Dual-homing / Redundant parents:
+    // Chỉ trả về suppressed: true khi TẤT CẢ các node cha trực tiếp đều đang ở trạng thái Offline/Down
+    const allParentsDown = parents.every((pid) => {
+      const st = this.state.get(pid);
+      return st && st.status === 'down';
+    });
 
-      const pState = this.state.get(parentId);
-      const isDown = pState && pState.status === 'down';
+    if (!allParentsDown) {
+      return { suppressed: false, rootCause: null, rootCauseDevice: null };
+    }
 
-      if (isDown) {
-        // Find if this parent itself has an upstream root cause that is also down
-        const upstream = this._checkParentDownWithGraph(parentId, parentMap, new Set(visited));
-        const rootCause = (upstream.suppressed && upstream.rootCauseDevice)
-          ? upstream.rootCauseDevice
-          : (this.devices.get(parentId) || { id: parentId, name: `Thiết bị #${parentId}` });
-
-        return {
-          suppressed: true,
-          rootCauseDevice: rootCause,
-        };
+    // Tất cả node cha đều Down -> Truy vết tìm node cha gốc (root cause)
+    let rootCause = null;
+    for (const pid of parents) {
+      const upstream = this.isSuppressedByParent(pid, new Set(visited));
+      if (upstream.suppressed && upstream.rootCause) {
+        rootCause = upstream.rootCause;
+        break;
       }
     }
-
-    // Step 2: Check if any indirect parent is DOWN
-    for (const parentId of parents) {
-      if (visited.has(parentId)) continue;
-      const upstream = this._checkParentDownWithGraph(parentId, parentMap, new Set(visited));
-      if (upstream.suppressed) {
-        return upstream;
-      }
+    if (!rootCause) {
+      const primaryPid = parents[0];
+      rootCause = this.devices.get(primaryPid) || { id: primaryPid, name: `Thiết bị #${primaryPid}` };
     }
 
-    return { suppressed: false, rootCauseDevice: null };
+    return {
+      suppressed: true,
+      rootCause,
+      rootCauseDevice: rootCause,
+    };
+  }
+
+  isParentDown(deviceId, visited = new Set()) {
+    return this.isSuppressedByParent(deviceId, visited);
+  }
+
+  // Lớp 3: Cầu chì chống bão khi KHÔNG có Topology (Burst / Mass Outage Aggregator)
+  _queueUnsuppressedDown(d, st, msg, now) {
+    if (!this._pendingDownAlerts) this._pendingDownAlerts = [];
+    this._pendingDownAlerts.push({ d, st, msg, now });
+  }
+
+  _flushDownAlerts(now = Date.now()) {
+    if (!this._pendingDownAlerts || this._pendingDownAlerts.length === 0) return;
+    const batch = this._pendingDownAlerts;
+    this._pendingDownAlerts = [];
+
+    // Duy trì cửa sổ trượt 10 giây gom sự cố
+    if (!this._downBurstWindow) this._downBurstWindow = [];
+    this._downBurstWindow = this._downBurstWindow.filter((e) => now - e.now <= 10000);
+    this._downBurstWindow.push(...batch);
+
+    // Gom theo thiết bị riêng biệt đang bị down
+    const distinctMap = new Map();
+    for (const item of this._downBurstWindow) {
+      distinctMap.set(item.d.id, item);
+    }
+    this._downBurstWindow = Array.from(distinctMap.values());
+
+    // Phát hiện từ 3 thiết bị riêng biệt trở lên cùng chuyển sang trạng thái Down trong 10s
+    if (distinctMap.size >= 3) {
+      const distinctItems = Array.from(distinctMap.values());
+      const allDown = distinctItems.map((e) => e.d);
+      for (const e of distinctItems) {
+        if (e.st) e.st.inMassOutage = true;
+      }
+      this._triggerMassOutageTelegram(allDown, now);
+      this._triggerMassOutageAi(allDown, batch[0]?.d, now);
+    } else {
+      // Dưới 3 thiết bị -> Bắn cảnh báo lẻ tẻ bình thường
+      for (const item of batch) {
+        if (!item.st.suppressed && !item.st.inMassOutage) {
+          this._triggerTelegramAlert(item.d, item.st, 'down', item.msg, item.now);
+        }
+      }
+    }
+  }
+
+  _triggerMassOutageTelegram(devices, now = Date.now()) {
+    if (!this.telegram) return;
+    const tg = this.settings && this.settings.telegram;
+    if (!tg || !tg.enabled || !tg.bot_token || !tg.chat_id) return;
+    const alertable = devices.filter((d) => d && d.telegram_enabled !== 0 && d.telegram_enabled !== false && this.severityOf(d) !== 'none');
+    if (alertable.length === 0) return;
+    if (this._lastMassOutageTg && now - this._lastMassOutageTg < 30000) return;
+    this._lastMassOutageTg = now;
+
+    this.telegram.notifyMassOutage({
+      devices,
+      now,
+      lang: (this.settings && this.settings.default_lang) || 'vi',
+    }, this.settings).catch(() => {});
+  }
+
+  _triggerMassOutageAi(devices, sampleDev, now = Date.now()) {
+    if (!this.settings.ai || !this.settings.ai.enabled || this.settings.ai.auto_incident === false) return;
+    if (this._lastMassOutageAi && now - this._lastMassOutageAi < 60000) return;
+    this._lastMassOutageAi = now;
+
+    const dev = sampleDev || devices[0];
+    const devNames = devices.map((d) => d.name).join(', ');
+    const ctx = {
+      device_id: dev ? dev.id : 0,
+      device_name: `${devices.length} thiết bị sập đồng thời`,
+      device_type: dev ? dev.type : 'infrastructure',
+      device_severity: 'critical',
+      address: dev ? dev.address : '',
+      severity: 'critical',
+      status: 'down',
+      kind: 'mass_outage',
+      reason: `Sập mạng diện rộng / Mass Outage đồng thời ${devices.length} thiết bị: ${devNames}`,
+    };
+    this.ai.analyzeIncident(ctx, this.settings, { now, force: false }).catch(() => {});
   }
 
   // ---- views ----------------------------------------------------------
@@ -897,12 +1047,14 @@ class Monitor extends EventEmitter {
     const net = this._net(st, Date.now(), !stale && a != null);
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
+      parent_id: d.parent_id || null,
       maintenance: !!d.maintenance, mute_local_alerts: !!d.mute_local_alerts,
       telegram_enabled: d.telegram_enabled !== 0,
       severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,
       suppressed: !!st.suppressed,
       root_cause_device: st.rootCauseDevice ? { id: st.rootCauseDevice.id, name: st.rootCauseDevice.name } : null,
+      in_mass_outage: !!st.inMassOutage,
       rtt: st.icmp.rtt,
       net_in: net ? Math.round(net.in) : null,
       net_out: net ? Math.round(net.out) : null,

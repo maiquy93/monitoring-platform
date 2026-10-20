@@ -112,6 +112,15 @@ function cleanDevice(b, partial = false) {
   for (const k of ['location', 'notes']) {
     if (!partial || has(k)) out[k] = String(b[k] || '').slice(0, 500);
   }
+  if (!partial || has('parent_id')) {
+    let pid = b.parent_id;
+    if (pid === undefined || pid === '' || pid === null || pid === 0 || pid === '0') pid = null;
+    else {
+      pid = Number(pid);
+      if (!Number.isInteger(pid) || pid <= 0) throw bad('Thiết bị Uplink/Cha không hợp lệ');
+    }
+    out.parent_id = pid;
+  }
   if ((out.check_icmp || out.snmp_enabled) && out.address === '') throw bad('Cần địa chỉ IP để ping/SNMP');
   return out;
 }
@@ -235,9 +244,9 @@ function createApp(db, monitor, opts = {}) {
     const token = crypto.randomBytes(24).toString('hex');
     const r = db.prepare(
       `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,snmp_profile,severity,
-        location,notes,maintenance,mute_local_alerts,telegram_enabled,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        location,notes,maintenance,mute_local_alerts,telegram_enabled,parent_id,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, token, Date.now());
+        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, token, Date.now());
     return { id: Number(r.lastInsertRowid), token };
   };
 
@@ -267,11 +276,12 @@ function createApp(db, monitor, opts = {}) {
     if (!cur) throw new HttpError(404, 'Không tìm thấy thiết bị');
     const b = await readBody(ctx.req);
     const d = cleanDevice({ ...cur, ...b });
+    if (d.parent_id === id) throw bad('Thiết bị không thể tự làm cha chính nó');
     db.prepare(
       `UPDATE devices SET name=?,type=?,address=?,check_icmp=?,check_agent=?,snmp_enabled=?,snmp_community=?,
-        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,mute_local_alerts=?,telegram_enabled=? WHERE id=?`)
+        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,mute_local_alerts=?,telegram_enabled=?,parent_id=? WHERE id=?`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, id);
+        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
     monitor.evaluate();

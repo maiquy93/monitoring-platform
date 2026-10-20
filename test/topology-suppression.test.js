@@ -4,12 +4,12 @@ const assert = require('node:assert/strict');
 const { open, setSetting } = require('../server/db');
 const { Monitor } = require('../server/monitor');
 
-function insertDevice(db, { id, name, type = 'server', address = '10.0.0.1', check_icmp = 1, severity = 'high', telegram_enabled = 1 }) {
+function insertDevice(db, { id, name, type = 'server', address = '10.0.0.1', check_icmp = 1, severity = 'high', telegram_enabled = 1, parent_id = null }) {
   const now = Date.now();
   db.prepare(`
-    INSERT INTO devices(id, name, type, address, check_icmp, severity, telegram_enabled, agent_token, created_at)
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, name, type, address, check_icmp, severity, telegram_enabled, `tok-${id}`, now);
+    INSERT INTO devices(id, name, type, address, check_icmp, severity, telegram_enabled, parent_id, agent_token, created_at)
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, name, type, address, check_icmp, severity, telegram_enabled, parent_id, `tok-${id}`, now);
 }
 
 function createTestMonitor(db, monitorOpts = {}) {
@@ -20,14 +20,17 @@ function createTestMonitor(db, monitorOpts = {}) {
   const monitor = new Monitor(db, {
     pingFn: async (addr) => (alive.has(addr) ? { ok: true, rtt: 2.1 } : { ok: false }),
     telegramFetchFn: async (url, opts) => {
-      telegramCalls.push({ url, opts });
+      telegramCalls.push({ url, opts, body: JSON.parse(opts.body || '{}') });
       return { ok: true, status: 200, json: async () => ({ ok: true, result: {} }) };
     },
     aiFetchFn: async (url, opts) => {
-      aiCalls.push({ url, opts });
+      aiCalls.push({ url, opts, body: JSON.parse(opts.body || '{}') });
       return {
         ok: true,
         status: 200,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: '{"summary":"AI root cause diagnosis","suggested_action":"Check power"}' }] } }],
+        }),
         text: async () => JSON.stringify({
           candidates: [{ content: { parts: [{ text: '{"summary":"AI root cause diagnosis","suggested_action":"Check power"}' }] } }],
         }),
@@ -39,151 +42,149 @@ function createTestMonitor(db, monitorOpts = {}) {
   return { monitor, alive, telegramCalls, aiCalls };
 }
 
-test('topology suppression: standalone device not in map alerts normally', () => {
+test('Layer 1: explicit parent_id configuration has Priority 1 over topology map', () => {
   const db = open(':memory:');
-  insertDevice(db, { id: 1, name: 'Standalone Server', type: 'server', address: '10.0.0.10', severity: 'high' });
+  insertDevice(db, { id: 1, name: 'Core Gateway', type: 'router', address: '10.0.0.1' });
+  insertDevice(db, { id: 2, name: 'Distribution Switch', type: 'switch', address: '10.0.0.2', parent_id: 1 });
+  insertDevice(db, { id: 3, name: 'Backup Gateway', type: 'router', address: '10.0.0.3' });
 
-  const { monitor } = createTestMonitor(db);
-  const result = monitor.isParentDown(1);
-  assert.equal(result.suppressed, false);
-  assert.equal(result.rootCauseDevice, null);
-});
-
-test('topology suppression: hierarchy traversal identifies upstream root cause', () => {
-  const db = open(':memory:');
-  insertDevice(db, { id: 1, name: 'Core Switch', type: 'switch', address: '10.0.0.1', severity: 'critical' });
-  insertDevice(db, { id: 2, name: 'Access Switch', type: 'switch', address: '10.0.0.2', severity: 'high' });
-  insertDevice(db, { id: 3, name: 'App Server', type: 'server', address: '10.0.0.3', severity: 'high' });
-
-  // Topology: Core Switch (node 1) -> Access Switch (node 2) -> App Server (node 3)
+  // In Topology map, user drew link from Backup Gateway (3) to Distribution Switch (2)
   const mapData = {
     nodes: [
-      { id: 'n1', kind: 'device', ref: 1, label: 'Core Switch' },
-      { id: 'n2', kind: 'device', ref: 2, label: 'Access Switch' },
-      { id: 'n3', kind: 'device', ref: 3, label: 'App Server' },
+      { id: 'n2', kind: 'device', ref: 2, label: 'Distribution Switch' },
+      { id: 'n3', kind: 'device', ref: 3, label: 'Backup Gateway' },
     ],
-    links: [
-      { from: 'n1', to: 'n2' },
-      { from: 'n2', to: 'n3' },
-    ],
+    links: [{ from: 'n3', to: 'n2' }],
   };
-  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Main DC Topology', JSON.stringify(mapData));
+  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Test Map', JSON.stringify(mapData));
 
   const { monitor } = createTestMonitor(db);
 
-  // Scenario 1: Everything is UP
-  monitor.state.get(1).status = 'up';
-  monitor.state.get(2).status = 'up';
-  monitor.state.get(3).status = 'up';
-  assert.equal(monitor.isParentDown(3).suppressed, false);
-  assert.equal(monitor.isParentDown(2).suppressed, false);
-  assert.equal(monitor.isParentDown(1).suppressed, false);
+  // Switch (2) has explicit parent_id = 1 => getUpstreamParents MUST return [1], ignoring Map link
+  const parents = monitor.getUpstreamParents(2);
+  assert.deepEqual(parents, [1]);
 
-  // Scenario 2: Core Switch goes DOWN, Access Switch goes DOWN, Server goes DOWN
+  // When Core Gateway (1) is DOWN, Switch (2) MUST be suppressed with root cause Core Gateway
   monitor.state.get(1).status = 'down';
   monitor.state.get(2).status = 'down';
-  monitor.state.get(3).status = 'down';
-
-  // Core Switch has no upstream down parent -> NOT suppressed (it is the root cause)
-  const sup1 = monitor.isParentDown(1);
-  assert.equal(sup1.suppressed, false);
-  assert.equal(sup1.rootCauseDevice, null);
-
-  // Access Switch parent is Core Switch (down) -> Suppressed, root cause is Core Switch
-  const sup2 = monitor.isParentDown(2);
-  assert.equal(sup2.suppressed, true);
-  assert.equal(sup2.rootCauseDevice.id, 1);
-  assert.equal(sup2.rootCauseDevice.name, 'Core Switch');
-
-  // App Server parent is Access Switch (down), which traces up to Core Switch (down) -> Root cause is Core Switch
-  const sup3 = monitor.isParentDown(3);
-  assert.equal(sup3.suppressed, true);
-  assert.equal(sup3.rootCauseDevice.id, 1);
-  assert.equal(sup3.rootCauseDevice.name, 'Core Switch');
-
-  // Scenario 3: Core Switch is UP, but Access Switch is DOWN
-  monitor.state.get(1).status = 'up';
-  monitor.state.get(2).status = 'down';
-  monitor.state.get(3).status = 'down';
-
-  // Access Switch is NOT suppressed because Core Switch is UP
-  const sup2b = monitor.isParentDown(2);
-  assert.equal(sup2b.suppressed, false);
-
-  // App Server IS suppressed with root cause Access Switch
-  const sup3b = monitor.isParentDown(3);
-  assert.equal(sup3b.suppressed, true);
-  assert.equal(sup3b.rootCauseDevice.id, 2);
-  assert.equal(sup3b.rootCauseDevice.name, 'Access Switch');
+  const sup = monitor.isSuppressedByParent(2);
+  assert.equal(sup.suppressed, true);
+  assert.equal(sup.rootCause.id, 1);
+  assert.equal(sup.rootCause.name, 'Core Gateway');
 });
 
-test('topology suppression: cycle detection prevents infinite loops', () => {
+test('Layer 1 & 2: Topology Role Weight priority and reverse-drawn links', () => {
   const db = open(':memory:');
-  insertDevice(db, { id: 10, name: 'Switch A', type: 'switch', address: '10.1.1.1', severity: 'high' });
-  insertDevice(db, { id: 11, name: 'Switch B', type: 'switch', address: '10.1.1.2', severity: 'high' });
-  insertDevice(db, { id: 12, name: 'Switch C', type: 'switch', address: '10.1.1.3', severity: 'high' });
+  insertDevice(db, { id: 10, name: 'Edge Firewall', type: 'firewall', address: '10.1.0.1' });
+  insertDevice(db, { id: 11, name: 'Access Switch', type: 'switch', address: '10.1.0.2' });
+  insertDevice(db, { id: 12, name: 'Web Server', type: 'server', address: '10.1.0.3' });
 
-  // Circular link: A -> B -> C -> A
+  // Map with reverse-drawn links: Server -> Switch -> Firewall
   const mapData = {
     nodes: [
-      { id: 'na', kind: 'device', ref: 10, label: 'Switch A' },
-      { id: 'nb', kind: 'device', ref: 11, label: 'Switch B' },
-      { id: 'nc', kind: 'device', ref: 12, label: 'Switch C' },
+      { id: 'n10', kind: 'device', ref: 10, label: 'Edge Firewall' },
+      { id: 'n11', kind: 'device', ref: 11, label: 'Access Switch' },
+      { id: 'n12', kind: 'device', ref: 12, label: 'Web Server' },
     ],
     links: [
-      { from: 'na', to: 'nb' },
-      { from: 'nb', to: 'nc' },
-      { from: 'nc', to: 'na' },
+      { from: 'n12', to: 'n11' }, // drawn reverse (Server -> Switch)
+      { from: 'n11', to: 'n10' }, // drawn reverse (Switch -> Firewall)
     ],
   };
-  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Ring Topology', JSON.stringify(mapData));
+  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Reverse Map', JSON.stringify(mapData));
 
   const { monitor } = createTestMonitor(db);
+
+  // Role Weight: Firewall (weight 1) > Switch (weight 2) > Server (weight 3)
+  assert.deepEqual(monitor.getUpstreamParents(11), [10]);
+  assert.deepEqual(monitor.getUpstreamParents(12), [11]);
+  assert.deepEqual(monitor.getUpstreamParents(10), []);
+
   monitor.state.get(10).status = 'down';
   monitor.state.get(11).status = 'down';
   monitor.state.get(12).status = 'down';
 
-  // Must not throw or hang in infinite loop
-  const sup = monitor.isParentDown(11);
-  assert.equal(sup.suppressed, true);
-  assert.ok(sup.rootCauseDevice);
+  // Both Switch and Server must trace root cause to Edge Firewall
+  assert.equal(monitor.isSuppressedByParent(11).rootCause.id, 10);
+  assert.equal(monitor.isSuppressedByParent(12).rootCause.id, 10);
+  assert.equal(monitor.isSuppressedByParent(10).suppressed, false);
 });
 
-test('topology suppression: device tier rank overrides reverse-drawn links', () => {
+test('Layer 2: Dual-Homing redundant upstreams (suppress ONLY when ALL parents are down)', () => {
   const db = open(':memory:');
-  insertDevice(db, { id: 20, name: 'Firewall Edge', type: 'firewall', address: '10.2.0.1', severity: 'critical' });
-  insertDevice(db, { id: 21, name: 'Database Server', type: 'server', address: '10.2.0.2', severity: 'high' });
+  insertDevice(db, { id: 20, name: 'Switch 1', type: 'switch', address: '10.2.0.1' });
+  insertDevice(db, { id: 21, name: 'Switch 2', type: 'switch', address: '10.2.0.2' });
+  insertDevice(db, { id: 22, name: 'Dual-Homed Server', type: 'server', address: '10.2.0.3' });
 
-  // User accidentally drew link from Server to Firewall
+  // Dual-homed links: Switch 1 -> Server and Switch 2 -> Server
   const mapData = {
     nodes: [
-      { id: 'n_fw', kind: 'device', ref: 20, label: 'Firewall' },
-      { id: 'n_srv', kind: 'device', ref: 21, label: 'DB Server' },
+      { id: 's1', kind: 'device', ref: 20, label: 'Switch 1' },
+      { id: 's2', kind: 'device', ref: 21, label: 'Switch 2' },
+      { id: 'srv', kind: 'device', ref: 22, label: 'Dual-Homed Server' },
     ],
     links: [
-      { from: 'n_srv', to: 'n_fw' }, // drawn reverse!
+      { from: 's1', to: 'srv' },
+      { from: 's2', to: 'srv' },
     ],
   };
-  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Edge Topology', JSON.stringify(mapData));
+  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Redundant Map', JSON.stringify(mapData));
 
   const { monitor } = createTestMonitor(db);
+  const parents = monitor.getUpstreamParents(22);
+  assert.equal(parents.length, 2);
+  assert.ok(parents.includes(20) && parents.includes(21));
+
+  // Case A: Only Switch 1 is DOWN, but Switch 2 is UP
+  // Dual-homing rule: Since not ALL parents are down, Server is NOT suppressed!
   monitor.state.get(20).status = 'down';
+  monitor.state.get(21).status = 'up';
+  monitor.state.get(22).status = 'down';
+
+  const supA = monitor.isSuppressedByParent(22);
+  assert.equal(supA.suppressed, false, 'Server must not be suppressed when one redundant uplink is still UP');
+
+  // Case B: BOTH Switch 1 AND Switch 2 are DOWN
+  // Dual-homing rule: ALL parents are down -> Server IS suppressed!
   monitor.state.get(21).status = 'down';
-
-  // Firewall is tier 4, Server is tier 2 => Firewall is recognized as parent!
-  const supServer = monitor.isParentDown(21);
-  assert.equal(supServer.suppressed, true);
-  assert.equal(supServer.rootCauseDevice.id, 20);
-  assert.equal(supServer.rootCauseDevice.name, 'Firewall Edge');
-
-  // Firewall itself has no parent
-  const supFw = monitor.isParentDown(20);
-  assert.equal(supFw.suppressed, false);
+  const supB = monitor.isSuppressedByParent(22);
+  assert.equal(supB.suppressed, true);
+  assert.ok(supB.rootCause);
 });
 
-test('topology suppression: alert storm suppression stops child Telegram alerts and AI analysis', async () => {
+test('Layer 2: Cycle detection handles ring topology without infinite loop', () => {
   const db = open(':memory:');
-  // Configure Telegram
+  insertDevice(db, { id: 30, name: 'Ring A', type: 'switch', address: '10.3.0.1' });
+  insertDevice(db, { id: 31, name: 'Ring B', type: 'switch', address: '10.3.0.2' });
+  insertDevice(db, { id: 32, name: 'Ring C', type: 'switch', address: '10.3.0.3' });
+
+  // Ring: A -> B -> C -> A
+  const mapData = {
+    nodes: [
+      { id: 'ra', kind: 'device', ref: 30, label: 'Ring A' },
+      { id: 'rb', kind: 'device', ref: 31, label: 'Ring B' },
+      { id: 'rc', kind: 'device', ref: 32, label: 'Ring C' },
+    ],
+    links: [
+      { from: 'ra', to: 'rb' },
+      { from: 'rb', to: 'rc' },
+      { from: 'rc', to: 'ra' },
+    ],
+  };
+  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Ring Map', JSON.stringify(mapData));
+
+  const { monitor } = createTestMonitor(db);
+  monitor.state.get(30).status = 'down';
+  monitor.state.get(31).status = 'down';
+  monitor.state.get(32).status = 'down';
+
+  const sup = monitor.isSuppressedByParent(31);
+  assert.equal(sup.suppressed, true);
+  assert.ok(sup.rootCause);
+});
+
+test('Layer 3: Burst / Mass Outage Aggregator when NO topology is configured', async () => {
+  const db = open(':memory:');
   setSetting(db, 'telegram', {
     enabled: true,
     bot_token: 'test-token-123',
@@ -192,124 +193,106 @@ test('topology suppression: alert storm suppression stops child Telegram alerts 
     notify_recovered: true,
   });
   setSetting(db, 'default_lang', 'vi');
+  setSetting(db, 'ai', {
+    enabled: true,
+    provider: 'gemini',
+    api_key: 'test-gemini-key',
+    auto_incident: true,
+  });
 
-  insertDevice(db, { id: 100, name: 'Gateway Router', type: 'router', address: '192.168.1.1', severity: 'critical', telegram_enabled: 1 });
-  insertDevice(db, { id: 101, name: 'Switch Floor 1', type: 'switch', address: '192.168.1.2', severity: 'high', telegram_enabled: 1 });
-  insertDevice(db, { id: 102, name: 'Camera 01', type: 'camera', address: '192.168.1.3', severity: 'medium', telegram_enabled: 1 });
+  // 4 Standalone devices with NO topology and NO parent_id
+  insertDevice(db, { id: 101, name: 'Standalone VM 1', type: 'server', address: '192.168.10.1', severity: 'high' });
+  insertDevice(db, { id: 102, name: 'Standalone VM 2', type: 'server', address: '192.168.10.2', severity: 'high' });
+  insertDevice(db, { id: 103, name: 'Standalone VM 3', type: 'server', address: '192.168.10.3', severity: 'high' });
+  insertDevice(db, { id: 104, name: 'Standalone VM 4', type: 'server', address: '192.168.10.4', severity: 'high' });
 
-  const mapData = {
-    nodes: [
-      { id: 'n_gw', kind: 'device', ref: 100, label: 'Gateway' },
-      { id: 'n_sw', kind: 'device', ref: 101, label: 'Switch' },
-      { id: 'n_cam', kind: 'device', ref: 102, label: 'Camera' },
-    ],
-    links: [
-      { from: 'n_gw', to: 'n_sw' },
-      { from: 'n_sw', to: 'n_cam' },
-    ],
-  };
-  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('Branch Map', JSON.stringify(mapData));
-
-  const { monitor, telegramCalls } = createTestMonitor(db);
+  const { monitor, telegramCalls, aiCalls } = createTestMonitor(db);
   monitor.reload();
 
   const now = Date.now();
 
-  // 1. Gateway Router goes DOWN (root cause)
-  const stGw = monitor.state.get(100);
-  stGw.icmp.ok = false;
-  stGw.reasons = ['Không ping được (ICMP)'];
-  monitor._transition(monitor.devices.get(100), stGw, 'down', now);
+  // Scenario A: 1 single device fails -> Normal individual alert
+  const st1 = monitor.state.get(101);
+  st1.icmp.ok = false;
+  st1.reasons = ['Không ping được (ICMP)'];
+  monitor._transition(monitor.devices.get(101), st1, 'down', now);
+  monitor._flushDownAlerts(now);
 
-  // Gateway Router MUST NOT be suppressed
-  assert.equal(stGw.suppressed, false);
-  // Gateway Router MUST trigger Telegram alert
-  assert.equal(telegramCalls.length, 1);
+  assert.equal(telegramCalls.length, 1, 'Single failure must trigger 1 individual Telegram alert');
+  assert.ok(telegramCalls[0].body.text.includes('Standalone VM 1'));
 
-  // 2. Switch Floor 1 goes DOWN (child of Gateway)
-  const stSw = monitor.state.get(101);
-  stSw.icmp.ok = false;
-  stSw.reasons = ['Không ping được (ICMP)'];
-  monitor._transition(monitor.devices.get(101), stSw, 'down', now + 1000);
+  // Clear calls for Scenario B
+  telegramCalls.length = 0;
+  aiCalls.length = 0;
 
-  // Switch Floor 1 MUST be suppressed
-  assert.equal(stSw.suppressed, true);
-  assert.equal(stSw.rootCauseDevice.id, 100);
-  // Telegram calls count MUST STILL BE 1 (child alert suppressed!)
-  assert.equal(telegramCalls.length, 1);
+  // Scenario B: Mass Outage - 3 devices fail simultaneously within 10s window without topology
+  const st2 = monitor.state.get(102);
+  const st3 = monitor.state.get(103);
+  const st4 = monitor.state.get(104);
+  st2.icmp.ok = false; st2.reasons = ['Không ping được (ICMP)'];
+  st3.icmp.ok = false; st3.reasons = ['Không ping được (ICMP)'];
+  st4.icmp.ok = false; st4.reasons = ['Không ping được (ICMP)'];
 
-  // 3. Camera 01 goes DOWN (grandchild of Gateway)
-  const stCam = monitor.state.get(102);
-  stCam.icmp.ok = false;
-  stCam.reasons = ['Không ping được (ICMP)'];
-  monitor._transition(monitor.devices.get(102), stCam, 'down', now + 2000);
+  monitor._transition(monitor.devices.get(102), st2, 'down', now + 1000);
+  monitor._transition(monitor.devices.get(103), st3, 'down', now + 1000);
+  monitor._transition(monitor.devices.get(104), st4, 'down', now + 1000);
+  monitor._flushDownAlerts(now + 1000);
+  await new Promise((r) => setTimeout(r, 50));
 
-  // Camera 01 MUST be suppressed
-  assert.equal(stCam.suppressed, true);
-  assert.equal(stCam.rootCauseDevice.id, 100);
-  // Telegram calls count MUST STILL BE 1!
-  assert.equal(telegramCalls.length, 1);
+  // Layer 3 Cầu chì chống bão: MUST aggregate into EXACTLY 1 Mass Outage Telegram alert!
+  assert.equal(telegramCalls.length, 1, 'Burst of 3+ devices must send exactly 1 aggregated Telegram notification');
+  assert.ok(telegramCalls[0].body.text.includes('MASS OUTAGE') || telegramCalls[0].body.text.includes('SẬP MẠNG HÀNG LOẠT'));
+  assert.ok(telegramCalls[0].body.text.includes('Standalone VM 2'));
+  assert.ok(telegramCalls[0].body.text.includes('Standalone VM 3'));
+  assert.ok(telegramCalls[0].body.text.includes('Standalone VM 4'));
 
-  // Check event messages in database
-  const events = db.prepare('SELECT device_id, kind, message FROM events ORDER BY id ASC').all();
-  assert.equal(events.length, 3);
+  // AI analysis: MUST be called at most 1 time for the mass outage cluster!
+  assert.equal(aiCalls.length, 1, 'Burst of 3+ devices must trigger AI at most 1 time');
+  const aiBodyStr = JSON.stringify(aiCalls[0].body);
+  assert.ok(aiBodyStr.includes('Mass Outage') || aiBodyStr.includes('sập đồng thời'));
 
-  // Gateway event has normal message
-  assert.ok(events[0].message.includes('Gateway Router mất kết nối: Không ping được (ICMP)'));
-  assert.ok(!events[0].message.includes('[Suppressed'));
+  // Check event logs: each device still has its event logged in the database for auditing
+  const events = db.prepare("SELECT device_id, kind FROM events WHERE kind = 'down'").all();
+  assert.equal(events.length, 4);
 
-  // Switch event has suppressed note with root cause Gateway Router
-  assert.ok(events[1].message.includes('[Suppressed - Do sập nguồn từ: Gateway Router]'));
-
-  // Camera event has suppressed note with root cause Gateway Router
-  assert.ok(events[2].message.includes('[Suppressed - Do sập nguồn từ: Gateway Router]'));
-
-  // 4. Test recovery: suppressed devices do NOT spam Telegram recovery alerts
-  monitor._transition(monitor.devices.get(101), stSw, 'up', now + 5000);
-  assert.equal(telegramCalls.length, 1); // No recovery alert for child!
-  assert.equal(stSw.suppressed, false);
-
-  // Root device recovers -> sends recovery alert
-  monitor._transition(monitor.devices.get(100), stGw, 'up', now + 6000);
-  assert.equal(telegramCalls.length, 2); // Recovery alert sent for root device!
+  // Test recovery: devices in mass outage do NOT flood individual Telegram recovery alerts
+  telegramCalls.length = 0;
+  monitor._transition(monitor.devices.get(102), st2, 'up', now + 5000);
+  monitor._transition(monitor.devices.get(103), st3, 'up', now + 5000);
+  assert.equal(telegramCalls.length, 0, 'Devices recovered from mass outage must not spam individual recovery alerts');
 });
 
-test('topology suppression: bilingual support in backend message and frontend trData', () => {
+test('Bilingual compatibility: Suppressed tag formats in VI and EN', () => {
   const db = open(':memory:');
-  setSetting(db, 'default_lang', 'en');
-  insertDevice(db, { id: 200, name: 'Core Router', type: 'router', address: '10.5.0.1', severity: 'high' });
-  insertDevice(db, { id: 201, name: 'Web Server', type: 'server', address: '10.5.0.2', severity: 'high' });
-
-  const mapData = {
-    nodes: [
-      { id: 'nr', kind: 'device', ref: 200, label: 'Router' },
-      { id: 'ns', kind: 'device', ref: 201, label: 'Server' },
-    ],
-    links: [{ from: 'nr', to: 'ns' }],
-  };
-  db.prepare('INSERT INTO maps(name, data) VALUES(?, ?)').run('EN Map', JSON.stringify(mapData));
+  setSetting(db, 'default_lang', 'vi');
+  insertDevice(db, { id: 201, name: 'Core Router', type: 'router', address: '10.9.0.1' });
+  insertDevice(db, { id: 202, name: 'Branch AP', type: 'ap', address: '10.9.0.2', parent_id: 201 });
 
   const { monitor } = createTestMonitor(db);
   monitor.reload();
 
-  // Root router goes down
-  const stR = monitor.state.get(200);
-  stR.icmp.ok = false;
-  stR.reasons = ['ICMP timeout'];
-  monitor._transition(monitor.devices.get(200), stR, 'down', Date.now());
+  monitor.state.get(201).status = 'down';
+  const stAp = monitor.state.get(202);
+  stAp.icmp.ok = false;
+  stAp.reasons = ['Không ping được (ICMP)'];
+  monitor._transition(monitor.devices.get(202), stAp, 'down', Date.now());
 
-  // Child server goes down with english default_lang
-  const stS = monitor.state.get(201);
-  stS.icmp.ok = false;
-  stS.reasons = ['ICMP timeout'];
-  monitor._transition(monitor.devices.get(201), stS, 'down', Date.now());
+  const evVi = db.prepare('SELECT * FROM events WHERE device_id = 202').get();
+  assert.ok(evVi.message.includes('[Suppressed - Mất kết nối từ: Core Router]'));
 
-  const ev = db.prepare('SELECT * FROM events WHERE device_id = 201').get();
-  assert.ok(ev);
-  assert.ok(ev.message.includes('[Suppressed - Upstream failure from: Core Router]'));
+  // Test EN language
+  setSetting(db, 'default_lang', 'en');
+  monitor.reload();
+  monitor.state.get(201).status = 'down';
+  monitor.state.get(202).status = 'unknown'; // reset to trigger transition
+  monitor._transition(monitor.devices.get(202), stAp, 'down', Date.now() + 1000);
 
-  // Test frontend trData regex replacement
+  const evEn = db.prepare('SELECT * FROM events WHERE device_id = 202 ORDER BY id DESC').get();
+  assert.ok(evEn.message.includes('[Suppressed - Upstream failure from: Core Router]'));
+
+  // Test frontend trData regex
   const fs = require('node:fs');
   const coreJs = fs.readFileSync(require('node:path').join(__dirname, '../public/core.js'), 'utf8');
-  assert.ok(coreJs.includes('Suppressed - Upstream failure from:'));
+  assert.ok(coreJs.includes('Mất kết nối từ'));
+  assert.ok(coreJs.includes('Upstream failure from:'));
 });

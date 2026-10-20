@@ -317,6 +317,49 @@ class TelegramService {
     const result = await this.sendRawMessage({ bot_token: token, chat_id: chatId, text });
     return { sent: true, text, telegram: result };
   }
+
+  async notifyMassOutage({ devices = [], now = Date.now(), lang = 'vi' }, settings = {}) {
+    this._syncDay(now);
+    const tg = (settings && settings.telegram) || {};
+    const token = String(tg.bot_token || '').trim();
+    const chatId = String(tg.chat_id || '').trim();
+    if (!tg.enabled || !token || !chatId) {
+      return { sent: false, reason: 'disabled_or_unconfigured' };
+    }
+    const isVi = lang !== 'en';
+    const appUrl = String(tg.app_url || '').trim() || 'http://localhost:8080';
+    const timeStr = formatTelegramTime(now, lang);
+    const count = devices.length;
+
+    const devLines = devices.slice(0, 15).map((d) => {
+      const name = escapeHtml(d.name || d.device_name || `ID #${d.id}`);
+      const ip = escapeHtml(d.address || 'N/A');
+      const type = escapeHtml(d.type || d.device_type || 'device');
+      return `  • <b>${name}</b> (<code>${ip}</code>, ${type})`;
+    }).join('\n');
+    const extra = count > 15 ? (isVi ? `\n  <i>...và ${count - 15} thiết bị khác</i>` : `\n  <i>...and ${count - 15} more devices</i>`) : '';
+
+    const text = isVi
+      ? `🚨 <b>BÁO ĐỘNG SẬP MẠNG HÀNG LOẠT (MASS OUTAGE)</b>\n\n` +
+        `⚠️ <b>Cầu chì chống bão:</b> Phát hiện <b>${count}</b> thiết bị mất kết nối đồng thời!\n` +
+        `🕒 <b>Thời gian:</b> <code>${timeStr}</code>\n\n` +
+        `📋 <b>Danh sách thiết bị sập nguồn/mất mạng:</b>\n${devLines}${extra}\n\n` +
+        `🛡️ <i>Hệ thống tự động gom cảnh báo và triệt tiêu bão thông báo (Zero-spam alert suppression).</i>\n` +
+        `🔗 <a href="${escapeHtml(appUrl)}/#/events">Xem chi tiết trên NMS Dashboard</a>`
+      : `🚨 <b>MASS NETWORK OUTAGE ALERT</b>\n\n` +
+        `⚠️ <b>Burst Aggregator:</b> <b>${count}</b> devices went offline simultaneously!\n` +
+        `🕒 <b>Timestamp:</b> <code>${timeStr}</code>\n\n` +
+        `📋 <b>Affected Devices:</b>\n${devLines}${extra}\n\n` +
+        `🛡️ <i>Aggregated into a single alert to prevent alert flooding (Zero-spam suppression).</i>\n` +
+        `🔗 <a href="${escapeHtml(appUrl)}/#/events">View on NMS Dashboard</a>`;
+
+    try {
+      const result = await this.sendRawMessage({ bot_token: token, chat_id: chatId, text });
+      return { sent: true, count, telegram: result };
+    } catch (err) {
+      return { sent: false, error: err.message };
+    }
+  }
 }
 
 module.exports = {

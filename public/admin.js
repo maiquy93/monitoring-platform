@@ -59,13 +59,18 @@
 
   // ---------- device editor ----------
   M.editDevice = async (id) => {
-    const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, mute_local_alerts: false, telegram_enabled: true, groups: [] };
+    const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, mute_local_alerts: false, telegram_enabled: true, parent_id: null, groups: [] };
     if (!M.S.groups.length) await M.loadGroups();
     if (!M.profiles) M.profiles = await M.api('GET', '/api/snmp/profiles').then((r) => r.profiles).catch(() => []);
     const def = M.S.settings.type_severity;
     const tgConfigured = M.isTelegramConfigured();
     const tgChecked = d.telegram_enabled !== false && tgConfigured;
     const isEn = M.S.lang === 'en';
+    const allDevs = (M.S.snap && M.S.snap.devices ? M.S.snap.devices : []);
+    const parentOpts = allDevs
+      .filter((x) => !id || x.id !== Number(id))
+      .map((x) => `<option value="${x.id}" ${d.parent_id === x.id ? 'selected' : ''}>${esc(x.name)} (${esc(t(x.type))})</option>`)
+      .join('');
     const { form } = M.modal(id ? (isEn ? `Edit device: ${d.name}` : `Sửa thiết bị: ${d.name}`) : t('Thêm thiết bị'), `
       <div class="field-grid">
         <div class="field"><label>${t('Tên thiết bị *')}</label><input class="inp" name="name" maxlength="100" required value="${esc(d.name)}"></div>
@@ -74,6 +79,7 @@
         <div class="field"><label>${t('Mức cảnh báo khi mất kết nối')}</label><select class="sel inp" name="severity" id="f-sev">${sevOptions(d.severity_override, byTypeLabel(def[d.type]))}</select></div>
         <div class="field"><label>${t('Vị trí')}</label><input class="inp" name="location" maxlength="200" value="${esc(d.location)}"></div>
         <div class="field"><label>${t('Ghi chú')}</label><input class="inp" name="notes" maxlength="500" value="${esc(d.notes)}"></div>
+        <div class="field full" style="grid-column:1 / -1"><label>${t('Thiết bị Uplink / Cha')}</label><select class="sel inp" style="width:100%" name="parent_id"><option value="">${t('(Không có / Tự động nhận diện)')}</option>${parentOpts}</select></div>
       </div>
       <div class="row">${chk('check_icmp', t('Kiểm tra ICMP ping'), d.check_icmp)}${chk('check_agent', t('Có cài Agent'), d.check_agent)}${chk('snmp_enabled', t('Giám sát SNMP'), d.snmp_enabled)}</div>
       <div class="field-grid" id="snmp-box" style="margin-top:4px">
@@ -93,6 +99,12 @@
       const body = {
         name: fd.get('name'), type: fd.get('type'), address: fd.get('address'), severity: fd.get('severity') || null,
         location: fd.get('location'), notes: fd.get('notes'), snmp_community: fd.get('snmp_community'), snmp_port: Number(fd.get('snmp_port')), snmp_profile: fd.get('snmp_profile') || '',
+        parent_id: fd.get('parent_id') ? Number(fd.get('parent_id')) : null,
+        check_icmp: f.check_icmp.checked, check_agent: f.check_agent.checked, snmp_enabled: f.snmp_enabled.checked,
+        maintenance: f.maintenance.checked, mute_local_alerts: f.mute_local_alerts.checked,
+        telegram_enabled: f.telegram_enabled ? f.telegram_enabled.checked : true,
+        groups: fd.getAll('grp').map(Number),
+      };
         check_icmp: f.check_icmp.checked, check_agent: f.check_agent.checked, snmp_enabled: f.snmp_enabled.checked,
         maintenance: f.maintenance.checked, mute_local_alerts: f.mute_local_alerts.checked,
         telegram_enabled: f.telegram_enabled ? f.telegram_enabled.checked : true,
