@@ -83,7 +83,7 @@ test('monitor.view: computes default and explicit port_count correctly', () => {
 
   const d1 = monitor.devices.get(1);
   const v1 = monitor.view(d1);
-  assert.equal(v1.port_count, 24, 'Switch default should be 24 ports');
+  assert.equal(v1.port_count, 48, 'Switch default should be 48 ports');
 
   const d2 = monitor.devices.get(2);
   const v2 = monitor.view(d2);

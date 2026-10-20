@@ -209,3 +209,64 @@ test('port-inspector filter: isPhysicalPort strips virtual interfaces and junk k
   assert.equal(isPhysicalPort(6, 'Port-Channel 1', 'Bond trunk'), false);
   assert.equal(isPhysicalPort(6, 'Gi0/1.100', 'VLAN sub-interface'), false);
 });
+
+test('port-inspector 48-port switch: preserves port 25, 31, 37, 47 status accurately without shifting', async () => {
+  const svc = new PortInspectorService();
+  const mockRows = {};
+  const mockIfx = {};
+
+  // Insert 48 physical ethernet ports + interspersed virtual interfaces
+  for (let i = 1; i <= 48; i++) {
+    const isUp = [1, 25, 31, 37, 47].includes(i);
+    mockRows[i] = {
+      [PORT_COLS.descr]: `GigabitEthernet1/0/${i}`,
+      [PORT_COLS.type]: 6,
+      [PORT_COLS.speed]: 1000000000,
+      [PORT_COLS.admin]: 1,
+      [PORT_COLS.oper]: isUp ? 1 : 2, // 1 = Up, 2 = Down
+    };
+    mockIfx[i] = {
+      [IFX_COLS.name]: `Gi1/0/${i}`,
+    };
+  }
+
+  // Interspersed junk virtual interfaces
+  mockRows[49] = { [PORT_COLS.descr]: 'Vlan1', [PORT_COLS.type]: 135, [PORT_COLS.oper]: 1 };
+  mockRows[50] = { [PORT_COLS.descr]: 'Null0', [PORT_COLS.type]: 6, [PORT_COLS.oper]: 1 };
+  mockRows[51] = { [PORT_COLS.descr]: 'Loopback0', [PORT_COLS.type]: 24, [PORT_COLS.oper]: 1 };
+
+  const walkColumnsFn = async ({ columns }) => {
+    if (columns.includes(PORT_COLS.descr)) return mockRows;
+    return mockIfx;
+  };
+  const snmpGetFn = async () => ({ [snmp.OIDS.sysUpTime]: 10000 });
+
+  const res = await svc.inspectDevice({
+    deviceKey: 'sw-access-48',
+    host: '10.10.10.10',
+    walkColumnsFn,
+    snmpGetFn,
+    configuredPortCount: 48,
+  });
+
+  assert.equal(res.total_ports, 48, 'Should include all 48 physical ports and exclude Vlan1, Null0, Loopback0');
+
+  const p1 = res.ports.find((p) => p.name === 'Gi1/0/1');
+  const p25 = res.ports.find((p) => p.name === 'Gi1/0/25');
+  const p31 = res.ports.find((p) => p.name === 'Gi1/0/31');
+  const p37 = res.ports.find((p) => p.name === 'Gi1/0/37');
+  const p47 = res.ports.find((p) => p.name === 'Gi1/0/47');
+  const p48 = res.ports.find((p) => p.name === 'Gi1/0/48');
+
+  assert.ok(p25, 'Port 25 must exist');
+  assert.ok(p31, 'Port 31 must exist');
+  assert.ok(p37, 'Port 37 must exist');
+  assert.ok(p47, 'Port 47 must exist');
+
+  assert.equal(p1.oper_status, 'up', 'Port 1 must be up');
+  assert.equal(p25.oper_status, 'up', 'Port 25 must be up');
+  assert.equal(p31.oper_status, 'up', 'Port 31 must be up');
+  assert.equal(p37.oper_status, 'up', 'Port 37 must be up');
+  assert.equal(p47.oper_status, 'up', 'Port 47 must be up');
+  assert.equal(p48.oper_status, 'down', 'Port 48 must be down');
+});

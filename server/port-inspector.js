@@ -113,7 +113,7 @@ class PortInspectorService {
     host,
     port = 161,
     community = 'public',
-    maxPorts = 48,
+    maxPorts = 64,
     configuredPortCount = null,
     includeVirtual = false,
     timeoutMs = 2000,
@@ -130,10 +130,13 @@ class PortInspectorService {
       }
     } catch { /* optional */ }
 
+    // Quét SNMP với số dòng đủ lớn để không cắt cụt các cổng 25, 31, 37, 47 của switch 48 port
+    const maxScanRows = Math.max(128, Math.min(256, (configuredPortCount || maxPorts || 48) * 3));
+
     const baseRows = await walkColumnsFn({
       ...conn,
       columns: Object.values(PORT_COLS),
-      maxRows: maxPorts,
+      maxRows: maxScanRows,
       timeout: timeoutMs,
     });
 
@@ -146,7 +149,7 @@ class PortInspectorService {
       ifxRows = await walkColumnsFn({
         ...conn,
         columns: Object.values(IFX_COLS),
-        maxRows: maxPorts,
+        maxRows: maxScanRows,
         timeout: timeoutMs,
       });
     } catch { /* ifXTable is optional on older devices */ }
@@ -169,8 +172,10 @@ class PortInspectorService {
         continue; // Lọc bỏ rác: loopback, null, vlan, tunnel, cpu, bridge, port-channel...
       }
       const category = classifyIfType(ifType, ifName);
-      const adminCode = num(r[PORT_COLS.admin]) ?? 1;
-      const operCode = num(r[PORT_COLS.oper]) ?? 2;
+      const rawAdmin = r[PORT_COLS.admin];
+      const adminCode = typeof rawAdmin === 'number' && Number.isFinite(rawAdmin) ? rawAdmin : (rawAdmin !== undefined && rawAdmin !== null && !isNaN(Number(rawAdmin)) ? Number(rawAdmin) : 1);
+      const rawOper = r[PORT_COLS.oper];
+      const operCode = typeof rawOper === 'number' && Number.isFinite(rawOper) ? rawOper : (rawOper !== undefined && rawOper !== null && !isNaN(Number(rawOper)) ? Number(rawOper) : 2);
       const adminStatus = adminCode === 1 ? 'up' : (adminCode === 2 ? 'down' : 'testing');
       const operStatus = operCode === 1 ? 'up' : (operCode === 5 ? 'dormant' : 'down');
 
@@ -247,6 +252,8 @@ class PortInspectorService {
         mtu: num(r[PORT_COLS.mtu]),
         admin_status: adminStatus,
         oper_status: operStatus,
+        admin_code: adminCode,
+        oper_code: operCode,
         speed_bps: speedBps,
         speed_label: formatSpeedLabel(speedBps),
         in_octets: inOctets,
@@ -268,11 +275,15 @@ class PortInspectorService {
 
     this.samples.set(key, { ts: now, ports: nextSamplePorts });
 
-    ports.sort((a, b) => Number(a.index) - Number(b.index));
+    // Sắp xếp thứ tự tự nhiên (Natural sort: Gi1/0/1 ... Gi1/0/25 ... Gi1/0/48)
+    ports.sort((a, b) => {
+      return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+        || Number(a.index) - Number(b.index);
+    });
 
-    // Giới hạn số cổng theo cấu hình thực tế thiết bị (VD Switch 24/48, Router 4/8/16)
-    const portLimit = (configuredPortCount && configuredPortCount > 0) ? configuredPortCount : (maxPorts || 48);
-    const finalPorts = ports.slice(0, portLimit);
+    // Giữ đầy đủ các cổng vật lý thực tế của thiết bị, chỉ dùng trần an toàn chống loop MIB
+    const safetyLimit = Math.max(configuredPortCount || 48, 64);
+    const finalPorts = ports.slice(0, safetyLimit);
 
     const upPorts = finalPorts.filter((p) => p.oper_status === 'up');
     const downPorts = finalPorts.filter((p) => p.oper_status !== 'up' && p.admin_status === 'up');

@@ -69,14 +69,14 @@
     return str.length > 5 ? str.slice(0, 4) : str;
   }
 
-  // Determine physical port count configured for device
+  // Determine physical port count configured for device (default 48 for switches)
   function getNodePortCount(n, snap) {
     if (!n || n.kind !== 'device') return 0;
     const d = snap && snap.devices && snap.devices.find((x) => x.id === n.ref);
     if (!d) return 0;
     if (d.port_count !== undefined && d.port_count !== null && d.port_count > 0) return d.port_count;
-    if (d.type === 'switch') return 24;
-    if (['router', 'firewall'].includes(d.type)) return 8;
+    if (d.type === 'switch') return 48;
+    if (['router', 'firewall'].includes(d.type)) return 16;
     return 0;
   }
 
@@ -218,7 +218,7 @@
       });
     },
 
-    // Modal to configure ports at both ends of a cable link
+    // Modal to configure ports at both ends of a cable link (supports up to 48 ports + SNMP ports + custom input)
     openLinkConfigModal(linkIndex) {
       const l = this.m.links[linkIndex];
       if (!l) return;
@@ -229,38 +229,54 @@
       const snap = M.S.snap;
       const infoA = this.info(nodeA);
       const infoB = this.info(nodeB);
-      const pcA = getNodePortCount(nodeA, snap);
-      const pcB = getNodePortCount(nodeB, snap);
+      const devA = nodeA.kind === 'device' && snap ? snap.devices.find((d) => d.id === nodeA.ref) : null;
+      const devB = nodeB.kind === 'device' && snap ? snap.devices.find((d) => d.id === nodeB.ref) : null;
 
-      const makePortOptions = (count, current) => {
-        let h = `<option value="">${t('(Không gán cổng / Tự động)')}</option>`;
-        for (let i = 1; i <= count; i++) {
-          h += `<option value="${i}" ${String(current) === String(i) ? 'selected' : ''}>Port ${i}</option>`;
+      const pcA = Math.max(getNodePortCount(nodeA, snap), (devA && devA.type === 'switch') ? 48 : 0);
+      const pcB = Math.max(getNodePortCount(nodeB, snap), (devB && devB.type === 'switch') ? 48 : 0);
+
+      const makeDatalistOptions = (count, current) => {
+        const opts = [];
+        const seen = new Set();
+        if (current) {
+          opts.push(`<option value="${esc(current)}">${t('Đang chọn:')} ${esc(current)}</option>`);
+          seen.add(String(current));
         }
-        return h;
+        const max = Math.max(48, count || 0);
+        for (let i = 1; i <= max; i++) {
+          const val = String(i);
+          if (!seen.has(val)) {
+            opts.push(`<option value="${val}">Port ${i} (P${i})</option>`);
+            seen.add(val);
+          }
+        }
+        return opts.join('');
       };
+
+      const curFrom = l.from_port || '';
+      const curTo = l.to_port || '';
 
       const bodyHtml = `
         <div style="margin-bottom:12px;font-size:13px" class="muted">
-          ${t('Gán cổng vật lý cho 2 đầu dây cáp. Nhãn cổng sẽ hiển thị rõ ràng ngay tại đầu mút kết nối của mỗi thiết bị.')}
+          ${t('Cấu hình cổng vật lý kết nối cho 2 đầu dây cáp. Chọn từ danh sách 48 cổng hoặc nhập tay cổng bất kỳ (vd: Gi1/0/25, ether1, Port 47...).')}
         </div>
         <div class="field-grid">
           <div class="field">
             <label>${esc(infoA.name)}</label>
-            ${pcA > 0
-              ? `<select class="sel inp" name="from_port" style="width:100%">${makePortOptions(pcA, l.from_port)}</select>`
-              : `<input class="inp" name="from_port" placeholder="Port 1, eth0..." value="${esc(l.from_port || '')}">`}
+            <input class="inp" list="dl-port-a" id="inp-port-a" name="from_port" placeholder="${t('Chọn hoặc nhập cổng (vd: 1, Gi1/0/25)...')}" value="${esc(curFrom)}" autocomplete="off" style="width:100%">
+            <datalist id="dl-port-a">${makeDatalistOptions(pcA, curFrom)}</datalist>
+            <div id="snmp-ports-a" class="muted" style="font-size:11px;margin-top:4px"></div>
           </div>
           <div class="field">
             <label>${esc(infoB.name)}</label>
-            ${pcB > 0
-              ? `<select class="sel inp" name="to_port" style="width:100%">${makePortOptions(pcB, l.to_port)}</select>`
-              : `<input class="inp" name="to_port" placeholder="Port 2, eth1..." value="${esc(l.to_port || '')}">`}
+            <input class="inp" list="dl-port-b" id="inp-port-b" name="to_port" placeholder="${t('Chọn hoặc nhập cổng (vd: 2, ether2)...')}" value="${esc(curTo)}" autocomplete="off" style="width:100%">
+            <datalist id="dl-port-b">${makeDatalistOptions(pcB, curTo)}</datalist>
+            <div id="snmp-ports-b" class="muted" style="font-size:11px;margin-top:4px"></div>
           </div>
         </div>
       `;
 
-      M.modal(t('🔌 Cấu hình cổng kết nối liên kết'), bodyHtml, (f) => {
+      const { form } = M.modal(t('🔌 Cấu hình cổng kết nối liên kết (Đến 48 Port)'), bodyHtml, (f) => {
         const fd = new FormData(f);
         const fp = String(fd.get('from_port') || '').trim();
         const tp = String(fd.get('to_port') || '').trim();
@@ -270,6 +286,31 @@
         this.draw();
         M.toast(t('Đã cập nhật cổng kết nối'));
       }, { submit: t('Lưu cổng') });
+
+      // Async enrich with real SNMP ports if device has SNMP configured
+      const enrichWithSnmp = async (dev, datalistId, hintId) => {
+        if (!dev || !dev.address || !dev.snmp_enabled) return;
+        try {
+          const res = await M.api('GET', `/api/devices/${dev.id}/ports`);
+          if (res && Array.isArray(res.ports) && res.ports.length > 0) {
+            const dl = $(`#${datalistId}`, form);
+            const hint = $(`#${hintId}`, form);
+            if (dl) {
+              const snmpOpts = res.ports.map((p) => {
+                const st = p.oper_status === 'up' ? '🟢 UP' : '⚪ DOWN';
+                return `<option value="${esc(p.name)}">${esc(p.name)} [${st}] (${esc(p.speed_label || '')})</option>`;
+              });
+              dl.innerHTML = snmpOpts.join('') + dl.innerHTML;
+            }
+            if (hint) {
+              hint.innerHTML = `<span style="color:var(--c-ok)">✓ ${t('Đã đọc')} ${res.ports.length} ${t('cổng vật lý từ SNMP')}</span>`;
+            }
+          }
+        } catch { /* optional SNMP enrich */ }
+      };
+
+      enrichWithSnmp(devA, 'dl-port-a', 'snmp-ports-a');
+      enrichWithSnmp(devB, 'dl-port-b', 'snmp-ports-b');
     },
 
     // Resolve a node to display info + status class from live data

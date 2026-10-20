@@ -1095,7 +1095,7 @@ class Monitor extends EventEmitter {
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
       parent_id: d.parent_id || null,
-      port_count: d.port_count !== undefined && d.port_count !== null && d.port_count > 0 ? d.port_count : (d.type === 'switch' ? 24 : (['router', 'firewall'].includes(d.type) ? 8 : 0)),
+      port_count: d.port_count !== undefined && d.port_count !== null && d.port_count > 0 ? d.port_count : (d.type === 'switch' ? 48 : (['router', 'firewall'].includes(d.type) ? 8 : 0)),
       maintenance: this.isDeviceInMaintenance(d),
       maintenance_until: d.maintenance_until || 0,
       mute_local_alerts: !!d.mute_local_alerts,
