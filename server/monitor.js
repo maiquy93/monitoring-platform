@@ -3,7 +3,7 @@ const { EventEmitter } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFile } = require('node:child_process');
-const { getSettings } = require('./db');
+const { getSettings, rollupMetrics } = require('./db');
 
 const SEV_RANK = { none: 0, '0': 0, low: 1, medium: 2, high: 3, critical: 4 };
 const ADDR_RE = /^[A-Za-z0-9][A-Za-z0-9.:_-]{0,252}$/;
@@ -641,7 +641,9 @@ class Monitor extends EventEmitter {
 
   purge() {
     const now = Date.now();
+    try { rollupMetrics(this.db, now); } catch (e) { /* ignore rollup error */ }
     this.db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - this.o.retentionDays * 86400e3);
+    this.db.prepare('DELETE FROM metrics_hourly WHERE hour_ts < ?').run(now - 90 * 86400e3);
     this.db.prepare('DELETE FROM events WHERE ts < ?').run(now - 90 * 86400e3);
     this.db.prepare('DELETE FROM ai_reports WHERE ts < ?').run(now - 90 * 86400e3);
     // hard cap so a flapping device can never grow the events table without limit
@@ -670,6 +672,7 @@ class Monitor extends EventEmitter {
     if (!this.diskLow) return false;
     const now = Date.now();
     this.db.prepare('DELETE FROM metrics WHERE ts < ?').run(now - 86400e3);
+    this.db.prepare('DELETE FROM metrics_hourly WHERE hour_ts < ?').run(now - 14 * 86400e3);
     this.db.prepare('DELETE FROM events WHERE ts < ?').run(now - 14 * 86400e3);
     this.checkpoint();
     console.warn(`[monitor] disk almost full (${Math.round(d.free / 1048576)} MB free): trimmed history`);

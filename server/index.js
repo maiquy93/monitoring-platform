@@ -1,6 +1,6 @@
 'use strict';
 const path = require('node:path');
-const { open } = require('./db');
+const { open, rollupMetrics, pruneMetrics } = require('./db');
 const { Monitor } = require('./monitor');
 const { createApp } = require('./app');
 const auth = require('./auth');
@@ -12,6 +12,18 @@ const host = env.HOST || '0.0.0.0';
 
 const db = open(dbFile);
 auth.ensureAdmin(db);
+
+// 2-tier metric rollup & auto-prune: runs immediately on startup and every 1 hour
+const runMetricMaintenance = () => {
+  try {
+    rollupMetrics(db);
+    pruneMetrics(db, Date.now(), Number(env.RETENTION_DAYS) || 7, 90);
+  } catch (err) {
+    console.error('[rollup] maintenance error:', err);
+  }
+};
+runMetricMaintenance();
+setInterval(runMetricMaintenance, 3600e3).unref();
 
 const monitor = new Monitor(db, {
   dbFile,

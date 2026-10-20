@@ -366,17 +366,70 @@ function createApp(db, monitor, opts = {}) {
     }
   }
 
-  const RANGES = { '1h': 3600e3, '6h': 6 * 3600e3, '24h': 86400e3, '7d': 7 * 86400e3 };
+  const RANGES = {
+    '1h': 3600e3,
+    '6h': 6 * 3600e3,
+    '24h': 86400e3,
+    '7d': 7 * 86400e3,
+    '30d': 30 * 86400e3,
+    '90d': 90 * 86400e3,
+  };
   route('GET', '/api/devices/:id/history', 'any', (ctx) => {
     const id = idOf(ctx.p.id);
-    const span = RANGES[ctx.query.get('range')] || RANGES['1h'];
-    const step = Math.max(30e3, Math.floor(span / 240 / 1000) * 1000);
-    const rows = db.prepare(
-      `SELECT (ts / ?) * ? AS ts, AVG(cpu) cpu, AVG(ram) ram, MAX(disk) disk, AVG(rtt) rtt,
-              AVG(net_in) net_in, AVG(net_out) net_out, AVG(temp) temp,
-              AVG(toner) toner, AVG(drum) drum
-       FROM metrics WHERE device_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY ts`)
-      .all(step, step, id, Date.now() - span, step);
+    const rangeParam = ctx.query.get('range');
+    const span = RANGES[rangeParam] || Number(rangeParam) || RANGES['1h'];
+    const since = Date.now() - span;
+
+    if (span <= 7 * 86400e3) {
+      const step = Math.max(30e3, Math.floor(span / 240 / 1000) * 1000);
+      const rows = db.prepare(
+        `SELECT (ts / ?) * ? AS ts,
+                AVG(cpu) cpu, MAX(cpu) cpu_max,
+                AVG(ram) ram, MAX(ram) ram_max,
+                MAX(disk) disk, MAX(disk) disk_max,
+                AVG(rtt) rtt, MAX(rtt) rtt_max,
+                AVG(net_in) net_in, MAX(net_in) net_in_max,
+                AVG(net_out) net_out, MAX(net_out) net_out_max,
+                AVG(temp) temp, MAX(temp) temp_max,
+                AVG(toner) toner, AVG(drum) drum
+         FROM metrics WHERE device_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY ts`)
+        .all(step, step, id, since, step);
+      return send(ctx.res, 200, { points: rows });
+    }
+
+    // Range > 7d (e.g. 30d, 90d): query metrics_hourly bucketed to ~200-300 points
+    const step = Math.max(3600e3, Math.floor(span / 240 / 3600e3) * 3600e3);
+    let rows = db.prepare(
+      `SELECT CAST(hour_ts / ? AS INTEGER) * ? AS ts,
+              ROUND(AVG(cpu_avg), 1) cpu, MAX(cpu_max) cpu_max,
+              ROUND(AVG(ram_avg), 1) ram, MAX(ram_max) ram_max,
+              ROUND(AVG(disk_avg), 1) disk, MAX(disk_max) disk_max,
+              ROUND(AVG(rtt_avg), 1) rtt, MAX(rtt_max) rtt_max,
+              ROUND(AVG(net_in_avg)) net_in, MAX(net_in_max) net_in_max,
+              ROUND(AVG(net_out_avg)) net_out, MAX(net_out_max) net_out_max,
+              ROUND(AVG(temp_avg), 1) temp, MAX(temp_max) temp_max,
+              ROUND(AVG(toner_avg), 1) toner,
+              ROUND(AVG(drum_avg), 1) drum
+       FROM metrics_hourly WHERE device_id = ? AND hour_ts >= ?
+       GROUP BY CAST(hour_ts / ? AS INTEGER) ORDER BY ts`)
+      .all(step, step, id, since, step);
+
+    if (rows.length === 0) {
+      // Fallback to raw metrics if metrics_hourly has no data yet
+      const rawStep = Math.max(30e3, Math.floor(span / 240 / 1000) * 1000);
+      rows = db.prepare(
+        `SELECT (ts / ?) * ? AS ts,
+                AVG(cpu) cpu, MAX(cpu) cpu_max,
+                AVG(ram) ram, MAX(ram) ram_max,
+                MAX(disk) disk, MAX(disk) disk_max,
+                AVG(rtt) rtt, MAX(rtt) rtt_max,
+                AVG(net_in) net_in, MAX(net_in) net_in_max,
+                AVG(net_out) net_out, MAX(net_out) net_out_max,
+                AVG(temp) temp, MAX(temp) temp_max,
+                AVG(toner) toner, AVG(drum) drum
+         FROM metrics WHERE device_id = ? AND ts >= ? GROUP BY ts / ? ORDER BY ts`)
+        .all(rawStep, rawStep, id, since, rawStep);
+    }
     send(ctx.res, 200, { points: rows });
   });
 

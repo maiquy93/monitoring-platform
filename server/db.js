@@ -96,6 +96,20 @@ function open(file) {
     CREATE INDEX IF NOT EXISTS idx_ai_reports_ts ON ai_reports(ts);
     CREATE INDEX IF NOT EXISTS idx_ai_reports_event ON ai_reports(event_id);
     CREATE INDEX IF NOT EXISTS idx_ai_reports_fp ON ai_reports(fingerprint, ts);
+    CREATE TABLE IF NOT EXISTS metrics_hourly(
+      device_id INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+      hour_ts INTEGER NOT NULL,
+      cpu_avg REAL, cpu_max REAL,
+      ram_avg REAL, ram_max REAL,
+      disk_avg REAL, disk_max REAL,
+      rtt_avg REAL, rtt_max REAL,
+      net_in_avg REAL, net_in_max REAL,
+      net_out_avg REAL, net_out_max REAL,
+      temp_avg REAL, temp_max REAL,
+      toner_avg REAL, drum_avg REAL,
+      samples_count INTEGER DEFAULT 0,
+      PRIMARY KEY(device_id, hour_ts));
+    CREATE INDEX IF NOT EXISTS idx_metrics_hourly ON metrics_hourly(device_id, hour_ts);
   `);
   const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!ucols.includes('lang')) db.exec('ALTER TABLE users ADD COLUMN lang TEXT');
@@ -131,4 +145,79 @@ function setSetting(db, key, value) {
     .run(key, JSON.stringify(value));
 }
 
-module.exports = { open, getSettings, setSetting, DEFAULT_TYPE_SEVERITY, DEFAULT_AI_SETTINGS, DEFAULT_TELEGRAM_SETTINGS };
+function rollupMetrics(db, now = Date.now(), toHour = null) {
+  const currentHour = toHour != null ? toHour : Math.floor(now / 3600e3) * 3600e3;
+  const lastRow = db.prepare('SELECT MAX(hour_ts) as last_hour FROM metrics_hourly').get();
+  let startTs = 0;
+  if (lastRow && lastRow.last_hour != null) {
+    startTs = Math.min(lastRow.last_hour, currentHour - 3600e3);
+  }
+
+  return db.prepare(`
+    INSERT INTO metrics_hourly(
+      device_id, hour_ts,
+      cpu_avg, cpu_max,
+      ram_avg, ram_max,
+      disk_avg, disk_max,
+      rtt_avg, rtt_max,
+      net_in_avg, net_in_max,
+      net_out_avg, net_out_max,
+      temp_avg, temp_max,
+      toner_avg, drum_avg,
+      samples_count
+    )
+    SELECT
+      device_id,
+      (ts / 3600000) * 3600000 AS hour_ts,
+      ROUND(AVG(cpu), 2), MAX(cpu),
+      ROUND(AVG(ram), 2), MAX(ram),
+      ROUND(AVG(disk), 2), MAX(disk),
+      ROUND(AVG(rtt), 2), MAX(rtt),
+      ROUND(AVG(net_in), 2), MAX(net_in),
+      ROUND(AVG(net_out), 2), MAX(net_out),
+      ROUND(AVG(temp), 1), MAX(temp),
+      ROUND(AVG(toner), 1),
+      ROUND(AVG(drum), 1),
+      COUNT(*)
+    FROM metrics
+    WHERE ts >= ? AND ts < ?
+    GROUP BY device_id, hour_ts
+    ON CONFLICT(device_id, hour_ts) DO UPDATE SET
+      cpu_avg = excluded.cpu_avg,
+      cpu_max = excluded.cpu_max,
+      ram_avg = excluded.ram_avg,
+      ram_max = excluded.ram_max,
+      disk_avg = excluded.disk_avg,
+      disk_max = excluded.disk_max,
+      rtt_avg = excluded.rtt_avg,
+      rtt_max = excluded.rtt_max,
+      net_in_avg = excluded.net_in_avg,
+      net_in_max = excluded.net_in_max,
+      net_out_avg = excluded.net_out_avg,
+      net_out_max = excluded.net_out_max,
+      temp_avg = excluded.temp_avg,
+      temp_max = excluded.temp_max,
+      toner_avg = excluded.toner_avg,
+      drum_avg = excluded.drum_avg,
+      samples_count = excluded.samples_count
+  `).run(startTs, currentHour);
+}
+
+function pruneMetrics(db, now = Date.now(), rawDays = 7, hourlyDays = 90) {
+  const rawCutoff = now - rawDays * 86400e3;
+  const hourlyCutoff = now - hourlyDays * 86400e3;
+  const r1 = db.prepare('DELETE FROM metrics WHERE ts < ?').run(rawCutoff);
+  const r2 = db.prepare('DELETE FROM metrics_hourly WHERE hour_ts < ?').run(hourlyCutoff);
+  return { rawDeleted: r1.changes, hourlyDeleted: r2.changes };
+}
+
+module.exports = {
+  open,
+  getSettings,
+  setSetting,
+  rollupMetrics,
+  pruneMetrics,
+  DEFAULT_TYPE_SEVERITY,
+  DEFAULT_AI_SETTINGS,
+  DEFAULT_TELEGRAM_SETTINGS,
+};
