@@ -42,7 +42,14 @@
     if (d.status === 'down') {
       subRight = ago;
     } else if (d.status === 'maint') {
-      subRight = t('Đang bảo trì');
+      const now = Date.now();
+      if (d.maintenance_until && d.maintenance_until > now) {
+        const leftMin = Math.max(1, Math.round((d.maintenance_until - now) / 60000));
+        const leftStr = leftMin >= 60 ? `${Math.floor(leftMin / 60)}h${leftMin % 60 ? `${leftMin % 60}m` : ''}` : `${leftMin}m`;
+        subRight = `${t('Bảo trì')} (${leftStr})`;
+      } else {
+        subRight = t('Đang bảo trì');
+      }
     } else if (d.status === 'unknown') {
       subRight = t('Chưa có dữ liệu');
     } else if (d.uptime != null) {
@@ -514,6 +521,123 @@
           analyzeBtn.disabled = false;
           analyzeBtn.textContent = isEn ? 'Run AI Analysis Now' : 'Gửi AI Phân tích ngay';
         }
+      };
+    }
+  };
+
+  M.openMaintenanceModal = (d, onDone) => {
+    const isEn = M.S.lang === 'en';
+    const now = Date.now();
+    const isMaint = Boolean(d.maintenance || (d.maintenance_until && d.maintenance_until > now));
+    const hasTimer = Boolean(d.maintenance_until && d.maintenance_until > now);
+    let leftStr = '';
+    let expireTimeStr = '';
+    if (hasTimer) {
+      const leftMs = d.maintenance_until - now;
+      const leftHrs = Math.floor(leftMs / 3600e3);
+      const leftMins = Math.round((leftMs % 3600e3) / 60e3);
+      leftStr = leftHrs > 0 ? `${leftHrs}h ${leftMins}m` : `${leftMins}m`;
+      expireTimeStr = new Date(d.maintenance_until).toLocaleTimeString(isEn ? 'en-US' : 'vi-VN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    const modalHtml = `
+      <div class="maint-modal-content">
+        <div class="maint-status-banner ${isMaint ? 'active' : 'inactive'}">
+          <div style="font-size:26px">${isMaint ? '🛠️' : '🛡️'}</div>
+          <div>
+            <div style="font-weight:700;font-size:15px">
+              ${isMaint ? (isEn ? 'Device is in Maintenance Mode' : 'Thiết bị đang trong Chế độ Bảo trì') : (isEn ? 'Normal Monitoring Active' : 'Hệ thống đang Giám sát Bình thường')}
+            </div>
+            <div class="muted" style="font-size:12px;margin-top:2px">
+              ${isMaint
+                ? (hasTimer
+                    ? (isEn ? `Muted alerts for ~${leftStr} (Expires at ${expireTimeStr})` : `Đã tạm ngắt cảnh báo còn ~${leftStr} (Hết hạn lúc ${expireTimeStr})`)
+                    : (isEn ? 'Manual maintenance (Muted indefinitely until toggled off)' : 'Bảo trì thủ công (Tạm ngắt cảnh báo vô thời hạn cho tới khi tắt)'))
+                : (isEn ? 'Sound alarms, Telegram alerts, and AI diagnoses are active.' : 'Chuông cảnh báo, thông báo Telegram và chẩn đoán AI đang hoạt động.')}
+            </div>
+          </div>
+        </div>
+
+        <div style="margin:12px 0 6px;font-size:13px;font-weight:600;color:var(--text)">
+          ${isEn ? '⚡ Select Maintenance Duration:' : '⚡ Bật nhanh Chế độ Bảo trì:'}
+        </div>
+
+        <div class="maint-actions-grid">
+          <button type="button" class="btn maint-btn" data-hours="1">
+            <span class="mb-ico">⏱️</span>
+            <span class="mb-title">${isEn ? '1 Hour' : '1 giờ'}</span>
+            <span class="mb-desc">${isEn ? 'Quick patch / reboot' : 'Vá lỗi nhanh / Khởi động'}</span>
+          </button>
+          <button type="button" class="btn maint-btn" data-hours="4">
+            <span class="mb-ico">⏳</span>
+            <span class="mb-title">${isEn ? '4 Hours' : '4 giờ'}</span>
+            <span class="mb-desc">${isEn ? 'Standard maintenance' : 'Bảo dưỡng định kỳ'}</span>
+          </button>
+          <button type="button" class="btn maint-btn" data-hours="24">
+            <span class="mb-ico">📅</span>
+            <span class="mb-title">${isEn ? '24 Hours' : '24 giờ'}</span>
+            <span class="mb-desc">${isEn ? 'Hardware overhaul' : 'Nâng cấp / Thay phần cứng'}</span>
+          </button>
+          <button type="button" class="btn maint-btn danger" data-clear="true" ${!isMaint ? 'disabled' : ''}>
+            <span class="mb-ico">🛑</span>
+            <span class="mb-title">${isEn ? 'End Maintenance' : 'Tắt bảo trì'}</span>
+            <span class="mb-desc">${isEn ? 'Resume monitoring' : 'Khôi phục cảnh báo ngay'}</span>
+          </button>
+        </div>
+
+        <div class="maint-note">
+          ℹ️ ${isEn
+            ? 'When maintenance mode is active, the device appears in "Unknown / Maintenance", alert bells & Telegram notifications are silenced, and AI incident diagnosis is skipped.'
+            : 'Khi bật chế độ bảo trì, thiết bị được chuyển vào ô "Chưa rõ / Bảo trì" trên Dashboard, tắt chuông báo động, không gửi cảnh báo Telegram và không gọi AI chẩn đoán.'}
+        </div>
+      </div>
+    `;
+
+    const { form } = M.modal(
+      isEn ? `🛠️ Maintenance Mode: ${d.name}` : `🛠️ Chế độ bảo trì: ${d.name}`,
+      modalHtml,
+      async () => {},
+      { submit: isEn ? 'Close' : 'Đóng', noCancel: true }
+    );
+
+    const applyMaintenance = async (payload, msg) => {
+      try {
+        const res = await M.api('POST', `/api/devices/${d.id}/maintenance`, payload);
+        d.maintenance = res.maintenance;
+        d.maintenance_until = res.maintenance_until;
+        if (M.S.snap && M.S.snap.devices) {
+          const sd = M.S.snap.devices.find((x) => x.id === d.id);
+          if (sd) {
+            sd.maintenance = res.maintenance;
+            sd.maintenance_until = res.maintenance_until;
+            sd.status = res.device ? res.device.status : (res.maintenance ? 'maint' : sd.status);
+          }
+        }
+        M.toast(msg);
+        M.closeModal();
+        if (typeof onDone === 'function') onDone();
+      } catch (err) {
+        M.toast(err.message);
+      }
+    };
+
+    form.querySelectorAll('[data-hours]').forEach((btn) => {
+      btn.onclick = () => {
+        const h = Number(btn.getAttribute('data-hours'));
+        applyMaintenance(
+          { duration_hours: h },
+          isEn ? `Enabled maintenance for ${h} hour(s)` : `Đã bật bảo trì ${h} giờ cho thiết bị`
+        );
+      };
+    });
+
+    const clearBtn = form.querySelector('[data-clear]');
+    if (clearBtn) {
+      clearBtn.onclick = () => {
+        applyMaintenance(
+          { clear: true },
+          isEn ? 'Maintenance mode disabled. Monitoring resumed!' : 'Đã tắt bảo trì. Hệ thống giám sát trở lại bình thường!'
+        );
       };
     }
   };
@@ -1520,13 +1644,28 @@
       const canAck = (d.status === 'down' || d.status === 'warning') && !d.acked && role !== 'viewer';
       const tgReady = typeof M.isTelegramConfigured === 'function' ? M.isTelegramConfigured() : Boolean(M.S.settings && M.S.settings.telegram_configured);
       const tgActive = d.telegram_enabled !== false && tgReady;
+      const now = Date.now();
+      const isMaint = Boolean(d.maintenance || (d.maintenance_until && d.maintenance_until > now));
+      const hasTimer = Boolean(d.maintenance_until && d.maintenance_until > now);
+      let maintBtnText = t('Bảo trì');
+      if (isMaint) {
+        if (hasTimer) {
+          const leftMin = Math.max(1, Math.round((d.maintenance_until - now) / 60000));
+          const leftStr = leftMin >= 60 ? `${Math.floor(leftMin / 60)}h${leftMin % 60 ? `${leftMin % 60}m` : ''}` : `${leftMin}m`;
+          maintBtnText = `${t('Bảo trì')} (${leftStr})`;
+        } else {
+          maintBtnText = t('Đang bảo trì');
+        }
+      }
       $('#d-hero').innerHTML = `<div class="hero ${M.statusClass(d)}"><div class="h-ico">${M.ICON[d.type] || ''}</div>
         <div style="flex:1;min-width:0"><h1>${esc(d.name)}</h1><div class="h-state">${M.STATE_NAME[d.status]}
         <span class="muted" style="font-size:14px;text-transform:none"> · ${sinceWord} ${M.fmtTime(d.since)} (${M.fmtDur((Date.now() - d.since) / 1000)})</span></div>
         ${d.reasons.map((r) => `<div class="reason">• ${esc(tr(r))}</div>`).join('')}</div>
         <div class="row">${canAck ? `<button class="btn" id="d-ack">${esc(t('Đã biết'))}</button>` : ''}
         ${!isPrinter ? `<button class="btn" id="d-copy-tech" title="${isEn ? 'Copy technical diagnostic logs to clipboard for ChatGPT / Claude' : 'Sao chép logs kỹ thuật để tra cứu trên ChatGPT / Claude'}">📋 ${esc(t('Copy Logs Kỹ thuật'))}</button>${role !== 'viewer' ? `<button class="btn" id="d-ai-diag" title="${isEn ? 'Run AI technical diagnosis on this device' : 'Chạy chẩn đoán AI kỹ thuật cho thiết bị này'}">✨ ${esc(t('Chẩn đoán AI'))}</button>` : ''}` : ''}
-        ${role === 'admin' ? `<button class="btn ${tgActive ? 'tg-on' : ''}" id="d-telegram" title="${isEn ? 'Toggle Telegram alerts for this device (Offline / Recovered)' : 'Bật/tắt cảnh báo Telegram cho thiết bị này (Mất kết nối / Phục hồi)'}">🔔 ${esc(tgActive ? (isEn ? 'Telegram: ON' : 'Telegram: Bật') : (isEn ? 'Telegram: OFF' : 'Telegram: Tắt'))}</button><button class="btn" id="d-maint">${esc(d.maintenance ? t('Kết thúc bảo trì') : t('Bảo trì'))}</button><button class="btn" id="d-edit">${esc(t('Sửa'))}</button>` : ''}
+        ${role === 'admin' ? `<button class="btn ${tgActive ? 'tg-on' : ''}" id="d-telegram" title="${isEn ? 'Toggle Telegram alerts for this device (Offline / Recovered)' : 'Bật/tắt cảnh báo Telegram cho thiết bị này (Mất kết nối / Phục hồi)'}">🔔 ${esc(tgActive ? (isEn ? 'Telegram: ON' : 'Telegram: Bật') : (isEn ? 'Telegram: OFF' : 'Telegram: Tắt'))}</button>` : ''}
+        ${role === 'admin' || role === 'operator' ? `<button class="btn ${isMaint ? 'maint-active' : ''}" id="d-maint" title="${isEn ? 'Device Maintenance Mode' : 'Chế độ bảo trì thiết bị'}">🛠️ ${esc(maintBtnText)}</button>` : ''}
+        ${role === 'admin' ? `<button class="btn" id="d-edit">${esc(t('Sửa'))}</button>` : ''}
         <button class="btn" id="d-back">${esc(t('← Quay lại'))}</button></div></div>`;
       const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
       on('#d-back', () => history.back());
@@ -1591,7 +1730,7 @@
         M.syncAlarmLoop();
         this.paint();
       });
-      on('#d-maint', async () => { await M.api('PUT', `/api/devices/${d.id}`, { maintenance: !d.maintenance }); });
+      on('#d-maint', () => M.openMaintenanceModal(d, () => this.paint()));
       on('#d-edit', () => M.editDevice(d.id));
 
       const a = d.agent;

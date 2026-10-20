@@ -59,7 +59,7 @@
 
   // ---------- device editor ----------
   M.editDevice = async (id) => {
-    const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, mute_local_alerts: false, telegram_enabled: true, parent_id: null, groups: [] };
+    const d = id ? await M.api('GET', `/api/devices/${id}`) : { name: '', type: 'server', address: '', check_icmp: true, check_agent: false, snmp_enabled: false, snmp_port: 161, severity_override: '', location: '', notes: '', maintenance: false, maintenance_until: 0, mute_local_alerts: false, telegram_enabled: true, parent_id: null, groups: [] };
     if (!M.S.groups.length) await M.loadGroups();
     if (!M.profiles) M.profiles = await M.api('GET', '/api/snmp/profiles').then((r) => r.profiles).catch(() => []);
     const def = M.S.settings.type_severity;
@@ -101,7 +101,9 @@
         location: fd.get('location'), notes: fd.get('notes'), snmp_community: fd.get('snmp_community'), snmp_port: Number(fd.get('snmp_port')), snmp_profile: fd.get('snmp_profile') || '',
         parent_id: fd.get('parent_id') ? Number(fd.get('parent_id')) : null,
         check_icmp: f.check_icmp.checked, check_agent: f.check_agent.checked, snmp_enabled: f.snmp_enabled.checked,
-        maintenance: f.maintenance.checked, mute_local_alerts: f.mute_local_alerts.checked,
+        maintenance: f.maintenance.checked,
+        maintenance_until: f.maintenance.checked ? (d.maintenance_until || 0) : 0,
+        mute_local_alerts: f.mute_local_alerts.checked,
         telegram_enabled: f.telegram_enabled ? f.telegram_enabled.checked : true,
         groups: fd.getAll('grp').map(Number),
       };

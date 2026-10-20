@@ -84,6 +84,16 @@ function cleanDevice(b, partial = false) {
   for (const k of ['check_icmp', 'check_agent', 'snmp_enabled', 'maintenance', 'mute_local_alerts']) {
     if (!partial || has(k)) out[k] = b[k] ? 1 : 0;
   }
+  if (!partial || has('maintenance_until')) {
+    let mu = b.maintenance_until;
+    if (mu === null || mu === undefined || mu === '' || mu === 0 || mu === '0') mu = 0;
+    else {
+      mu = Number(mu);
+      if (!Number.isFinite(mu) || mu < 0) throw bad('Thời gian bảo trì không hợp lệ');
+      mu = Math.round(mu);
+    }
+    out.maintenance_until = mu;
+  }
   if (!partial || has('telegram_enabled')) {
     out.telegram_enabled = b.telegram_enabled === undefined ? 1 : (b.telegram_enabled ? 1 : 0);
   }
@@ -244,9 +254,9 @@ function createApp(db, monitor, opts = {}) {
     const token = crypto.randomBytes(24).toString('hex');
     const r = db.prepare(
       `INSERT INTO devices(name,type,address,check_icmp,check_agent,snmp_enabled,snmp_community,snmp_port,snmp_profile,severity,
-        location,notes,maintenance,mute_local_alerts,telegram_enabled,parent_id,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        location,notes,maintenance,maintenance_until,mute_local_alerts,telegram_enabled,parent_id,agent_token,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, token, Date.now());
+        d.severity, d.location, d.notes, d.maintenance, d.maintenance_until || 0, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, token, Date.now());
     return { id: Number(r.lastInsertRowid), token };
   };
 
@@ -279,14 +289,57 @@ function createApp(db, monitor, opts = {}) {
     if (d.parent_id === id) throw bad('Thiết bị không thể tự làm cha chính nó');
     db.prepare(
       `UPDATE devices SET name=?,type=?,address=?,check_icmp=?,check_agent=?,snmp_enabled=?,snmp_community=?,
-        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,mute_local_alerts=?,telegram_enabled=?,parent_id=? WHERE id=?`)
+        snmp_port=?,snmp_profile=?,severity=?,location=?,notes=?,maintenance=?,maintenance_until=?,mute_local_alerts=?,telegram_enabled=?,parent_id=? WHERE id=?`)
       .run(d.name, d.type, d.address, d.check_icmp, d.check_agent, d.snmp_enabled, d.snmp_community, d.snmp_port, d.snmp_profile || '',
-        d.severity, d.location, d.notes, d.maintenance, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, id);
+        d.severity, d.location, d.notes, d.maintenance, d.maintenance_until || 0, d.mute_local_alerts || 0, d.telegram_enabled !== undefined ? d.telegram_enabled : 1, d.parent_id || null, id);
     if (b.groups !== undefined) setGroups(id, b.groups);
     monitor.reload();
     monitor.evaluate();
     monitor.emit('change');
     send(ctx.res, 200, { ok: true });
+  });
+
+  route('POST', '/api/devices/:id/maintenance', 'operator', async (ctx) => {
+    const id = idOf(ctx.p.id);
+    const cur = monitor.devices.get(id);
+    if (!cur) throw new HttpError(404, 'Không tìm thấy thiết bị');
+    const b = await readBody(ctx.req);
+    let maint = 0;
+    let maintUntil = 0;
+    const now = Date.now();
+
+    if (b.clear === true || b.duration_hours === 0 || b.enabled === false) {
+      maint = 0;
+      maintUntil = 0;
+    } else if (b.duration_hours != null) {
+      const h = Number(b.duration_hours);
+      if (!Number.isFinite(h) || h <= 0 || h > 720) throw bad('Số giờ bảo trì không hợp lệ (1 - 720 giờ)');
+      maint = 1;
+      maintUntil = now + Math.round(h * 3600e3);
+    } else if (b.maintenance_until != null) {
+      const until = Number(b.maintenance_until);
+      if (!Number.isFinite(until) || until < 0) throw bad('Thời điểm kết thúc bảo trì không hợp lệ');
+      maintUntil = Math.round(until);
+      maint = maintUntil > now ? 1 : 0;
+    } else if (b.maintenance !== undefined) {
+      maint = b.maintenance ? 1 : 0;
+      maintUntil = maint ? (cur.maintenance_until && cur.maintenance_until > now ? cur.maintenance_until : 0) : 0;
+    } else {
+      const isCurrentlyMaint = Boolean(cur.maintenance || (cur.maintenance_until && cur.maintenance_until > now));
+      maint = isCurrentlyMaint ? 0 : 1;
+      maintUntil = 0;
+    }
+
+    db.prepare('UPDATE devices SET maintenance = ?, maintenance_until = ? WHERE id = ?')
+      .run(maint, maintUntil, id);
+    monitor.reload();
+    monitor.evaluate(now);
+    monitor.emit('change');
+
+    const updatedDev = monitor.devices.get(id);
+    const view = monitor.view(updatedDev, true);
+    audit(ctx, maint ? `Bật bảo trì thiết bị "${cur.name}"${maintUntil ? ` (đến ${new Date(maintUntil).toLocaleString()})` : ''}` : `Tắt bảo trì thiết bị "${cur.name}"`);
+    send(ctx.res, 200, { ok: true, device: view, maintenance: !!maint, maintenance_until: maintUntil });
   });
 
   route('DELETE', '/api/devices/:id', 'admin', (ctx) => {

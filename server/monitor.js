@@ -210,6 +210,11 @@ class Monitor extends EventEmitter {
     this.evaluate(Date.now());
   }
 
+  isDeviceInMaintenance(d, now = Date.now()) {
+    if (!d) return false;
+    return Boolean(d.maintenance || (d.maintenance_until && d.maintenance_until > now));
+  }
+
   _newState(id) {
     const last = this.db.prepare('SELECT MAX(ts) t FROM metrics WHERE device_id = ? AND cpu IS NOT NULL').get(id);
     return {
@@ -386,7 +391,7 @@ class Monitor extends EventEmitter {
       }
       if (d.snmp_enabled && d.address) checks.push({ n: 'snmp', ok: st.snmp.ok });
 
-      if (d.maintenance) status = 'maint';
+      if (this.isDeviceInMaintenance(d, now)) status = 'maint';
       else if (!checks.length) status = 'unknown';
       else if (checks.some((c) => c.ok === true)) {
         status = 'up';
@@ -583,7 +588,7 @@ class Monitor extends EventEmitter {
 
   _triggerTelegramAlert(d, st, kind, reason, now = Date.now()) {
     if (st && (st.suppressed || st.inMassOutage)) return;
-    if (!this.telegram || !d || !d.id || d.maintenance) return;
+    if (!this.telegram || !d || !d.id || this.isDeviceInMaintenance(d, now)) return;
     if (this.severityOf(d) === 'none') return;
     if (d.telegram_enabled === 0 || d.telegram_enabled === false) return;
     const tg = this.settings && this.settings.telegram;
@@ -648,6 +653,7 @@ class Monitor extends EventEmitter {
 
   _triggerAiIncident(d, kind, aiSev, message, eventId, now = Date.now()) {
     if (!this.settings.ai || !this.settings.ai.enabled || this.settings.ai.auto_incident === false) return;
+    if (this.isDeviceInMaintenance(d, now)) return;
     const { collectDeviceTechnicalLogs } = require('./ai');
     const techLogs = collectDeviceTechnicalLogs(this, {
       eventId,
@@ -1089,7 +1095,9 @@ class Monitor extends EventEmitter {
     const v = {
       id: d.id, name: d.name, type: d.type, address: d.address, location: d.location,
       parent_id: d.parent_id || null,
-      maintenance: !!d.maintenance, mute_local_alerts: !!d.mute_local_alerts,
+      maintenance: this.isDeviceInMaintenance(d),
+      maintenance_until: d.maintenance_until || 0,
+      mute_local_alerts: !!d.mute_local_alerts,
       telegram_enabled: d.telegram_enabled !== 0,
       severity: this.severityOf(d), groups: d.groups,
       status: st.status, reasons: st.reasons, since: st.since, acked: st.acked,

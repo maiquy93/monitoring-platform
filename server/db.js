@@ -70,7 +70,7 @@ function open(file) {
       check_agent INTEGER NOT NULL DEFAULT 0, snmp_enabled INTEGER NOT NULL DEFAULT 0,
       snmp_community TEXT NOT NULL DEFAULT 'public', snmp_port INTEGER NOT NULL DEFAULT 161,
       severity TEXT, location TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '',
-      maintenance INTEGER NOT NULL DEFAULT 0, mute_local_alerts INTEGER NOT NULL DEFAULT 0,
+      maintenance INTEGER NOT NULL DEFAULT 0, maintenance_until INTEGER DEFAULT 0, mute_local_alerts INTEGER NOT NULL DEFAULT 0,
       telegram_enabled INTEGER NOT NULL DEFAULT 1, parent_id INTEGER REFERENCES devices(id) ON DELETE SET NULL,
       agent_token TEXT UNIQUE NOT NULL, created_at INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS device_groups(
@@ -122,6 +122,7 @@ function open(file) {
   if (!cols.includes('mute_local_alerts')) db.exec("ALTER TABLE devices ADD COLUMN mute_local_alerts INTEGER NOT NULL DEFAULT 0");
   if (!cols.includes('telegram_enabled')) db.exec("ALTER TABLE devices ADD COLUMN telegram_enabled INTEGER NOT NULL DEFAULT 1");
   if (!cols.includes('parent_id')) db.exec('ALTER TABLE devices ADD COLUMN parent_id INTEGER REFERENCES devices(id) ON DELETE SET NULL');
+  if (!cols.includes('maintenance_until')) db.exec('ALTER TABLE devices ADD COLUMN maintenance_until INTEGER DEFAULT 0');
   // bandwidth history (bytes per second): net_in = download/rx, net_out = upload/tx
   const mcols = db.prepare('PRAGMA table_info(metrics)').all().map((c) => c.name);
   if (!mcols.includes('net_in')) db.exec('ALTER TABLE metrics ADD COLUMN net_in REAL');

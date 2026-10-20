@@ -913,7 +913,7 @@ class AiService {
 
     const risks = [];
     for (const d of snap.devices) {
-      if (d.maintenance || d.type === 'printer') continue;
+      if (d.maintenance || (d.maintenance_until && d.maintenance_until > Date.now()) || d.type === 'printer') continue;
       if (d.disk != null && d.disk >= 80) risks.push(`${d.name}:Disk=${Math.round(d.disk)}%`);
       if (d.cpu != null && d.cpu >= 85) risks.push(`${d.name}:CPU=${Math.round(d.cpu)}%`);
       if (d.temperature != null && d.temperature >= 80) risks.push(`${d.name}:Temp=${Math.round(d.temperature)}C`);

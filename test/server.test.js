@@ -2319,5 +2319,105 @@ test('ui settings & API: storm guard toggle switch, instant save on master chang
   }
 });
 
+test('maintenance mode: DB migration, quick set 1h/4h/24h/clear, alert suppression and UI bindings', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
+  const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+
+  // Verify Frontend UI code defines M.openMaintenanceModal and quick duration buttons
+  assert.ok(viewsJs.includes('M.openMaintenanceModal'), 'views.js must define M.openMaintenanceModal');
+  assert.ok(viewsJs.includes('data-hours="1"'), 'Maintenance modal must have 1 hour button');
+  assert.ok(viewsJs.includes('data-hours="4"'), 'Maintenance modal must have 4 hours button');
+  assert.ok(viewsJs.includes('data-hours="24"'), 'Maintenance modal must have 24 hours button');
+  assert.ok(viewsJs.includes('data-clear="true"'), 'Maintenance modal must have Turn OFF button');
+  assert.ok(styleCss.includes('.maint-btn'), 'style.css must define .maint-btn');
+  assert.ok(styleCss.includes('.maint-status-banner'), 'style.css must define .maint-status-banner');
+  assert.ok(styleCss.includes('.btn.maint-active'), 'style.css must define .btn.maint-active');
+
+  // Boot server and test backend API & DB
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+
+    // 1. Verify DB schema has maintenance_until column
+    const cols = t.db.prepare('PRAGMA table_info(devices)').all().map((c) => c.name);
+    assert.ok(cols.includes('maintenance_until'), 'devices table must have maintenance_until column');
+
+    // Create a test device
+    const createRes = await t.api('POST', '/api/devices', {
+      name: 'Server-Maintenance-Test',
+      type: 'server',
+      address: '10.99.99.10',
+      check_icmp: true,
+    });
+    assert.equal(createRes.status, 201);
+    const devId = createRes.body.id;
+
+    // 2. Test Quick Activation: 1 Hour
+    const now1 = Date.now();
+    const maint1 = await t.api('POST', `/api/devices/${devId}/maintenance`, { duration_hours: 1 });
+    assert.equal(maint1.status, 200);
+    assert.equal(maint1.body.ok, true);
+    assert.equal(maint1.body.maintenance, true);
+    assert.ok(maint1.body.maintenance_until >= now1 + 3590e3, 'maintenance_until must be ~1h in future');
+
+    // Verify snapshot reflects maintenance status
+    let snap = t.monitor.snapshot();
+    let dev = snap.devices.find((d) => d.id === devId);
+    assert.equal(dev.status, 'maint');
+    assert.equal(dev.maintenance, true);
+    assert.ok(dev.maintenance_until > Date.now());
+    assert.equal(snap.summary.maintenance, 1, 'Dashboard summary must count in maintenance');
+
+    // 3. Test Quick Activation: 4 Hours
+    const now4 = Date.now();
+    const maint4 = await t.api('POST', `/api/devices/${devId}/maintenance`, { duration_hours: 4 });
+    assert.equal(maint4.status, 200);
+    assert.ok(maint4.body.maintenance_until >= now4 + 4 * 3590e3, 'maintenance_until must be ~4h in future');
+
+    // 4. Test Quick Activation: 24 Hours
+    const now24 = Date.now();
+    const maint24 = await t.api('POST', `/api/devices/${devId}/maintenance`, { duration_hours: 24 });
+    assert.equal(maint24.status, 200);
+    assert.ok(maint24.body.maintenance_until >= now24 + 24 * 3590e3, 'maintenance_until must be ~24h in future');
+
+    // 5. Test Alert Suppression while in maintenance mode:
+    // Even if device ICMP fails and drops offline, it must NOT fire events or telegram alerts
+    const devState = t.monitor.state.get(devId);
+    devState.icmp.ok = false;
+    devState.icmp.fails = 2;
+    t.monitor.startedAt -= 60000;
+    t.monitor.evaluate(Date.now());
+
+    // Status remains 'maint' because maintenance mode is active!
+    snap = t.monitor.snapshot();
+    dev = snap.devices.find((d) => d.id === devId);
+    assert.equal(dev.status, 'maint', 'Device status must remain maint even when checks fail');
+
+    // Check events table: No 'down' event should be created for this device
+    const events = t.db.prepare('SELECT * FROM events WHERE device_id = ?').all(devId);
+    assert.equal(events.length, 0, 'No events should be created while device is under maintenance');
+
+    // 6. Test Turn OFF Maintenance: clear = true
+    const maintOff = await t.api('POST', `/api/devices/${devId}/maintenance`, { clear: true });
+    assert.equal(maintOff.status, 200);
+    assert.equal(maintOff.body.maintenance, false);
+    assert.equal(maintOff.body.maintenance_until, 0);
+
+    // After turning off maintenance, evaluate drops the unreachable device to 'down'
+    t.monitor.startedAt -= 60000;
+    t.monitor.evaluate(Date.now());
+    snap = t.monitor.snapshot();
+    dev = snap.devices.find((d) => d.id === devId);
+    assert.equal(dev.status, 'down', 'Device should transition to down after maintenance is turned off');
+    assert.equal(snap.summary.maintenance, 0);
+    assert.equal(snap.summary.down, 1);
+  } finally {
+    t.close();
+  }
+});
+
+
 
 
