@@ -247,3 +247,38 @@ test('history API: range=30d falls back cleanly to raw metrics when hourly metri
     t.close();
   }
 });
+
+test('frontend UI: views.js, style.css, and core.js integrate interactive timeframe tabs and chart tooltips', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  const viewsJs = fs.readFileSync(path.join(__dirname, '../public/views.js'), 'utf8');
+  const styleCss = fs.readFileSync(path.join(__dirname, '../public/style.css'), 'utf8');
+  const coreJs = fs.readFileSync(path.join(__dirname, '../public/core.js'), 'utf8');
+
+  // 1. Timeframe switch buttons: Realtime, 24h, 7d, 30d, 90d
+  assert.ok(viewsJs.includes('data-range="realtime"'));
+  assert.ok(viewsJs.includes('data-range="24h"'));
+  assert.ok(viewsJs.includes('data-range="7d"'));
+  assert.ok(viewsJs.includes('data-range="30d"'));
+  assert.ok(viewsJs.includes('data-range="90d"'));
+
+  // 2. Interactive SVG chart tooltips & crosshair handler
+  assert.ok(viewsJs.includes('M.initChartTooltips'));
+  assert.ok(viewsJs.includes('chart-crosshair'));
+  assert.ok(viewsJs.includes('chart-tooltip'));
+
+  // 3. Styling classes in style.css
+  assert.ok(styleCss.includes('.time-tabs'));
+  assert.ok(styleCss.includes('.time-tab'));
+  assert.ok(styleCss.includes('.chart-box'));
+  assert.ok(styleCss.includes('.chart-tooltip'));
+  assert.ok(styleCss.includes('.live-indicator'));
+
+  // 4. i18n support in core.js
+  assert.ok(coreJs.includes("'30 ngày': '30 days'"));
+  assert.ok(coreJs.includes("'90 ngày': '90 days'"));
+  assert.ok(coreJs.includes("'Thời gian thực': 'Realtime'"));
+  assert.ok(coreJs.includes("'Tải xuống': 'Download'"));
+  assert.ok(coreJs.includes("'Tải lên': 'Upload'"));
+});

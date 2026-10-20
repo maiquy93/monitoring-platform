@@ -234,9 +234,11 @@
       <div class="g-label">${label}${sub ? `<br>${sub}` : ''}</div></div>`;
   };
 
+  let chartIdCounter = 0;
   M.chart = (pts, series, range, max, fmtY) => {
     const W = 600, H = 170, L = fmtY ? 54 : 34, R = 8, T = 8, B = 20;
-    if (pts.length < 2) return `<div class="muted" style="padding:30px;text-align:center">${esc(t('Chưa đủ dữ liệu lịch sử'))}</div>`;
+    if (!pts || pts.length < 2) return `<div class="muted" style="padding:30px;text-align:center">${esc(t('Chưa đủ dữ liệu lịch sử'))}</div>`;
+    const chartId = `ch-${++chartIdCounter}`;
     const x0 = pts[0].ts, x1 = pts[pts.length - 1].ts;
     const yMax = max || Math.max(1, ...series.flatMap((s) => pts.map((p) => p[s.key] ?? 0))) * 1.2;
     const sx = (tVal) => L + (W - L - R) * ((tVal - x0) / (x1 - x0 || 1));
@@ -251,12 +253,133 @@
       return `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
     }).join('');
     const loc = M.S.lang === 'en' ? 'en-US' : 'vi-VN';
-    const fmt = (tVal) => new Date(tVal).toLocaleString(loc, range === '7d' || range === '24h' ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { hour: '2-digit', minute: '2-digit' });
+    const fmt = (tVal) => {
+      const d = new Date(tVal);
+      if (range === '30d' || range === '90d') {
+        return d.toLocaleDateString(loc, { day: '2-digit', month: '2-digit' });
+      }
+      if (range === '7d' || range === '24h') {
+        return d.toLocaleString(loc, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      }
+      return d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
+    };
     const formatY = fmtY || ((v) => Math.round(v));
     const grid = [0, 0.5, 1].map((f) => `<line class="grid-l" x1="${L}" x2="${W - R}" y1="${sy(yMax * f)}" y2="${sy(yMax * f)}"/><text x="${L - 4}" y="${sy(yMax * f) + 3}" text-anchor="end">${formatY(yMax * f)}</text>`).join('');
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${grid}${paths}
-      <text x="${L}" y="${H - 4}">${fmt(x0)}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">${fmt(x1)}</text></svg>
-      <div class="legend">${series.map((s) => `<span style="--lc:${s.color}">${s.label}</span>`).join('')}</div>`;
+
+    const crosshair = `<line class="chart-crosshair hidden" x1="0" y1="${T}" x2="0" y2="${H - B}"/>`;
+    const dots = series.map((s, idx) => `<circle class="chart-hover-dot hidden" data-sidx="${idx}" r="4" fill="var(--panel)" stroke="${s.color}" stroke-width="2.5"/>`).join('');
+    const overlay = `<rect class="chart-overlay" x="0" y="0" width="${W}" height="${H}" fill="transparent" pointer-events="all" style="cursor:crosshair;"/>`;
+
+    M._chartMeta = M._chartMeta || {};
+    M._chartMeta[chartId] = { pts, series, range, max, fmtY, W, H, L, R, T, B, x0, x1, yMax, sx, sy };
+
+    return `<div class="chart-box" id="${chartId}" data-chart-id="${chartId}">
+      <svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        ${grid}${paths}${crosshair}${dots}${overlay}
+        <text x="${L}" y="${H - 4}">${fmt(x0)}</text><text x="${W - R}" y="${H - 4}" text-anchor="end">${fmt(x1)}</text>
+      </svg>
+      <div class="chart-tooltip hidden"></div>
+      <div class="legend">${series.map((s) => `<span style="--lc:${s.color}">${s.label}</span>`).join('')}</div>
+    </div>`;
+  };
+
+  M.initChartTooltips = () => {
+    document.querySelectorAll('.chart-box').forEach((box) => {
+      const id = box.dataset.chartId;
+      const meta = M._chartMeta && M._chartMeta[id];
+      if (!meta) return;
+      const svg = box.querySelector('svg.chart');
+      const overlay = box.querySelector('.chart-overlay');
+      const crosshair = box.querySelector('.chart-crosshair');
+      const dots = box.querySelectorAll('.chart-hover-dot');
+      const tooltip = box.querySelector('.chart-tooltip');
+      if (!svg || !overlay || !tooltip) return;
+
+      const { pts, series, fmtY, W, L, R, x0, x1, sx, sy, range } = meta;
+      const loc = M.S.lang === 'en' ? 'en-US' : 'vi-VN';
+
+      const hide = () => {
+        if (crosshair) crosshair.classList.add('hidden');
+        dots.forEach((d) => d.classList.add('hidden'));
+        tooltip.classList.add('hidden');
+      };
+
+      const handleMove = (e) => {
+        const svgRect = svg.getBoundingClientRect();
+        if (!svgRect.width) return;
+        const normX = (e.clientX - svgRect.left) / svgRect.width;
+        const mouseSvgX = normX * W;
+        if (mouseSvgX < L || mouseSvgX > W - R) { hide(); return; }
+
+        const targetTs = x0 + (x1 - x0) * ((mouseSvgX - L) / (W - L - R));
+
+        let closest = pts[0], minDiff = Math.abs(pts[0].ts - targetTs);
+        for (let i = 1; i < pts.length; i++) {
+          const diff = Math.abs(pts[i].ts - targetTs);
+          if (diff < minDiff) { minDiff = diff; closest = pts[i]; }
+          else if (diff > minDiff) { break; }
+        }
+        if (!closest) { hide(); return; }
+
+        const cx = sx(closest.ts);
+        if (crosshair) {
+          crosshair.setAttribute('x1', cx.toFixed(1));
+          crosshair.setAttribute('x2', cx.toFixed(1));
+          crosshair.classList.remove('hidden');
+        }
+
+        let tipRows = '';
+        series.forEach((s, sidx) => {
+          const val = closest[s.key];
+          const dot = dots[sidx];
+          if (val != null) {
+            if (dot) {
+              dot.setAttribute('cx', cx.toFixed(1));
+              dot.setAttribute('cy', sy(val).toFixed(1));
+              dot.classList.remove('hidden');
+            }
+            let displayVal = fmtY ? fmtY(val) : (typeof val === 'number' ? `${Math.round(val * 10) / 10}${s.unit || '%'}` : val);
+            const maxVal = closest[`${s.key}_max`];
+            if (maxVal != null && maxVal !== val && Math.abs(maxVal - val) > 0.05) {
+              const maxDisplay = fmtY ? fmtY(maxVal) : `${Math.round(maxVal * 10) / 10}${s.unit || '%'}`;
+              displayVal += ` <span class="muted" style="font-size:11px">(${t('Cao nhất')}: ${maxDisplay})</span>`;
+            }
+            tipRows += `<div class="chart-tip-row">
+              <span class="chart-tip-dot" style="background:${s.color}"></span>
+              <span class="chart-tip-label">${esc(s.label)}:</span>
+              <span class="chart-tip-val">${displayVal}</span>
+            </div>`;
+          } else if (dot) {
+            dot.classList.add('hidden');
+          }
+        });
+
+        if (!tipRows) { hide(); return; }
+
+        const dObj = new Date(closest.ts);
+        const timeFmt = dObj.toLocaleString(loc, {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit',
+          second: range === '1h' || range === 'realtime' ? '2-digit' : undefined,
+        });
+
+        tooltip.innerHTML = `<div class="chart-tip-time">⏱️ ${timeFmt}</div>${tipRows}`;
+        tooltip.classList.remove('hidden');
+
+        const px = (cx / W) * svgRect.width;
+        if (px > svgRect.width * 0.6) {
+          tooltip.style.left = 'auto';
+          tooltip.style.right = `${Math.max(6, svgRect.width - px + 12)}px`;
+        } else {
+          tooltip.style.right = 'auto';
+          tooltip.style.left = `${Math.max(6, px + 12)}px`;
+        }
+      };
+
+      overlay.onpointermove = handleMove;
+      overlay.onpointerdown = handleMove;
+      overlay.onpointerleave = hide;
+    });
   };
 
   M.renderAiReportCard = (r, showHeader = true) => {
@@ -1323,21 +1446,51 @@
   // ---------- device ----------
   M.views.device = {
     async render(el, id) {
-      this.id = Number(id); this.range = this.range || '1h'; this.busy = false;
+      this.id = Number(id);
+      this.range = this.range || 'realtime';
+      this.busy = false;
+      const isEn = M.S.lang === 'en';
       el.innerHTML = `<div id="d-hero"></div><div class="panel" id="d-gauges" style="margin-top:14px"></div>
         <div class="cols"><div>
-          <div class="panel"><div class="row"><h2 style="margin:0">${esc(t('Lịch sử'))}</h2><span class="spacer"></span>
-            <select class="sel" id="d-range"><option value="1h">${esc(t('1 giờ'))}</option><option value="6h">${esc(t('6 giờ'))}</option><option value="24h">${esc(t('24 giờ'))}</option><option value="7d">${esc(t('7 ngày'))}</option></select></div>
-            <div id="d-charts"></div></div>
+          <div class="panel">
+            <div class="row" style="flex-wrap:wrap;gap:8px;margin-bottom:8px">
+              <h2 style="margin:0">${esc(t('Lịch sử'))}</h2>
+              <span class="spacer"></span>
+              <div class="time-tabs" id="d-time-tabs" role="tablist">
+                <button type="button" class="time-tab ${this.range === 'realtime' ? 'active' : ''}" data-range="realtime" title="${isEn ? 'Live real-time monitoring (1h window, auto-refresh)' : 'Giám sát trực tiếp thời gian thực (chu kỳ 1 giờ, tự động làm mới)'}">
+                  <span class="live-indicator"></span> ${esc(t('Thời gian thực'))}
+                </button>
+                <button type="button" class="time-tab ${this.range === '24h' ? 'active' : ''}" data-range="24h" title="${isEn ? 'Last 24 hours history' : 'Lịch sử 24 giờ qua'}">24h</button>
+                <button type="button" class="time-tab ${this.range === '7d' ? 'active' : ''}" data-range="7d" title="${isEn ? 'Last 7 days history' : 'Lịch sử 7 ngày qua'}">7d</button>
+                <button type="button" class="time-tab ${this.range === '30d' ? 'active' : ''}" data-range="30d" title="${isEn ? 'Last 30 days history' : 'Lịch sử 30 ngày qua'}">30d</button>
+                <button type="button" class="time-tab ${this.range === '90d' ? 'active' : ''}" data-range="90d" title="${isEn ? 'Last 90 days history' : 'Lịch sử 90 ngày qua'}">90d</button>
+              </div>
+            </div>
+            <div id="d-charts"></div>
+          </div>
           <div class="panel" style="margin-top:14px"><h2 style="margin:0 0 10px">${esc(t('Sự kiện gần đây'))}</h2><div id="d-events"></div></div>
         </div><div class="panel" id="d-info"></div></div>`;
-      $('#d-range').value = this.range;
       this._infoHtml = null;
       if (!M.profiles) M.profiles = await M.api('GET', '/api/snmp/profiles').then((r) => r.profiles).catch(() => []);
-      $('#d-range').onchange = (e) => { this.range = e.target.value; this.loadCharts(); };
+      const tabWrap = $('#d-time-tabs');
+      if (tabWrap) {
+        tabWrap.querySelectorAll('.time-tab').forEach((btn) => {
+          btn.onclick = () => {
+            const next = btn.dataset.range;
+            if (this.range === next) return;
+            this.range = next;
+            tabWrap.querySelectorAll('.time-tab').forEach((b) => {
+              b.classList.toggle('active', b.dataset.range === this.range);
+            });
+            this.loadCharts();
+          };
+        });
+      }
       await this.load();
       this.loadCharts(); this.loadEvents();
-      this.t1 = setInterval(() => this.loadCharts(), 30000);
+      this.t1 = setInterval(() => {
+        if (this.range === 'realtime') this.loadCharts();
+      }, 15000);
       this.t2 = setInterval(() => this.loadEvents(), 10000);
     },
     destroy() { clearInterval(this.t1); clearInterval(this.t2); this.D = null; },
@@ -1761,40 +1914,51 @@
     },
     async loadCharts() {
       if (!$('#d-charts')) return;
-      const { points } = await M.api('GET', `/api/devices/${this.id}/history?range=${this.range}`);
+      const apiRange = (this.range === 'realtime') ? '1h' : (this.range || '1h');
+      const { points } = await M.api('GET', `/api/devices/${this.id}/history?range=${apiRange}`);
       if (!$('#d-charts')) return;
-      const has = (k) => points.some((p) => p[k] != null);
+      M._chartMeta = {};
+      const has = (k) => points && points.some((p) => p[k] != null);
       let html = '';
       if (this.D && this.D.type === 'printer') {
         if (has('toner') || has('drum')) {
           const pSeries = [];
-          if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: t('Mực in (%)') });
-          if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: t('Độ bền Drum (%)') });
-          html += `<h2>${esc(t('Lịch sử tiêu hao Vật tư (Mực in & Drum %)'))}</h2>${M.chart(points, pSeries, this.range, 100)}`;
+          if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: t('Mực in (%)'), unit: '%' });
+          if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: t('Độ bền Drum (%)'), unit: '%' });
+          html += `<h2>${esc(t('Lịch sử tiêu hao Vật tư (Mực in & Drum %)'))}</h2>${M.chart(points, pSeries, this.range, 100, (v) => `${Math.round(v)}%`)}`;
         }
         if (has('ram')) {
-          html += `<h2>${esc(t('Lịch sử sử dụng Bộ nhớ máy in (RAM %)'))}</h2>${M.chart(points, [{ key: 'ram', color: 'var(--c-medium)', label: t('RAM máy in (%)') }], this.range, 100)}`;
+          html += `<h2>${esc(t('Lịch sử sử dụng Bộ nhớ máy in (RAM %)'))}</h2>${M.chart(points, [{ key: 'ram', color: 'var(--c-medium)', label: t('RAM máy in (%)'), unit: '%' }], this.range, 100, (v) => `${Math.round(v)}%`)}`;
         }
       } else {
-        if (has('cpu')) html += `<h2>${esc(t('CPU / RAM / Ổ đĩa (%)'))}</h2>${M.chart(points, [{ key: 'cpu', color: 'var(--c-low)', label: 'CPU' }, { key: 'ram', color: 'var(--c-medium)', label: 'RAM' }, { key: 'disk', color: 'var(--c-high)', label: 'Disk' }], this.range, 100)}`;
-        if (has('rtt')) html += `<h2>${esc(t('Độ trễ ping (ms)'))}</h2>${M.chart(points, [{ key: 'rtt', color: 'var(--c-ok)', label: 'RTT' }], this.range)}`;
+        if (has('cpu') || has('ram') || has('disk')) {
+          const s = [];
+          if (has('cpu')) s.push({ key: 'cpu', color: 'var(--c-low)', label: 'CPU', unit: '%' });
+          if (has('ram')) s.push({ key: 'ram', color: 'var(--c-medium)', label: 'RAM', unit: '%' });
+          if (has('disk')) s.push({ key: 'disk', color: 'var(--c-high)', label: t('Ổ đĩa'), unit: '%' });
+          html += `<h2>${esc(t('CPU / RAM / Ổ đĩa (%)'))}</h2>${M.chart(points, s, this.range, 100, (v) => `${Math.round(v)}%`)}`;
+        }
+        if (has('rtt')) {
+          html += `<h2>${esc(t('Độ trễ ping (ms)'))}</h2>${M.chart(points, [{ key: 'rtt', color: 'var(--c-ok)', label: 'RTT', unit: ' ms' }], this.range, null, (v) => `${Math.round(v)} ms`)}`;
+        }
         if (has('net_in') || has('net_out')) {
           html += `<h2>${esc(t('Tổng băng thông sử dụng'))}</h2>${M.chart(points, [
-            { key: 'net_in', color: 'var(--c-low)', label: 'Download' },
-            { key: 'net_out', color: 'var(--c-maint)', label: 'Upload' },
+            { key: 'net_in', color: 'var(--c-low)', label: t('Tải xuống') },
+            { key: 'net_out', color: 'var(--c-maint)', label: t('Tải lên') },
           ], this.range, null, M.fmtRate)}`;
         }
         if (has('temp')) {
-          html += `<h2>${esc(t('Nhiệt độ CPU (°C)'))}</h2>${M.chart(points, [{ key: 'temp', color: 'var(--c-high)', label: t('Nhiệt độ (°C)') }], this.range, 120, (v) => `${Math.round(v)}°`)}`;
+          html += `<h2>${esc(t('Nhiệt độ CPU (°C)'))}</h2>${M.chart(points, [{ key: 'temp', color: 'var(--c-high)', label: t('Nhiệt độ (°C)'), unit: '°C' }], this.range, 120, (v) => `${Math.round(v)}°C`)}`;
         }
         if (has('toner') || has('drum')) {
           const pSeries = [];
-          if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: t('Mực in (%)') });
-          if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: t('Độ bền Drum (%)') });
-          html += `<h2>${esc(t('Lịch sử Mực in & Độ bền Drum (%)'))}</h2>${M.chart(points, pSeries, this.range, 100)}`;
+          if (has('toner')) pSeries.push({ key: 'toner', color: 'var(--c-low)', label: t('Mực in (%)'), unit: '%' });
+          if (has('drum')) pSeries.push({ key: 'drum', color: 'var(--c-maint)', label: t('Độ bền Drum (%)'), unit: '%' });
+          html += `<h2>${esc(t('Lịch sử Mực in & Độ bền Drum (%)'))}</h2>${M.chart(points, pSeries, this.range, 100, (v) => `${Math.round(v)}%`)}`;
         }
       }
       $('#d-charts').innerHTML = html || `<div class="muted" style="padding:20px">${esc(t('Chưa có dữ liệu lịch sử'))}</div>`;
+      if (typeof M.initChartTooltips === 'function') M.initChartTooltips();
     },
     async loadEvents() {
       if (!$('#d-events')) return;
