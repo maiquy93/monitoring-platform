@@ -105,11 +105,6 @@
         telegram_enabled: f.telegram_enabled ? f.telegram_enabled.checked : true,
         groups: fd.getAll('grp').map(Number),
       };
-        check_icmp: f.check_icmp.checked, check_agent: f.check_agent.checked, snmp_enabled: f.snmp_enabled.checked,
-        maintenance: f.maintenance.checked, mute_local_alerts: f.mute_local_alerts.checked,
-        telegram_enabled: f.telegram_enabled ? f.telegram_enabled.checked : true,
-        groups: fd.getAll('grp').map(Number),
-      };
       if (id) await M.api('PUT', `/api/devices/${id}`, body); else await M.api('POST', '/api/devices', body);
       await M.loadGroups();
       M.toast(t('Đã lưu thiết bị'));

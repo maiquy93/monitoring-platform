@@ -2227,3 +2227,21 @@ test('ui settings & device detail: Telegram Alert Channels card, toggle switch, 
   assert.match(styleCss, /\.tg-popup-overlay\s*\{/);
 });
 
+test('frontend scripts: all public/*.js files parse without syntax errors and settings view is defined', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const pubDir = path.join(__dirname, '../public');
+  const jsFiles = fs.readdirSync(pubDir).filter((f) => f.endsWith('.js'));
+  assert.ok(jsFiles.length > 0, 'public JS files must exist');
+  for (const f of jsFiles) {
+    const code = fs.readFileSync(path.join(pubDir, f), 'utf8');
+    assert.doesNotThrow(() => {
+      new vm.Script(code, { filename: f });
+    }, `Syntax error in public/${f}`);
+  }
+  const adminJs = fs.readFileSync(path.join(pubDir, 'admin.js'), 'utf8');
+  assert.ok(adminJs.includes('M.views.settings ='), 'admin.js must define M.views.settings');
+});
+
+
