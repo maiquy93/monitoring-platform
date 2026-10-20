@@ -532,7 +532,7 @@
         <div class="row" style="flex-wrap:wrap;gap:8px">
           <h2 style="margin:0">🛡️ ${isEn ? 'Alert Storm Guard Module' : 'Module Chống bão cảnh báo (Alert Storm Guard)'}</h2>
           <span class="spacer"></span>
-          <span class="ai-badge ${isActive ? '' : 'cached'}">${isActive
+          <span class="ai-badge ${isActive ? '' : 'cached'}" id="st-storm-badge">${isActive
             ? (isEn ? '🟢 Storm Guard Active' : '🟢 Đang kích hoạt Chống bão')
             : (isEn ? '⚪ Guard Disabled (Original Flow)' : '⚪ Đang tắt (Luồng cảnh báo nguyên bản)')}</span>
         </div>
@@ -542,16 +542,16 @@
 
         <form id="st-storm-guard">
           <div class="row" style="margin-bottom:14px;padding:10px 12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border)">
-            <label class="toggle-switch" for="f-sg_enabled">
+            <label class="toggle-switch">
               <input type="checkbox" name="storm_guard_enabled" id="f-sg_enabled" ${sg.enabled ? 'checked' : ''}>
               <span class="toggle-slider"></span>
               <span><b>${isEn ? 'Enable Alert Storm Guard (Master Switch)' : 'Bật Module Chống bão cảnh báo (Công tắc tổng)'}</b></span>
             </label>
           </div>
 
-          <div class="field-grid">
+          <div class="field-grid" id="st-storm-subfields" style="transition:opacity 0.2s ease;${isActive ? '' : 'opacity:0.65'}">
             <div class="field" style="background:var(--panel2);padding:10px;border-radius:6px;border:1px solid var(--border)">
-              <label class="toggle-switch" for="f-sg_parent_id">
+              <label class="toggle-switch">
                 <input type="checkbox" name="storm_use_parent_id" id="f-sg_parent_id" ${sg.use_parent_id ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
                 <span>${isEn ? 'Layer 1: Suppress by explicit Uplink/Parent ID' : 'Lớp 1: Chặn theo Thiết bị Uplink/Cha chỉ định'}</span>
@@ -562,7 +562,7 @@
             </div>
 
             <div class="field" style="background:var(--panel2);padding:10px;border-radius:6px;border:1px solid var(--border)">
-              <label class="toggle-switch" for="f-sg_topology">
+              <label class="toggle-switch">
                 <input type="checkbox" name="storm_use_topology" id="f-sg_topology" ${sg.use_topology ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
                 <span>${isEn ? 'Layer 2: Infer dependencies from Topology Map' : 'Lớp 2: Tự suy luận từ Sơ đồ mạng Topology'}</span>
@@ -582,7 +582,7 @@
           </div>
 
           <div style="margin-top:14px">
-            <button class="btn primary">${isEn ? '💾 Save Storm Guard Settings' : '💾 Lưu cấu hình chống bão'}</button>
+            <button class="btn primary" id="btn-sg-save">${isEn ? '💾 Save Storm Guard Settings' : '💾 Lưu cấu hình chống bão'}</button>
           </div>
         </form>
       </div>`;
@@ -590,23 +590,61 @@
     bindStormGuardPanel(el, s, save, guard) {
       const form = $('#st-storm-guard', el);
       if (!form) return;
-      form.onsubmit = guard(async (fd) => {
-        const isEn = M.S.lang === 'en';
+      const isEn = M.S.lang === 'en';
+      const masterChk = $('#f-sg_enabled', form);
+      const badge = $('#st-storm-badge', el);
+      const subfields = $('#st-storm-subfields', el);
+
+      const updateVisualState = () => {
+        if (!masterChk) return;
+        const active = masterChk.checked;
+        if (badge) {
+          badge.className = `ai-badge ${active ? '' : 'cached'}`;
+          badge.textContent = active
+            ? (isEn ? '🟢 Storm Guard Active' : '🟢 Đang kích hoạt Chống bão')
+            : (isEn ? '⚪ Guard Disabled (Original Flow)' : '⚪ Đang tắt (Luồng cảnh báo nguyên bản)');
+        }
+        if (subfields) {
+          subfields.style.opacity = active ? '1' : '0.65';
+        }
+      };
+
+      const doSave = async () => {
         const enabled = $('#f-sg_enabled', form).checked ? 1 : 0;
         const useParentId = $('#f-sg_parent_id', form).checked ? 1 : 0;
         const useTopology = $('#f-sg_topology', form).checked ? 1 : 0;
-        const burstThreshold = Math.max(0, Number(fd.get('storm_burst_threshold') || 0));
+        const burstInput = $('#f-sg_burst', form);
+        const burstThreshold = Math.max(0, Number((burstInput && burstInput.value) || 0));
 
-        await M.api('PUT', '/api/settings', {
+        await save({
           storm_guard_enabled: enabled,
           storm_use_parent_id: useParentId,
           storm_use_topology: useTopology,
           storm_burst_threshold: burstThreshold,
-        });
+          storm_guard: {
+            enabled,
+            use_parent_id: useParentId,
+            use_topology: useTopology,
+            burst_threshold: burstThreshold,
+          },
+        }, isEn ? 'Storm guard settings saved successfully!' : 'Đã lưu cấu hình chống bão thành công!');
 
-        M.S.settings = { ...M.S.settings, ...(await M.api('GET', '/api/settings')) };
-        M.toast(isEn ? 'Storm guard settings saved successfully!' : 'Đã lưu cấu hình chống bão thành công!');
         this.render(el);
+      };
+
+      if (masterChk) {
+        masterChk.onchange = async () => {
+          updateVisualState();
+          try {
+            await doSave();
+          } catch (err) {
+            M.toast(err.message);
+          }
+        };
+      }
+
+      form.onsubmit = guard(async () => {
+        await doSave();
       });
     },
     aiPanel(s) {

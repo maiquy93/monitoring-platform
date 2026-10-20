@@ -2244,4 +2244,80 @@ test('frontend scripts: all public/*.js files parse without syntax errors and se
   assert.ok(adminJs.includes('M.views.settings ='), 'admin.js must define M.views.settings');
 });
 
+test('ui settings & API: storm guard toggle switch, instant save on master change, form submit, and persistent settings via PUT /api/settings', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const adminJs = fs.readFileSync(path.join(__dirname, '../public/admin.js'), 'utf8');
+
+  // Verify Storm Guard panel markup & elements
+  assert.ok(adminJs.includes('id="st-storm-panel"'), 'admin.js must contain st-storm-panel');
+  assert.ok(adminJs.includes('id="st-storm-badge"'), 'admin.js must contain st-storm-badge');
+  assert.ok(adminJs.includes('id="st-storm-guard"'), 'admin.js must contain st-storm-guard form');
+  assert.ok(adminJs.includes('id="f-sg_enabled"'), 'admin.js must contain master switch f-sg_enabled');
+  assert.ok(adminJs.includes('id="f-sg_parent_id"'), 'admin.js must contain f-sg_parent_id');
+  assert.ok(adminJs.includes('id="f-sg_topology"'), 'admin.js must contain f-sg_topology');
+  assert.ok(adminJs.includes('id="f-sg_burst"'), 'admin.js must contain f-sg_burst');
+  assert.ok(adminJs.includes('id="btn-sg-save"'), 'admin.js must contain btn-sg-save');
+  assert.ok(adminJs.includes('masterChk.onchange'), 'admin.js must bind masterChk.onchange for instant toggle save');
+  assert.ok(adminJs.includes('updateVisualState'), 'admin.js must provide updateVisualState for instant UI feedback');
+
+  // Verify API end-to-end saving and retrieving
+  const t = await boot();
+  try {
+    await loginAdmin(t);
+
+    // Initial check: storm_guard_enabled is 0 by default
+    const initGet = await t.api('GET', '/api/settings');
+    assert.equal(initGet.status, 200);
+    assert.equal(initGet.body.storm_guard_enabled, 0);
+    assert.equal(initGet.body.storm_guard.enabled, 0);
+
+    // Save Storm Guard settings: Enable with custom params
+    const putRes = await t.api('PUT', '/api/settings', {
+      storm_guard_enabled: 1,
+      storm_use_parent_id: 1,
+      storm_use_topology: 1,
+      storm_burst_threshold: 4,
+      storm_guard: {
+        enabled: 1,
+        use_parent_id: 1,
+        use_topology: 1,
+        burst_threshold: 4,
+      },
+    });
+    assert.equal(putRes.status, 200);
+    assert.equal(putRes.body.ok, true);
+
+    // Verify GET /api/settings returns the persisted settings
+    const afterPut = await t.api('GET', '/api/settings');
+    assert.equal(afterPut.status, 200);
+    assert.equal(afterPut.body.storm_guard_enabled, 1);
+    assert.equal(afterPut.body.storm_use_parent_id, 1);
+    assert.equal(afterPut.body.storm_use_topology, 1);
+    assert.equal(afterPut.body.storm_burst_threshold, 4);
+    assert.equal(afterPut.body.storm_guard.enabled, 1);
+    assert.equal(afterPut.body.storm_guard.use_parent_id, 1);
+    assert.equal(afterPut.body.storm_guard.use_topology, 1);
+    assert.equal(afterPut.body.storm_guard.burst_threshold, 4);
+
+    // Save Storm Guard settings: Disable master switch
+    const disablePut = await t.api('PUT', '/api/settings', {
+      storm_guard_enabled: 0,
+      storm_use_parent_id: 1,
+      storm_use_topology: 0,
+      storm_burst_threshold: 3,
+    });
+    assert.equal(disablePut.status, 200);
+
+    // Verify GET /api/settings reflects disabled state
+    const afterDisable = await t.api('GET', '/api/settings');
+    assert.equal(afterDisable.status, 200);
+    assert.equal(afterDisable.body.storm_guard_enabled, 0);
+    assert.equal(afterDisable.body.storm_guard.enabled, 0);
+  } finally {
+    t.close();
+  }
+});
+
+
 
