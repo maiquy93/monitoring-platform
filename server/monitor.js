@@ -270,9 +270,18 @@ class Monitor extends EventEmitter {
       battery_percent: num(p.power.battery_percent, 0, 100),
       status: str(p.power.status, 32),
     } : null;
+    let listeningServices = null;
+    const rawPorts = p.listening_ports ?? p.listening_services ?? p.ports ?? p.services;
+    if (rawPorts) {
+      try {
+        const { parseAndValidateListeningPorts } = require('./diagnostics');
+        listeningServices = parseAndValidateListeningPorts(rawPorts);
+      } catch {}
+    }
     st.agent = {
       net: st.agent.net,
       lastAt: now,
+      listening_services: listeningServices || st.agent.listening_services || null,
       data: {
         hostname: str(p.hostname, 128), os: str(p.os, 128), ip: str(p.ip, 64), version: str(p.agent_version, 32),
         cpu: num(p.cpu && p.cpu.percent, 0, 100),
@@ -284,6 +293,7 @@ class Monitor extends EventEmitter {
         temperature: temp,
         smart,
         power,
+        listening_services: listeningServices || st.agent.data?.listening_services || null,
       },
     };
     return true;

@@ -7,12 +7,12 @@
 
   const DEFAULT_PORTS_BY_TYPE = {
     printer: '80, 443, 515, 631, 9100',
-    router: '22, 53, 80, 443, 8080, 8291, 8728',
-    switch: '22, 23, 80, 443, 8080',
-    firewall: '22, 80, 443, 4443, 8443, 10443',
+    router: '22, 53, 80, 161, 443, 8080, 8291, 8728',
+    switch: '22, 23, 80, 161, 443, 8080',
+    firewall: '22, 80, 161, 443, 4443, 8443, 10443',
     ap: '22, 80, 443, 8080',
-    server: '22, 80, 443, 3306, 3389, 5432, 6379, 8080',
-    vm: '22, 80, 443, 3306, 3389, 5432, 8080',
+    server: '22, 53, 80, 161, 443, 3306, 3389, 5432, 6379, 8080',
+    vm: '22, 53, 80, 161, 443, 3306, 3389, 5432, 8080',
     ups: '22, 80, 443, 3493',
     pc: '22, 80, 445, 3389, 5900',
   };
@@ -74,7 +74,7 @@
       <div class="diag-tabs">
         <button type="button" class="diag-tab-btn" data-diag-tab="ping">📡 Ping ICMP</button>
         <button type="button" class="diag-tab-btn" data-diag-tab="traceroute">🧭 Traceroute</button>
-        <button type="button" class="diag-tab-btn" data-diag-tab="tcp">🔌 ${isEn ? 'TCP Ports' : 'Cổng TCP'}</button>
+        <button type="button" class="diag-tab-btn" data-diag-tab="tcp">🔌 ${isEn ? 'Port Scanner (TCP/UDP)' : 'Kiểm tra Cổng (TCP/UDP)'}</button>
         <button type="button" class="diag-tab-btn" data-diag-tab="snmp">🔍 SNMP Live Walk</button>
       </div>
 
@@ -129,12 +129,24 @@
           <button type="button" class="btn primary" id="diag-run-btn">▶️ ${isEn ? 'Run Traceroute' : 'Chạy Traceroute'}</button>
         `;
       } else if (activeTool === 'tcp') {
-        const defPorts = DEFAULT_PORTS_BY_TYPE[curDev.type] || '22, 80, 443, 3389, 8080, 8291, 9100';
-        ctrlBox.innerHTML = `
-          <label style="font-size:13px">${isEn ? 'TCP Ports:' : 'Danh sách cổng TCP:'}</label>
-          <input class="inp" id="diag-tcp-ports" value="${esc(defPorts)}" style="flex:1;min-width:220px" placeholder="22, 80, 443, 3389, 9100">
-          <button type="button" class="btn primary" id="diag-run-btn">▶️ ${isEn ? 'Scan TCP Ports' : 'Kiểm tra Cổng TCP'}</button>
-        `;
+        const isServer = curDev.type === 'server';
+        if (isServer) {
+          ctrlBox.innerHTML = `
+            <div style="font-size:13px;display:flex;align-items:center;gap:6px">
+              <span class="chip" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-weight:600">🤖 Agent-based</span>
+              <span>${isEn ? 'Direct OS listening ports query via Agent' : 'Thu thập cổng đang mở trực tiếp từ OS qua Agent'}</span>
+            </div>
+            <span class="spacer"></span>
+            <button type="button" class="btn primary" id="diag-run-btn">🔄 ${isEn ? 'Fetch Listening Services' : 'Tải danh sách dịch vụ thực tế'}</button>
+          `;
+        } else {
+          const defPorts = DEFAULT_PORTS_BY_TYPE[curDev.type] || '22, 53, 80, 443, 3389, 8080, 8291, 9100';
+          ctrlBox.innerHTML = `
+            <label style="font-size:13px">${isEn ? 'Ports (list / range):' : 'Cổng (danh sách / dải):'}</label>
+            <input class="inp" id="diag-tcp-ports" value="${esc(defPorts)}" style="flex:1;min-width:240px" placeholder="${isEn ? 'e.g. 22, 80/tcp, 161/udp, 53, 22-8000' : 'vd: 22, 80/tcp, 161/udp, 53, 22-8000'}">
+            <button type="button" class="btn primary" id="diag-run-btn">▶️ ${isEn ? 'Scan Ports' : 'Quét Cổng'}</button>
+          `;
+        }
       } else if (activeTool === 'snmp') {
         ctrlBox.innerHTML = `
           <label style="font-size:13px">${isEn ? 'MIB Branch:' : 'Nhánh MIB:'}</label>
@@ -202,28 +214,130 @@
           <div class="diag-term">${esc(r.raw_output || '')}</div>
         `;
       } else if (tool === 'tcp') {
-        const list = Array.isArray(r.results) ? r.results : [];
-        lastCopyText = list.map((x) => `Port ${x.port} (${x.service}): ${x.open ? `OPEN (${x.rtt_ms}ms)` : x.state.toUpperCase()}`).join('\n');
-        copyBtn.style.display = list.length ? '' : 'none';
-        const cardsHtml = list.map((x) => `
-          <div class="diag-port-card ${x.open ? 'open' : 'closed'}">
-            <div>
-              <div style="font-weight:700;font-size:14px">${x.open ? '🟢' : '🔴'} Port ${x.port}</div>
-              <div class="muted" style="font-size:12px">${esc(x.service)}</div>
+        const isAgentServer = curDev.type === 'server' || r.mode === 'agent' || Array.isArray(r.services);
+        if (isAgentServer) {
+          const list = Array.isArray(r.services) ? r.services : (r.open_ports || []);
+          const tcpCount = r.tcp_count != null ? r.tcp_count : (r.tcp_open_count || 0);
+          const udpCount = r.udp_count != null ? r.udp_count : (r.udp_open_count || 0);
+          const totalCount = r.total_count != null ? r.total_count : (r.open_count || list.length);
+
+          lastCopyText = list.map((s) => `${(s.proto || 'tcp').toUpperCase()}\t${s.port}\t${s.service || '-'}\tLISTEN`).join('\n');
+          copyBtn.style.display = list.length ? '' : 'none';
+
+          const rowsHtml = list.map((s) => {
+            const proto = (s.proto || 'tcp').toUpperCase();
+            const protoCol = proto === 'TCP' ? '#60a5fa' : '#c084fc';
+            const protoBg = proto === 'TCP' ? 'rgba(59,130,246,0.15)' : 'rgba(192,132,252,0.15)';
+            return `
+              <tr>
+                <td><span class="chip" style="background:${protoBg};color:${protoCol};font-weight:700;font-size:11px;padding:2px 8px">${esc(proto)}</span></td>
+                <td><code style="font-size:13px;font-weight:700">Port ${s.port}</code></td>
+                <td><b style="color:var(--text)">${esc(s.service || '-')}</b></td>
+                <td><span class="sev-badge ok" style="font-weight:700;letter-spacing:0.5px">LISTEN</span></td>
+              </tr>
+            `;
+          }).join('');
+
+          outBox.innerHTML = `
+            <div class="diag-kpis">
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'Total Services' : 'Tổng dịch vụ'}</div><div class="dk-val" style="color:var(--c-ok)">${totalCount}</div></div>
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'TCP Listening' : 'Dịch vụ TCP (LISTEN)'}</div><div class="dk-val" style="color:#60a5fa">${tcpCount}</div></div>
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'UDP Listening' : 'Dịch vụ UDP (LISTEN)'}</div><div class="dk-val" style="color:#c084fc">${udpCount}</div></div>
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'Status' : 'Trạng thái'}</div><div class="dk-val" style="color:var(--c-ok);font-size:15px">🟢 ACTIVE</div></div>
             </div>
-            <div style="text-align:right">
-              <span class="sev-badge ${x.open ? 'ok' : 'critical'}">${x.open ? 'OPEN' : esc(x.state.toUpperCase())}</span>
-              ${x.rtt_ms != null ? `<div class="muted" style="font-size:11px;margin-top:2px">${x.rtt_ms} ms</div>` : ''}
+            <div style="margin:8px 0 6px;font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:space-between">
+              <span>${isEn ? 'Real Listening Services (Agent OS direct query):' : 'Danh sách dịch vụ thực tế đang lắng nghe (OS Agent):'}</span>
+              <span class="muted" style="font-size:12px">${list.length} ${isEn ? 'services' : 'dịch vụ'}</span>
             </div>
-          </div>
-        `).join('');
-        outBox.innerHTML = `
-          <div style="margin-bottom:8px;font-size:13px">
-            <b>${isEn ? 'Summary:' : 'Tổng kết:'}</b>
-            <span style="color:var(--c-ok);font-weight:700">${r.open_count} ${isEn ? 'open' : 'cổng mở'}</span> / ${r.total_count} ${isEn ? 'checked on' : 'cổng kiểm tra trên'} <code>${esc(r.host)}</code>
-          </div>
-          <div class="diag-port-grid">${cardsHtml}</div>
-        `;
+            <div class="diag-tbl-wrap">
+              <table class="tbl" style="margin:0">
+                <thead>
+                  <tr>
+                    <th style="width:120px">${isEn ? 'Protocol' : 'Giao thức'}</th>
+                    <th style="width:140px">${isEn ? 'Port' : 'Số Cổng'}</th>
+                    <th>${isEn ? 'Service Name' : 'Tên Dịch Vụ'}</th>
+                    <th style="width:130px">${isEn ? 'Status' : 'Trạng thái'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rowsHtml || `<tr><td colspan="4" class="muted" style="text-align:center;padding:24px">${isEn ? 'No listening services detected on this server.' : 'Không phát hiện dịch vụ nào đang mở (LISTEN) trên máy chủ này.'}</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          `;
+          return;
+        }
+
+        const isSummary = r.mode === 'summary' || !r.results;
+        const list = Array.isArray(r.results) ? r.results : (r.open_ports || []);
+
+        if (isSummary) {
+          lastCopyText = [
+            `Port Scan Summary for ${r.host}:`,
+            `Total Checked: ${r.total_count}`,
+            `Open TCP: ${r.tcp_open_count || 0}`,
+            `Open UDP: ${r.udp_open_count || 0}`,
+            `Total Open: ${r.open_count || 0}`,
+            list.length ? `Open Ports:\n` + list.map((x) => `Port ${x.port}/${(x.protocol || 'TCP').toUpperCase()} (${x.service || 'Service'})${x.rtt_ms ? ` - ${x.rtt_ms}ms` : ''}`).join('\n') : 'No open ports found',
+          ].join('\n');
+          copyBtn.style.display = '';
+
+          const openCardsHtml = list.length ? list.map((x) => `
+            <div class="diag-port-card open">
+              <div>
+                <div style="font-weight:700;font-size:14px">
+                  🟢 Port ${x.port}
+                  <span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;background:rgba(34,197,94,0.18);color:var(--c-ok);text-transform:uppercase;margin-left:4px">${esc((x.protocol || 'TCP').toUpperCase())}</span>
+                </div>
+                <div class="muted" style="font-size:12px">${esc(x.service || 'Service')}</div>
+              </div>
+              <div style="text-align:right">
+                <span class="sev-badge ok">OPEN</span>
+                ${x.rtt_ms != null ? `<div class="muted" style="font-size:11px;margin-top:2px">${x.rtt_ms} ms</div>` : ''}
+              </div>
+            </div>
+          `).join('') : `<div class="muted" style="padding:14px;text-align:center;grid-column:1/-1">${isEn ? 'No open ports detected in this range.' : 'Không phát hiện cổng mở nào trong khoảng này.'}</div>`;
+
+          outBox.innerHTML = `
+            <div class="diag-kpis">
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'Total Checked' : 'Tổng cổng quét'}</div><div class="dk-val">${r.total_count}</div></div>
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'Open TCP' : 'Cổng TCP Mở'}</div><div class="dk-val" style="color:var(--c-ok)">${r.tcp_open_count || 0}</div></div>
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'Open UDP' : 'Cổng UDP Mở'}</div><div class="dk-val" style="color:var(--c-ok)">${r.udp_open_count || 0}</div></div>
+              <div class="diag-kpi"><div class="dk-lbl">${isEn ? 'Total Open' : 'Tổng Cổng Mở'}</div><div class="dk-val" style="color:${r.open_count ? 'var(--c-ok)' : 'var(--muted)'}">${r.open_count || 0}</div></div>
+            </div>
+            <div style="margin:8px 0 6px;font-size:13px;font-weight:600">
+              ${isEn ? 'Open Ports Found:' : 'Danh sách cổng mở phát hiện:'}
+            </div>
+            <div class="diag-port-grid">${openCardsHtml}</div>
+          `;
+        } else {
+          lastCopyText = list.map((x) => `Port ${x.port}/${(x.protocol || 'TCP').toUpperCase()} (${x.service}): ${x.open ? `OPEN (${x.rtt_ms}ms)` : x.state.toUpperCase()}`).join('\n');
+          copyBtn.style.display = list.length ? '' : 'none';
+          const cardsHtml = list.map((x) => `
+            <div class="diag-port-card ${x.open ? 'open' : 'closed'}">
+              <div>
+                <div style="font-weight:700;font-size:14px">
+                  ${x.open ? '🟢' : '🔴'} Port ${x.port}
+                  <span style="font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px;background:var(--border);color:var(--text);text-transform:uppercase;margin-left:4px">${esc((x.protocol || 'TCP').toUpperCase())}</span>
+                </div>
+                <div class="muted" style="font-size:12px">${esc(x.service)}</div>
+              </div>
+              <div style="text-align:right">
+                <span class="sev-badge ${x.open ? 'ok' : 'critical'}">${x.open ? 'OPEN' : esc(x.state.toUpperCase())}</span>
+                ${x.rtt_ms != null ? `<div class="muted" style="font-size:11px;margin-top:2px">${x.rtt_ms} ms</div>` : ''}
+              </div>
+            </div>
+          `).join('');
+          outBox.innerHTML = `
+            <div style="margin-bottom:8px;font-size:13px">
+              <b>${isEn ? 'Summary:' : 'Tổng kết:'}</b>
+              <span style="color:var(--c-ok);font-weight:700">${r.open_count} ${isEn ? 'open' : 'cổng mở'}</span>
+              (${r.tcp_open_count || 0} TCP, ${r.udp_open_count || 0} UDP) /
+              ${r.total_count} ${isEn ? 'checked on' : 'cổng kiểm tra trên'} <code>${esc(r.host)}</code>
+            </div>
+            <div class="diag-port-grid">${cardsHtml}</div>
+          `;
+        }
       } else if (tool === 'snmp') {
         const rows = Array.isArray(r.rows) ? r.rows : [];
         lastCopyText = rows.map((x) => `${x.oid}${x.label ? ` (${x.label})` : ''} [${x.type}] = ${x.value}`).join('\n');
@@ -272,6 +386,20 @@
       runBtn.textContent = isEn ? '⏳ Running...' : '⏳ Đang kiểm tra...';
       copyBtn.style.display = 'none';
       durSpan.textContent = '';
+
+      if (activeTool === 'tcp' && curDev.type === 'server') {
+        outBox.innerHTML = `<div class="muted" style="padding:28px;text-align:center">⏳ ${isEn ? `Fetching real listening services from Agent on ${curDev.name}...` : `Đang tải danh sách dịch vụ thực tế từ Agent trên ${curDev.name}...`}</div>`;
+        try {
+          const res = await M.api('GET', `/api/devices/${curDev.id}/listening-services`);
+          renderResult(activeTool, { result: res });
+        } catch (err) {
+          outBox.innerHTML = `<div class="panel err" style="margin:0">⚠️ ${esc(M.trData(err.message))}</div>`;
+        } finally {
+          runBtn.disabled = false;
+          runBtn.textContent = origText;
+        }
+        return;
+      }
 
       const payload = { tool: activeTool };
       if (activeTool === 'ping') {

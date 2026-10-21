@@ -1,8 +1,9 @@
 'use strict';
-// Independent Quick Diagnostic Toolkit service (Ping, Traceroute, TCP Port Check, Live SNMP Walk).
+// Independent Quick Diagnostic Toolkit service (Ping, Traceroute, Port Scanner TCP/UDP, Live SNMP Walk).
 // Zero-Impact Core: runs strictly on-demand via API, never modifies the background Monitor loop.
 const { execFile } = require('node:child_process');
 const net = require('node:net');
+const dgram = require('node:dgram');
 const snmp = require('./snmp');
 const { ADDR_RE } = require('./monitor');
 
@@ -14,19 +15,32 @@ const WELL_KNOWN_PORTS = {
   23: 'Telnet',
   25: 'SMTP',
   53: 'DNS',
+  67: 'DHCP Server',
+  68: 'DHCP Client',
+  69: 'TFTP',
   80: 'HTTP',
   110: 'POP3',
+  123: 'NTP',
+  137: 'NetBIOS-NS',
+  138: 'NetBIOS-DGM',
   143: 'IMAP',
   161: 'SNMP',
+  162: 'SNMP-Trap',
   389: 'LDAP',
   443: 'HTTPS',
   445: 'SMB',
+  500: 'IKE (VPN)',
+  514: 'Syslog',
   515: 'LPD Printer',
   631: 'IPP Printer',
+  1194: 'OpenVPN',
   1433: 'MSSQL',
   1521: 'Oracle DB',
+  1900: 'SSDP / UPnP',
   3306: 'MySQL / MariaDB',
   3389: 'RDP (Windows)',
+  4500: 'IPSec NAT-T',
+  5353: 'mDNS',
   5432: 'PostgreSQL',
   5900: 'VNC',
   6379: 'Redis',
@@ -271,26 +285,135 @@ async function runTraceroute({ host, maxHops = 15, timeoutSec = 1, execFn = defa
   };
 }
 
-// ---- 3. TCP Port Scanner / Service Check ------------------------------------
-function parsePortsInput(portsInput) {
-  const defaultPorts = [22, 80, 443, 3389, 8080, 8291, 9100];
-  if (!portsInput) return defaultPorts;
-  const rawList = Array.isArray(portsInput)
-    ? portsInput
-    : String(portsInput).split(/[\s,;]+/).filter(Boolean);
-  const valid = [];
-  const seen = new Set();
-  for (const item of rawList) {
-    const p = Number(item);
-    if (Number.isInteger(p) && p >= 1 && p <= 65535 && !seen.has(p)) {
-      seen.add(p);
-      valid.push(p);
-      if (valid.length >= 24) break;
-    }
-  }
-  return valid.length ? valid : defaultPorts;
+// ---- 3. Port Scanner / Service Check (TCP + UDP) ----------------------------
+
+const CORE_UDP_PORTS = {
+  53: 'udp',   // DNS
+  67: 'udp',   // DHCP Server
+  68: 'udp',   // DHCP Client
+  69: 'udp',   // TFTP
+  123: 'udp',  // NTP
+  137: 'udp',  // NetBIOS-NS
+  138: 'udp',  // NetBIOS-DGM
+  161: 'udp',  // SNMP
+  162: 'udp',  // SNMP-Trap
+  500: 'udp',  // IKE (VPN)
+  514: 'udp',  // Syslog
+  1194: 'udp', // OpenVPN
+  1900: 'udp', // SSDP / UPnP
+  4500: 'udp', // IPSec NAT-T
+  5353: 'udp', // mDNS
+};
+
+// RFC-compliant probes for common UDP services to elicit responses from daemons and prevent silent firewall drops:
+// - Port 161: SNMPv2c GetRequest for sysUpTime (1.3.6.1.2.1.1.3.0) with community 'public'
+const SNMP_PROBE_PAYLOAD = Buffer.from('302602010104067075626c6963a019020101020100020100300e300c06082b060102010103000500', 'hex');
+// - Port 53: DNS Standard Query for root '.' (IN A)
+const DNS_PROBE_PAYLOAD = Buffer.from('1234010000010000000000000000010001', 'hex');
+// - Port 123: NTP v3/v4 client mode probe (48 bytes)
+const NTP_PROBE_PAYLOAD = Buffer.concat([Buffer.from([0x1b]), Buffer.alloc(47)]);
+
+/**
+ * Checks whether the input string/array contains a port range expression (e.g. "22-8000" or "22 - 8000").
+ */
+function hasRangeInput(portsInput) {
+  if (!portsInput && portsInput !== 0) return false;
+  const str = Array.isArray(portsInput) ? portsInput.join(',') : String(portsInput);
+  return /\d+\s*-\s*\d+/.test(str);
 }
 
+/**
+ * Parses user input for ports supporting:
+ * - Auto protocol mapping for core UDP ports (e.g. 161, 53, 123 -> udp; others -> tcp)
+ * - Explicit suffix override: "161/udp, 80/tcp, 161/tcp, 80/udp"
+ * - Comma / semicolon / whitespace separated lists
+ * - Port ranges with or without suffix (e.g. "22-8000", "160-162/udp", "80-85/tcp")
+ * - Combined expressions (e.g. "22, 53, 80/tcp, 100-105")
+ * - Array of ports/ranges/objects
+ * - Safe clamping to 1..65535, invalid token filtering, and deduplication by port/protocol
+ */
+function parsePortsInput(portsInput) {
+  const defaultTargets = [22, 80, 443, 3389, 8080, 8291, 9100].map((p) => ({ port: p, protocol: 'tcp' }));
+  if (!portsInput && portsInput !== 0) return defaultTargets;
+
+  let rawSegments = [];
+  if (Array.isArray(portsInput)) {
+    for (const item of portsInput) {
+      if (item && typeof item === 'object' && item.port) {
+        rawSegments.push(item.protocol ? `${item.port}/${item.protocol}` : String(item.port));
+      } else {
+        rawSegments.push(String(item));
+      }
+    }
+  } else {
+    rawSegments = String(portsInput).split(/[\n\r,;]+/);
+  }
+
+  const valid = [];
+  const seen = new Set();
+
+  const addTarget = (p, explicitProto) => {
+    if (!Number.isInteger(p) || p < 1 || p > 65535) return;
+    const proto = explicitProto ? explicitProto.toLowerCase() : (CORE_UDP_PORTS[p] || 'tcp');
+    if (proto !== 'tcp' && proto !== 'udp') return;
+    const key = `${p}/${proto}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      const target = { port: p, protocol: proto };
+      if (explicitProto) target.explicit = true;
+      valid.push(target);
+    }
+  };
+
+  const addRange = (start, end, explicitProto) => {
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    const min = Math.max(1, Math.min(start, end));
+    const max = Math.min(65535, Math.max(start, end));
+    if (min > 65535 || max < 1) return;
+    for (let p = min; p <= max; p++) {
+      addTarget(p, explicitProto);
+    }
+  };
+
+  for (const seg of rawSegments) {
+    const trimmed = seg.trim();
+    if (!trimmed) continue;
+
+    // Direct range match: e.g. "22-8000", "22 - 25", "160-162/udp", "80-85/tcp"
+    const rangeMatch = trimmed.match(/^(\d+)\s*-\s*(\d+)(?:\s*\/\s*(tcp|udp))?$/i);
+    if (rangeMatch) {
+      addRange(parseInt(rangeMatch[1], 10), parseInt(rangeMatch[2], 10), rangeMatch[3]);
+      continue;
+    }
+
+    // Direct single port match: e.g. "80", "161/udp", "443/tcp"
+    const singleMatch = trimmed.match(/^(\d+)(?:\s*\/\s*(tcp|udp))?$/i);
+    if (singleMatch) {
+      addTarget(parseInt(singleMatch[1], 10), singleMatch[2]);
+      continue;
+    }
+
+    // Whitespace separated tokens within segment
+    const tokens = trimmed.split(/\s+/).filter(Boolean);
+    for (const token of tokens) {
+      const subRange = token.match(/^(\d+)\s*-\s*(\d+)(?:\s*\/\s*(tcp|udp))?$/i);
+      if (subRange) {
+        addRange(parseInt(subRange[1], 10), parseInt(subRange[2], 10), subRange[3]);
+      } else {
+        const subSingle = token.match(/^(\d+)(?:\s*\/\s*(tcp|udp))?$/i);
+        if (subSingle) {
+          addTarget(parseInt(subSingle[1], 10), subSingle[2]);
+        }
+      }
+    }
+  }
+
+  return valid.length ? valid : defaultTargets;
+}
+
+/**
+ * Standard TCP probe using net.Socket connect + timeout.
+ */
 function defaultTcpProbe(host, port, timeoutMs = 1500) {
   return new Promise((resolve) => {
     const t0 = Date.now();
@@ -302,10 +425,11 @@ function defaultTcpProbe(host, port, timeoutMs = 1500) {
       try { sock.destroy(); } catch { /* ignore */ }
       resolve({
         port,
+        protocol: 'tcp',
         service: WELL_KNOWN_PORTS[port] || 'TCP',
         open,
         state,
-        rtt_ms: open ? Date.now() - t0 : null,
+        rtt_ms: open ? Math.max(1, Date.now() - t0) : null,
         error,
       });
     };
@@ -324,22 +448,243 @@ function defaultTcpProbe(host, port, timeoutMs = 1500) {
   });
 }
 
-async function runTcpCheck({ host, ports, timeoutMs = 1500, probeFn = defaultTcpProbe }) {
+/**
+ * Standard UDP probe using node:dgram connect + payload probe + timeout.
+ * - Port 53: DNS root query header
+ * - Port 161: SNMP v1/v2c GetRequest for sysUpTime
+ * - Port 123: NTP client mode request
+ * - Generic: 1-byte dummy packet
+ * Any byte received from target is treated as OPEN.
+ */
+function defaultUdpProbe(host, port, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const t0 = Date.now();
+    let settled = false;
+    let socket;
+
+    try {
+      const isIpv6 = net.isIP(host) === 6;
+      socket = dgram.createSocket(isIpv6 ? 'udp6' : 'udp4');
+    } catch (err) {
+      return resolve({
+        port,
+        protocol: 'udp',
+        service: WELL_KNOWN_PORTS[port] || 'UDP',
+        open: false,
+        state: 'error',
+        rtt_ms: null,
+        error: err.message,
+      });
+    }
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      try { socket.close(); } catch { /* ignore */ }
+    };
+
+    const finish = (open, state, error = null) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve({
+        port,
+        protocol: 'udp',
+        service: WELL_KNOWN_PORTS[port] || 'UDP',
+        open,
+        state,
+        rtt_ms: open ? Math.max(1, Date.now() - t0) : null,
+        error,
+      });
+    };
+
+    const timer = setTimeout(() => {
+      finish(false, 'timeout', 'Timeout');
+    }, timeoutMs);
+
+    socket.on('error', (err) => {
+      const code = err && err.code ? err.code : 'CLOSED';
+      finish(false, code === 'ECONNREFUSED' ? 'closed' : 'filtered', code);
+    });
+
+    // Any byte response returned (even error status / auth rejection) proves the UDP daemon is alive and listening
+    socket.on('message', () => {
+      finish(true, 'open', null);
+    });
+
+    try {
+      socket.connect(port, host, (err) => {
+        if (err) return finish(false, 'error', err.message);
+
+        let payload;
+        if (port === 53) {
+          payload = DNS_PROBE_PAYLOAD;
+        } else if (port === 161) {
+          try {
+            payload = snmp.buildGet('public', 1, [snmp.OIDS.sysUpTime]);
+          } catch {
+            payload = SNMP_PROBE_PAYLOAD;
+          }
+        } else if (port === 123) {
+          payload = NTP_PROBE_PAYLOAD;
+        } else {
+          // 1-byte dummy packet for other UDP services
+          payload = Buffer.from([0x00]);
+        }
+
+        socket.send(payload, (sendErr) => {
+          if (sendErr) finish(false, 'error', sendErr.message);
+        });
+      });
+    } catch (err) {
+      finish(false, 'error', err.message);
+    }
+  });
+}
+
+/**
+ * Port Scanner Coordinator with dual TCP/UDP scanning and Concurrency Pool.
+ * - Auto protocol mapping: UDP ports (161, 53, 123...) use UDP probe; TCP ports use TCP probe.
+ * - Explicit override: "/udp" and "/tcp" suffixes override auto mapping.
+ * - If small list (<= 32 ports): detailed array with cards (OPEN, CLOSED, TIMEOUT).
+ * - If range / large port count (> 32 ports, e.g. 22-8000): returns summary counts
+ *   (tcp_open_count, udp_open_count, open_ports list) without allocating thousands
+ *   of closed port objects in memory.
+ */
+async function runPortScan({
+  host,
+  ports,
+  timeoutMs = 1500,
+  concurrency = 32,
+  protocols = ['tcp', 'udp'],
+  tcpProbeFn = defaultTcpProbe,
+  udpProbeFn = defaultUdpProbe,
+  probeFn, // backward-compatible alias for tcpProbeFn
+  mode,    // 'auto' | 'detailed' | 'summary'
+}) {
   if (!host || !ADDR_RE.test(host)) throw new Error('Địa chỉ IP/hostname không hợp lệ');
-  const portList = parsePortsInput(ports);
-  const waitMs = Math.min(5000, Math.max(300, Number(timeoutMs) || 1500));
+
+  const actualTcpProbe = probeFn || tcpProbeFn || defaultTcpProbe;
+  const actualUdpProbe = udpProbeFn || defaultUdpProbe;
+  let targetList = parsePortsInput(ports);
+
+  // If caller explicitly restricted protocols filter to a single protocol (e.g. ['tcp'] or ['udp'])
+  if (Array.isArray(protocols) && protocols.length === 1) {
+    const singleProto = protocols[0].toLowerCase();
+    if (singleProto === 'tcp' || singleProto === 'udp') {
+      targetList = targetList.map((t) => (t.explicit ? t : { ...t, protocol: singleProto }));
+    }
+  }
+
+  const isRange = hasRangeInput(ports);
+  // Auto-detect summary mode for large ranges or large port counts
+  const isSummary = mode === 'summary' || (mode !== 'detailed' && (targetList.length > 32 || (isRange && targetList.length > 20)));
+
+  const defaultTimeout = isSummary ? 800 : 1500;
+  const waitMs = Math.min(5000, Math.max(100, Number(timeoutMs) || defaultTimeout));
+  const maxConcurrency = Math.min(128, Math.max(1, Number(concurrency) || (isSummary ? 64 : 32)));
+
   const started = Date.now();
-  const results = await Promise.all(portList.map((p) => probeFn(host, p, waitMs)));
-  const openCount = results.filter((r) => r.open).length;
+
+  let tcpOpenCount = 0;
+  let udpOpenCount = 0;
+  let totalOpenCount = 0;
+  const openPorts = [];
+  const detailedResults = isSummary ? null : new Array(targetList.length);
+
+  // Concurrency Pool (Worker Queue)
+  let nextIdx = 0;
+  const workerCount = Math.min(maxConcurrency, targetList.length);
+
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIdx < targetList.length) {
+      const idx = nextIdx++;
+      const target = targetList[idx];
+      const p = target.port;
+      const proto = target.protocol;
+
+      let probeRes;
+      if (proto === 'udp') {
+        probeRes = await actualUdpProbe(host, p, waitMs);
+      } else {
+        probeRes = await actualTcpProbe(host, p, waitMs);
+      }
+
+      const isOpen = Boolean(probeRes && probeRes.open);
+      if (isOpen) {
+        totalOpenCount++;
+        if (proto === 'udp') {
+          udpOpenCount++;
+        } else {
+          tcpOpenCount++;
+        }
+      }
+
+      const state = isOpen ? 'open' : (probeRes?.state || 'closed');
+      const rttMs = isOpen ? probeRes.rtt_ms : null;
+      const serviceName = WELL_KNOWN_PORTS[p] || (proto === 'udp' ? 'UDP' : 'TCP');
+
+      if (isSummary) {
+        if (isOpen) {
+          openPorts.push({
+            port: p,
+            service: serviceName,
+            protocol: proto,
+            state: 'open',
+            rtt_ms: rttMs,
+            tcp: proto === 'tcp' ? probeRes : null,
+            udp: proto === 'udp' ? probeRes : null,
+          });
+        }
+      } else {
+        detailedResults[idx] = {
+          port: p,
+          service: serviceName,
+          protocol: proto,
+          open: isOpen,
+          state,
+          rtt_ms: rttMs,
+          error: isOpen ? null : (probeRes?.error || null),
+          tcp: proto === 'tcp' ? probeRes : null,
+          udp: proto === 'udp' ? probeRes : null,
+        };
+      }
+    }
+  });
+
+  await Promise.all(workers);
+
+  if (isSummary) {
+    openPorts.sort((a, b) => a.port - b.port);
+    return {
+      ok: totalOpenCount > 0,
+      host,
+      mode: 'summary',
+      is_range: isRange,
+      open_count: totalOpenCount,
+      tcp_open_count: tcpOpenCount,
+      udp_open_count: udpOpenCount,
+      total_count: targetList.length,
+      open_ports: openPorts,
+      duration_ms: Date.now() - started,
+    };
+  }
+
   return {
-    ok: openCount > 0,
+    ok: totalOpenCount > 0,
     host,
-    open_count: openCount,
-    total_count: results.length,
-    results,
+    mode: 'detailed',
+    is_range: isRange,
+    open_count: totalOpenCount,
+    tcp_open_count: tcpOpenCount,
+    udp_open_count: udpOpenCount,
+    total_count: detailedResults.length,
+    results: detailedResults,
     duration_ms: Date.now() - started,
   };
 }
+
+// Backward-compatible alias for existing callers
+const runTcpCheck = runPortScan;
 
 // ---- 4. Live SNMP Walk / OID Inspector --------------------------------------
 async function runSnmpLiveWalk({
@@ -416,6 +761,148 @@ async function runSnmpLiveWalk({
   };
 }
 
+function isLocalAddress(addr) {
+  if (!addr) return false;
+  const a = String(addr).toLowerCase().trim();
+  if (a === '127.0.0.1' || a === '::1' || a === 'localhost') return true;
+  const os = require('node:os');
+  try {
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) {
+      for (const info of ifaces[name]) {
+        if (info.address && info.address.toLowerCase() === a) return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
+function parseAndValidateListeningPorts(input) {
+  let list = input;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list.trim() || '[]');
+    } catch {
+      list = [];
+    }
+  }
+  if (!Array.isArray(list)) list = [];
+
+  const seen = new Map();
+  let tcpCount = 0;
+  let udpCount = 0;
+
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const proto = String(item.proto || item.protocol || '').toLowerCase().trim();
+    if (proto !== 'tcp' && proto !== 'udp') continue;
+
+    const port = Number(item.port);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) continue;
+
+    let service = String(item.service || item.process || item.name || '').trim();
+    const key = `${proto}:${port}`;
+
+    if (seen.has(key)) {
+      const existing = seen.get(key);
+      if ((!existing.service || existing.service === '-') && service) {
+        existing.service = service;
+      }
+      continue;
+    }
+
+    if (!service && WELL_KNOWN_PORTS[port]) {
+      service = WELL_KNOWN_PORTS[port];
+    }
+
+    if (proto === 'tcp') tcpCount++;
+    else if (proto === 'udp') udpCount++;
+
+    seen.set(key, {
+      proto,
+      port,
+      service: service || '-',
+      state: 'LISTEN',
+    });
+  }
+
+  const cleaned = Array.from(seen.values());
+  cleaned.sort((a, b) => {
+    if (a.proto !== b.proto) return a.proto === 'tcp' ? -1 : 1;
+    return a.port - b.port;
+  });
+
+  return {
+    tcp_count: tcpCount,
+    udp_count: udpCount,
+    total_count: cleaned.length,
+    services: cleaned,
+  };
+}
+
+function collectLocalListeningPorts(timeoutMs = 5000) {
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      const psCmd = `$procMap = @{0='System';4='System'}; try { Get-Process -ErrorAction SilentlyContinue | ForEach-Object { if ($_.Id -ne $null -and $_.ProcessName) { $procMap[[int]$_.Id] = $_.ProcessName } } } catch {}; function Resolve-PName($p) { if ($p -eq 4 -or $p -eq 0) { return 'System' }; if ($procMap.ContainsKey($p) -and -not [string]::IsNullOrEmpty($procMap[$p])) { return $procMap[$p] }; try { $o = Get-Process -Id $p -ErrorAction SilentlyContinue; if ($o -and $o.ProcessName) { return $o.ProcessName } } catch {}; return 'System/Unknown' }; $tcp = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{proto='tcp';port=[int]$_.LocalPort;service=(Resolve-PName([int]$_.OwningProcess))} }); $udp = @(Get-NetUDPEndpoint -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{proto='udp';port=[int]$_.LocalPort;service=(Resolve-PName([int]$_.OwningProcess))} }); (@($tcp)+@($udp)) | ConvertTo-Json -Compress`;
+      execFile('powershell', ['-NoProfile', '-Command', psCmd], { timeout: timeoutMs }, (err, stdout) => {
+        if (err || !stdout) return resolve(parseAndValidateListeningPorts([]));
+        resolve(parseAndValidateListeningPorts(stdout));
+      });
+      return;
+    }
+
+    const script = `ss -tulnp 2>/dev/null | awk 'NR>1 {
+      proto = tolower($1);
+      if (proto ~ /^tcp/) proto = "tcp";
+      else if (proto ~ /^udp/) proto = "udp";
+      else next;
+
+      state = $2;
+      if (proto == "tcp" && state != "LISTEN") next;
+      if (proto == "udp" && state != "UNCONN" && state != "LISTEN" && state != "ESTAB") next;
+
+      n = split($5, addr_parts, ":");
+      port = addr_parts[n] + 0;
+      if (port < 1 || port > 65535) next;
+
+      svc = "";
+      idx = index($0, "users:((\\"");
+      if (idx > 0) {
+        rem = substr($0, idx + 9);
+        qidx = index(rem, "\\"");
+        if (qidx > 0) svc = substr(rem, 1, qidx - 1);
+      }
+
+      key = proto ":" port;
+      if (!seen[key] || (svc != "" && services[key] == "")) {
+        if (!seen[key]) {
+          seen[key] = 1;
+          order[++count] = key;
+        }
+        protos[key] = proto;
+        ports[key] = port;
+        services[key] = svc;
+      }
+    }
+    END {
+      printf "[";
+      for (i = 1; i <= count; i++) {
+        k = order[i];
+        if (i > 1) printf ",";
+        s = services[k];
+        gsub(/\\\\/, "\\\\\\\\", s); gsub(/\\"/, "\\\\\\"", s);
+        printf "{\\"proto\\":\\"%s\\",\\"port\\":%d,\\"service\\":\\"%s\\"}", protos[k], ports[k], s;
+      }
+      printf "]";
+    }'`;
+
+    execFile('sh', ['-c', script], { timeout: timeoutMs }, (err, stdout) => {
+      if (err || !stdout) return resolve(parseAndValidateListeningPorts([]));
+      resolve(parseAndValidateListeningPorts(stdout));
+    });
+  });
+}
+
 // ---- Route Registration (Plug-and-Play into server/app.js) ------------------
 function registerRoutes({ route, monitor, readBody, send, idOf, bad, HttpError, audit }, opts = {}) {
   route('POST', '/api/devices/:id/diag', 'operator', async (ctx) => {
@@ -443,13 +930,71 @@ function registerRoutes({ route, monitor, readBody, send, idOf, bad, HttpError, 
           timeoutSec: b.timeout_sec,
           execFn: opts.traceExecFn || opts.execFn,
         });
-      } else if (tool === 'tcp') {
-        result = await runTcpCheck({
-          host: d.address,
-          ports: b.ports,
-          timeoutMs: b.timeout_ms,
-          probeFn: opts.tcpProbeFn,
-        });
+      } else if (tool === 'tcp' || tool === 'ports' || tool === 'port' || tool === 'port_scan' || tool === 'listening_ports' || tool === 'listening_services') {
+        if (d.type === 'server') {
+          const st = monitor.state.get(d.id);
+          let agentData = st?.agent?.listening_services || st?.agent?.data?.listening_services;
+
+          if (b.raw || b.ports_json || (Array.isArray(b.ports) && typeof b.ports[0] === 'object')) {
+            agentData = parseAndValidateListeningPorts(b.raw || b.ports_json || b.ports);
+            if (st) {
+              if (!st.agent) st.agent = { data: {} };
+              st.agent.listening_services = agentData;
+              if (st.agent.data) st.agent.data.listening_services = agentData;
+            }
+          }
+
+          if ((!agentData || agentData.total_count === 0) && isLocalAddress(d.address)) {
+            try {
+              const localData = await collectLocalListeningPorts();
+              if (localData && localData.total_count > 0) {
+                agentData = localData;
+                if (st) {
+                  if (!st.agent) st.agent = { data: {} };
+                  st.agent.listening_services = agentData;
+                  if (st.agent.data) st.agent.data.listening_services = agentData;
+                }
+              }
+            } catch {}
+          }
+
+          if (!agentData) {
+            agentData = {
+              tcp_count: 0,
+              udp_count: 0,
+              total_count: 0,
+              services: [],
+            };
+          }
+
+          result = {
+            ok: agentData.total_count > 0,
+            mode: 'agent',
+            host: d.address,
+            device_type: 'server',
+            tcp_count: agentData.tcp_count,
+            udp_count: agentData.udp_count,
+            total_count: agentData.total_count,
+            services: agentData.services,
+            open_count: agentData.total_count,
+            tcp_open_count: agentData.tcp_count,
+            udp_open_count: agentData.udp_count,
+            open_ports: agentData.services,
+            duration_ms: 5,
+          };
+        } else {
+          result = await runPortScan({
+            host: d.address,
+            ports: b.ports,
+            timeoutMs: b.timeout_ms,
+            concurrency: b.concurrency,
+            protocols: b.protocols,
+            mode: b.mode,
+            tcpProbeFn: opts.tcpProbeFn,
+            udpProbeFn: opts.udpProbeFn,
+            probeFn: opts.tcpProbeFn,
+          });
+        }
       } else if (tool === 'snmp') {
         result = await runSnmpLiveWalk({
           host: d.address,
@@ -461,7 +1006,7 @@ function registerRoutes({ route, monitor, readBody, send, idOf, bad, HttpError, 
           getFn: opts.snmpGetFn,
         });
       } else {
-        throw bad('Công cụ chẩn đoán không hợp lệ (chọn ping, traceroute, tcp hoặc snmp)');
+        throw bad('Công cụ chẩn đoán không hợp lệ (chọn ping, traceroute, tcp/port hoặc snmp)');
       }
     } catch (err) {
       if (err instanceof HttpError) throw err;
@@ -482,19 +1027,101 @@ function registerRoutes({ route, monitor, readBody, send, idOf, bad, HttpError, 
       result,
     });
   });
+
+  // GET /api/devices/:id/listening-services
+  route('GET', '/api/devices/:id/listening-services', 'operator', async (ctx) => {
+    const id = idOf(ctx.p.id);
+    const d = monitor.devices.get(id);
+    if (!d) throw new HttpError(404, 'Không tìm thấy thiết bị');
+
+    const st = monitor.state.get(id);
+    let agentData = st?.agent?.listening_services || st?.agent?.data?.listening_services;
+
+    if ((!agentData || agentData.total_count === 0) && isLocalAddress(d.address)) {
+      try {
+        const localData = await collectLocalListeningPorts();
+        if (localData && localData.total_count > 0) {
+          agentData = localData;
+          if (st) {
+            if (!st.agent) st.agent = { data: {} };
+            st.agent.listening_services = agentData;
+            if (st.agent.data) st.agent.data.listening_services = agentData;
+          }
+        }
+      } catch {}
+    }
+
+    if (!agentData) {
+      agentData = {
+        tcp_count: 0,
+        udp_count: 0,
+        total_count: 0,
+        services: [],
+      };
+    }
+
+    send(ctx.res, 200, {
+      ok: true,
+      device_id: d.id,
+      device_name: d.name,
+      device_type: d.type,
+      address: d.address,
+      ...agentData,
+    });
+  });
+
+  // POST /api/devices/:id/listening-services
+  route('POST', '/api/devices/:id/listening-services', 'operator', async (ctx) => {
+    const id = idOf(ctx.p.id);
+    const d = monitor.devices.get(id);
+    if (!d) throw new HttpError(404, 'Không tìm thấy thiết bị');
+
+    const b = await readBody(ctx.req, 65536);
+    const rawData = (b && typeof b === 'object' && ('ports' in b || 'services' in b || 'data' in b || 'raw' in b))
+      ? (b.ports || b.services || b.data || b.raw)
+      : b;
+
+    const validated = parseAndValidateListeningPorts(rawData);
+    const st = monitor.state.get(id);
+    if (st) {
+      if (!st.agent) st.agent = { data: {} };
+      st.agent.listening_services = validated;
+      if (st.agent.data) st.agent.data.listening_services = validated;
+    }
+
+    send(ctx.res, 200, {
+      ok: true,
+      device_id: d.id,
+      device_name: d.name,
+      device_type: d.type,
+      address: d.address,
+      ...validated,
+    });
+  });
 }
 
 module.exports = {
   WELL_KNOWN_PORTS,
+  CORE_UDP_PORTS,
+  SNMP_PROBE_PAYLOAD,
+  DNS_PROBE_PAYLOAD,
+  NTP_PROBE_PAYLOAD,
   SNMP_PRESETS,
   OID_LABELS,
   labelOid,
   parsePingOutput,
   parseTracerouteOutput,
   parsePortsInput,
+  hasRangeInput,
+  defaultTcpProbe,
+  defaultUdpProbe,
   runPing,
   runTraceroute,
+  runPortScan,
   runTcpCheck,
   runSnmpLiveWalk,
+  isLocalAddress,
+  parseAndValidateListeningPorts,
+  collectLocalListeningPorts,
   registerRoutes,
 };

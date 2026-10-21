@@ -1080,6 +1080,28 @@ function createApp(db, monitor, opts = {}) {
     monitor.emit('change');
     send(ctx.res, 200, { ok: true, interval: 5, ...(enrolled ? { device_id: dev.id, token: enrolled } : {}) });
   });
+  route('POST', '/api/agent/listening-ports', null, async (ctx) => {
+    const m = /^Bearer\s+(\S+)$/.exec(ctx.req.headers.authorization || '');
+    if (!m) throw new HttpError(401, 'Thiếu token');
+    const dev = db.prepare('SELECT id FROM devices WHERE agent_token = ?').get(m[1]);
+    if (!dev) throw new HttpError(401, 'Token không hợp lệ');
+
+    const b = await readBody(ctx.req, 65536);
+    const { parseAndValidateListeningPorts } = require('./diagnostics');
+    const rawData = (b && typeof b === 'object' && ('ports' in b || 'services' in b || 'data' in b || 'raw' in b))
+      ? (b.ports || b.services || b.data || b.raw)
+      : b;
+    const validated = parseAndValidateListeningPorts(rawData);
+
+    const st = monitor.state.get(dev.id);
+    if (st) {
+      if (!st.agent) st.agent = { data: {} };
+      st.agent.listening_services = validated;
+      if (st.agent.data) st.agent.data.listening_services = validated;
+    }
+    monitor.emit('change');
+    send(ctx.res, 200, { ok: true, device_id: dev.id, ...validated });
+  });
 
   // ---------- static ----------
   const serveStatic = (req, res, pathname) => {

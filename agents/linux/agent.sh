@@ -104,6 +104,56 @@ power_data() {
     printf '{"on_battery":false,"battery_percent":null,"status":"ac"}'
   fi
 }
+listening_ports() {
+  if command -v ss >/dev/null 2>&1; then
+    ss -tulnp 2>/dev/null | awk 'NR>1 {
+      proto = tolower($1);
+      if (proto ~ /^tcp/) proto = "tcp";
+      else if (proto ~ /^udp/) proto = "udp";
+      else next;
+
+      state = $2;
+      if (proto == "tcp" && state != "LISTEN") next;
+      if (proto == "udp" && state != "UNCONN" && state != "LISTEN" && state != "ESTAB") next;
+
+      n = split($5, addr_parts, ":");
+      port = addr_parts[n] + 0;
+      if (port < 1 || port > 65535) next;
+
+      svc = "";
+      idx = index($0, "users:((\"");
+      if (idx > 0) {
+        rem = substr($0, idx + 9);
+        qidx = index(rem, "\"");
+        if (qidx > 0) svc = substr(rem, 1, qidx - 1);
+      }
+
+      key = proto ":" port;
+      if (!seen[key] || (svc != "" && services[key] == "")) {
+        if (!seen[key]) {
+          seen[key] = 1;
+          order[++count] = key;
+        }
+        protos[key] = proto;
+        ports[key] = port;
+        services[key] = svc;
+      }
+    }
+    END {
+      printf "[";
+      for (i = 1; i <= count; i++) {
+        k = order[i];
+        if (i > 1) printf ",";
+        s = services[k];
+        gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s);
+        printf "{\"proto\":\"%s\",\"port\":%d,\"service\":\"%s\"}", protos[k], ports[k], s;
+      }
+      printf "]";
+    }'
+  else
+    printf '[]'
+  fi
+}
 payload() {
   host=$(hostname 2>/dev/null || echo unknown); ip=$(local_ip); [ -n "$ip" ] || ip=$(hostname -I 2>/dev/null | awk '{print $1}'); [ -n "$ip" ] || ip=
   set -- $(cpu_data); cpercent=$1; cores=$2; load1=$3
@@ -119,8 +169,9 @@ payload() {
   temp=$(thermal_data)
   smart=$(smart_data)
   power=$(power_data)
-  printf '{"hostname":"%s","os":"Linux","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s,"net":%s,"temperature":%s,"smart":%s,"power":%s}' \
-    "$(json_escape "$host")" "$(json_escape "$AGENT_VERSION")" "$(json_escape "$ip")" "$cpercent" "$cores" "$load1" "$total" "$used" "$mempercent" "$disks" "$uptime_s" "$net" "$temp" "$smart" "$power"
+  lports=$(listening_ports)
+  printf '{"hostname":"%s","os":"Linux","agent_version":"%s","ip":"%s","cpu":{"percent":%s,"cores":%s,"load1":%s},"memory":{"total":%s,"used":%s,"percent":%s},"disks":[%s],"uptime":%s,"net":%s,"temperature":%s,"smart":%s,"power":%s,"listening_ports":%s}' \
+    "$(json_escape "$host")" "$(json_escape "$AGENT_VERSION")" "$(json_escape "$ip")" "$cpercent" "$cores" "$load1" "$total" "$used" "$mempercent" "$disks" "$uptime_s" "$net" "$temp" "$smart" "$power" "$lports"
 }
 mkdir -p "$(dirname "$STATE")" 2>/dev/null || :
 [ -s "$STATE" ] && TOKEN=$(cat "$STATE")

@@ -7,6 +7,71 @@ $Token = if ($Token) { $Token } else { $EnrollKey }; $Version = '1.0.0'
 $State = if ($StateFile) { $StateFile } else { "$env:ProgramData\Monitoring\token" }
 New-Item (Split-Path $State) -ItemType Directory -Force | Out-Null
 if (Test-Path $State) { $Token = (Get-Content $State -Raw).Trim() }
+function Get-ListeningPorts {
+  $procMap = @{ 0 = 'System'; 4 = 'System' }
+  try {
+    Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+      if ($_.Id -ne $null -and $_.ProcessName) { $procMap[[int]$_.Id] = $_.ProcessName }
+    }
+  } catch {}
+
+  $getProcName = {
+    param([int]$p)
+    if ($p -eq 4 -or $p -eq 0) { return 'System' }
+    if ($procMap.ContainsKey($p) -and -not [string]::IsNullOrEmpty($procMap[$p])) {
+      return $procMap[$p]
+    }
+    try {
+      $pObj = Get-Process -Id $p -ErrorAction SilentlyContinue
+      if ($pObj -and $pObj.ProcessName) {
+        $procMap[$p] = $pObj.ProcessName
+        return $pObj.ProcessName
+      }
+    } catch {}
+    return 'System/Unknown'
+  }
+
+  $items = @()
+  try {
+    $tcp = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | ForEach-Object {
+      $ownPid = [int]$_.OwningProcess
+      [pscustomobject]@{ proto = 'tcp'; port = [int]$_.LocalPort; service = (& $getProcName $ownPid) }
+    })
+    if ($tcp.Count -gt 0) { $items += $tcp }
+  } catch {}
+
+  try {
+    $udp = @(Get-NetUDPEndpoint -ErrorAction SilentlyContinue | ForEach-Object {
+      $ownPid = [int]$_.OwningProcess
+      [pscustomobject]@{ proto = 'udp'; port = [int]$_.LocalPort; service = (& $getProcName $ownPid) }
+    })
+    if ($udp.Count -gt 0) { $items += $udp }
+  } catch {}
+
+  if ($items.Count -eq 0) {
+    try {
+      netstat -ano | ForEach-Object {
+        if ($_ -match '^\s*(TCP|UDP)\s+\S+:(\d+)\s+\S+\s*(?:LISTENING)?\s+(\d+)') {
+          $p = $matches[1].ToLower(); $prt = [int]$matches[2]; $pid = [int]$matches[3]
+          $items += [pscustomobject]@{ proto = $p; port = $prt; service = (& $getProcName $pid) }
+        }
+      }
+    } catch {}
+  }
+
+  $seen = @{}; $unique = @()
+  foreach ($e in $items) {
+    $k = "$($e.proto):$($e.port)"
+    if (-not $seen.ContainsKey($k)) {
+      $seen[$k] = $e; $unique += $e
+    } else {
+      if (($seen[$k].service -eq '' -or $seen[$k].service -eq 'System/Unknown') -and ($e.service -ne '' -and $e.service -ne 'System/Unknown')) {
+        $seen[$k].service = $e.service
+      }
+    }
+  }
+  return $unique
+}
 function Get-Payload {
   $os = Get-CimInstance Win32_OperatingSystem; $cs = Get-CimInstance Win32_ComputerSystem
   $cpu = (Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average
@@ -51,7 +116,8 @@ function Get-Payload {
       $power = [pscustomobject]@{on_battery=$onBat;battery_percent=[int]$bat.EstimatedChargeRemaining;status=(if ($onBat) {'discharging'} else {'ac'})}
     }
   } catch {}
-  [pscustomobject]@{hostname=$env:COMPUTERNAME;os='Windows';agent_version=$Version;ip=$ip;cpu=[pscustomobject]@{percent=$cpuPercent;cores=$cores;load1=[math]::Round($cpuPercent/100,2)};memory=[pscustomobject]@{total=$total;used=$used;percent=$memoryPercent};disks=$disks;uptime=[int64]((Get-Date)-$os.LastBootUpTime).TotalSeconds;net=[pscustomobject]@{rx_bytes=[int64]($rx ?? 0);tx_bytes=[int64]($tx ?? 0)};temperature=$temp;smart=$smart;power=$power}
+  $lports = @(Get-ListeningPorts)
+  [pscustomobject]@{hostname=$env:COMPUTERNAME;os='Windows';agent_version=$Version;ip=$ip;cpu=[pscustomobject]@{percent=$cpuPercent;cores=$cores;load1=[math]::Round($cpuPercent/100,2)};memory=[pscustomobject]@{total=$total;used=$used;percent=$memoryPercent};disks=$disks;uptime=[int64]((Get-Date)-$os.LastBootUpTime).TotalSeconds;net=[pscustomobject]@{rx_bytes=[int64]($rx ?? 0);tx_bytes=[int64]($tx ?? 0)};temperature=$temp;smart=$smart;power=$power;listening_ports=$lports}
 }
 $delay=5
 while ($true) {
