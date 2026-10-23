@@ -33,7 +33,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .hidden { display: none !important; }
 
 /* ---------- header ---------- */
-header.top { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: var(--panel);
+header.top { display: flex; align-items: center; gap: 14px; padding: 10px 18px;
+  background: color-mix(in srgb, var(--panel) 84%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; box-shadow: var(--glow); }
 .brand { font-weight: 700; font-size: 18px; letter-spacing: .5px; color: var(--accent); white-space: nowrap; text-shadow: var(--glow); }
 nav.main { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
@@ -95,9 +97,11 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 
 /* ---------- tiles ---------- */
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-.tile { --s: var(--c-unknown); display: flex; flex-direction: column; justify-content: flex-start; min-height: 76px; color: var(--text); background: color-mix(in srgb, var(--s) 9%, var(--panel));
+.tile { --s: var(--c-unknown); display: flex; flex-direction: column; justify-content: flex-start; min-height: 76px; color: var(--text);
+  background: color-mix(in srgb, var(--s) 9%, color-mix(in srgb, var(--panel) 88%, transparent));
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border: 1px solid color-mix(in srgb, var(--s) 55%, var(--border)); border-left: 6px solid var(--s); border-radius: var(--radius);
-  padding: 9px 12px; cursor: pointer; position: relative; box-shadow: 0 0 10px color-mix(in srgb, var(--s) 18%, transparent); transition: transform .1s; }
+  padding: 9px 12px; cursor: pointer; position: relative; box-shadow: 0 0 10px color-mix(in srgb, var(--s) 18%, transparent); transition: transform .1s, box-shadow .3s ease; }
 .tile:hover { transform: translateY(-2px); }
 #grid .tile { cursor: grab; user-select: none; -webkit-user-select: none; touch-action: pan-y; }
 #grid .tile:active { cursor: grabbing; }
@@ -236,13 +240,17 @@ h2 { font-size: 16px; margin: 22px 0 10px; color: var(--muted); text-transform: 
 .ap-arp-note .note-content { flex: 1; }
 .ap-arp-note b { color: var(--c-low); }
 
-.tile.up { --s: var(--c-ok); }
+.tile.up { --s: var(--c-ok); animation: tile-breathe-up 3.6s ease-in-out infinite; }
 .tile.warning { --s: var(--c-medium); }
 .tile.maint { --s: var(--c-maint); }
 .tile.sev-none { --s: var(--c-unknown); }
 .tile.sev-low { --s: var(--c-low); } .tile.sev-medium { --s: var(--c-medium); }
 .tile.sev-high { --s: var(--c-high); } .tile.sev-critical { --s: var(--c-critical); }
 .tile.down:not(.acked) { animation: pulse 1.4s infinite; }
+@keyframes tile-breathe-up {
+  0%, 100% { box-shadow: 0 0 8px color-mix(in srgb, var(--c-ok) 14%, transparent); }
+  50% { box-shadow: 0 0 18px color-mix(in srgb, var(--c-ok) 32%, transparent); }
+}
 @keyframes pulse { 50% { box-shadow: 0 0 22px color-mix(in srgb, var(--s) 70%, transparent); } }
 .tile.group .g-count { font-size: 26px; font-weight: 800; color: var(--s); line-height: 1.15; margin: 2px 0; }
 .tile.group .g-count small { font-size: 14px; color: var(--muted); font-weight: 600; }
@@ -439,18 +447,92 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
 .map-box { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; position: relative; box-shadow: var(--glow); }
 .map-box svg { width: 100%; height: calc(100vh - 200px); min-height: 420px; display: block; touch-action: none; user-select: none; }
 .map-box.editing { outline: 2px dashed var(--accent); }
-.m-link { stroke: var(--c-ok); stroke-width: 3; }
+.m-link { stroke: var(--c-ok); stroke-width: 3; transition: stroke 0.2s ease, stroke-width 0.2s ease; }
+.m-link.m-link-lacp { stroke-width: 3.4; }
+.m-link.m-link-mlag { stroke-width: 3.2; stroke-dasharray: 8 5; }
+.m-link.degraded { stroke: var(--c-high); }
 .m-link.down { stroke-dasharray: 8 6; animation: dash 1s linear infinite; }
 @keyframes dash { to { stroke-dashoffset: -14; } }
-.m-node rect { fill: color-mix(in srgb, var(--s) 14%, var(--panel)); stroke: var(--s); stroke-width: 2.5; }
+
+/* 6.1 Hiệu ứng "Dòng dữ liệu chạy dọc dây cáp" (SVG Stroke Dashoffset) */
+.m-link-flow {
+  stroke: color-mix(in srgb, #ffffff 78%, var(--c-ok));
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-dasharray: 8 28;
+  stroke-dashoffset: 36;
+  opacity: 0.85;
+  pointer-events: none;
+  filter: drop-shadow(0 0 4px var(--c-ok));
+  animation: cable-data-flow 1.35s linear infinite;
+}
+.m-link-bundle.degraded .m-link-flow {
+  stroke: color-mix(in srgb, #ffffff 75%, var(--c-high));
+  filter: drop-shadow(0 0 4px var(--c-high));
+  animation-duration: 2.1s;
+}
+@keyframes cable-data-flow {
+  from { stroke-dashoffset: 36; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 6.2 & 6.3 Kính mờ hiện đại (Glassmorphism Card) + Soft Glow / Pulse cho Node */
+.m-node rect {
+  fill: color-mix(in srgb, var(--s) 15%, color-mix(in srgb, var(--panel) 82%, transparent));
+  fill-opacity: 0.88;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  stroke: var(--s);
+  stroke-width: 2.5;
+  transition: stroke 0.2s ease, filter 0.3s ease;
+}
 .m-node text { fill: var(--text); pointer-events: none; }
 .m-node .m-sub { fill: var(--muted); font-size: 12px; }
 .m-node.sel rect { stroke-width: 5; }
-.m-node.up { --s: var(--c-ok); } .m-node.warning { --s: var(--c-medium); } .m-node.maint { --s: var(--c-maint); } .m-node { --s: var(--c-unknown); cursor: pointer; }
+.m-node.up {
+  --s: var(--c-ok);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c-ok) 32%, transparent);
+}
+.m-node.up rect {
+  animation: node-breathe-up 3.2s ease-in-out infinite;
+}
+.m-node.warning {
+  --s: var(--c-medium);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c-medium) 35%, transparent);
+}
+.m-node.warning rect {
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--c-medium) 45%, transparent));
+}
+.m-node.maint { --s: var(--c-maint); }
+.m-node { --s: var(--c-unknown); cursor: pointer; }
 .m-node.sev-none { --s: var(--c-unknown); }
 .m-node.sev-low { --s: var(--c-low); } .m-node.sev-medium { --s: var(--c-medium); } .m-node.sev-high { --s: var(--c-high); } .m-node.sev-critical { --s: var(--c-critical); }
-.m-node.down:not(.acked) rect { animation: nodepulse 1.4s infinite; }
-@keyframes nodepulse { 50% { stroke-width: 6; } }
+.m-node.down:not(.acked) {
+  box-shadow: 0 0 20px color-mix(in srgb, var(--c-critical) 65%, transparent);
+}
+.m-node.down:not(.acked) rect {
+  animation: nodepulse 1.25s ease-in-out infinite;
+}
+@keyframes node-breathe-up {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--c-ok) 25%, transparent));
+    stroke-width: 2.4;
+  }
+  50% {
+    filter: drop-shadow(0 0 14px color-mix(in srgb, var(--c-ok) 58%, transparent));
+    stroke-width: 3.1;
+  }
+}
+@keyframes nodepulse {
+  0%, 100% {
+    stroke-width: 2.5;
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c-critical) 40%, transparent));
+  }
+  50% {
+    stroke-width: 5.5;
+    filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c-critical) 88%, transparent));
+  }
+}
 .m-label rect { fill: transparent; stroke: var(--border); stroke-dasharray: 4 4; }
 .edit-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 
@@ -471,30 +553,110 @@ html.has-modal, body.has-modal { overflow: hidden !important; }
   stroke-width: 1;
 }
 
-/* ---------- Topology Cable Port Badges ---------- */
-.m-port-badge {
+/* ---------- Topology Cable Port Badges & LACP Center Bundle Badges ---------- */
+.m-port-badge, .m-lacp-badge {
   cursor: pointer;
   pointer-events: all;
 }
-.m-port-badge-bg {
-  fill: var(--panel);
+.m-port-badge-bg, .m-lacp-badge-bg {
+  fill: color-mix(in srgb, var(--panel) 88%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   stroke: var(--c-ok);
   stroke-width: 1.5;
   transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
 }
-.m-port-badge-bg.down {
+.m-lacp-badge-bg {
+  stroke-width: 1.8;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+.m-port-badge-bg.down, .m-lacp-badge-bg.down {
   stroke: var(--c-critical);
 }
-.m-port-badge-bg.warning {
-  stroke: var(--c-medium);
+.m-port-badge-bg.warning, .m-lacp-badge-bg.warning {
+  stroke: var(--c-high);
 }
-.m-port-badge:hover .m-port-badge-bg {
+.m-port-badge:hover .m-port-badge-bg, .m-lacp-badge:hover .m-lacp-badge-bg {
   stroke: var(--accent);
   stroke-width: 2.2;
   filter: drop-shadow(0 0 5px var(--accent));
 }
-.m-port-badge:hover text {
+.m-port-badge:hover text, .m-lacp-badge:hover text {
   fill: var(--accent);
+}
+
+/* ---------- LACP Multi-Port Config Modal Grid ---------- */
+.lacp-port-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 5px;
+  max-height: 185px;
+  overflow-y: auto;
+  padding: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.lacp-port-chk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+  margin: 0 !important;
+  color: var(--text) !important;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+.lacp-port-chk input[type="checkbox"] {
+  margin: 0;
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent);
+}
+.lacp-port-chk:hover {
+  border-color: var(--accent);
+}
+.lacp-port-chk.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  color: var(--accent) !important;
+  font-weight: 700;
+}
+.lacp-port-chk.snmp-up {
+  border-bottom: 2px solid var(--c-ok);
+}
+.lacp-port-chk.snmp-down {
+  opacity: 0.72;
+}
+.lacp-member-preview {
+  margin-top: 8px;
+  padding: 9px 12px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lacp-pair-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--accent) 15%, var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  font-weight: 700;
+  font-size: 11.5px;
+  color: var(--text);
 }
 
 /* ---------- Topology Port Matrix Grid ---------- */

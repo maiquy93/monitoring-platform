@@ -270,3 +270,42 @@ test('port-inspector 48-port switch: preserves port 25, 31, 37, 47 status accura
   assert.equal(p47.oper_status, 'up', 'Port 47 must be up');
   assert.equal(p48.oper_status, 'down', 'Port 48 must be down');
 });
+
+test('port-inspector RFC 2863 standard: filters out notPresent(6) unpopulated slot ports, connector=2 virtuals, and logical interfaces', async () => {
+  const svc = new PortInspectorService();
+  const mockRows = {};
+  const mockIfx = {};
+
+  // Unpopulated hardware slot 1 (oper=6 notPresent per RFC 2863)
+  for (let i = 1; i <= 24; i++) {
+    mockRows[i] = { [PORT_COLS.descr]: `Slot 1 Port ${i}`, [PORT_COLS.type]: 6, [PORT_COLS.admin]: 1, [PORT_COLS.oper]: 6 };
+    mockIfx[i] = { [IFX_COLS.name]: `1/e${i}`, [IFX_COLS.connector]: 2 };
+  }
+  // Populated hardware slot 2 (24 ports + 2 uplink ports = 26 present physical ports)
+  for (let i = 1; i <= 26; i++) {
+    const idx = 100 + i;
+    const name = i <= 24 ? `2/e${i}` : `2/g${i - 24}`;
+    const isUp = [1, 12, 24, 25].includes(i);
+    mockRows[idx] = { [PORT_COLS.descr]: `Slot 2 Port ${i}`, [PORT_COLS.type]: 6, [PORT_COLS.admin]: 1, [PORT_COLS.oper]: isUp ? 1 : 2 };
+    mockIfx[idx] = { [IFX_COLS.name]: name, [IFX_COLS.connector]: 1 };
+  }
+  // Logical / non-connector interfaces (LAG, virtual radio, software interface)
+  mockRows[201] = { [PORT_COLS.descr]: 'LAG 1', [PORT_COLS.type]: 6, [PORT_COLS.admin]: 1, [PORT_COLS.oper]: 2 };
+  mockIfx[201] = { [IFX_COLS.name]: 'ch1', [IFX_COLS.connector]: 2 };
+  mockRows[202] = { [PORT_COLS.descr]: 'Virtual Interface', [PORT_COLS.type]: 6, [PORT_COLS.admin]: 2, [PORT_COLS.oper]: 2 };
+  mockIfx[202] = { [IFX_COLS.name]: 'virt0', [IFX_COLS.connector]: 2 };
+
+  const res = await svc.inspectDevice({
+    deviceKey: 'generic-stack-switch',
+    host: '10.20.30.40',
+    walkColumnsFn: async ({ columns }) => (columns.includes(PORT_COLS.descr) ? mockRows : mockIfx),
+    snmpGetFn: async () => ({ [snmp.OIDS.sysUpTime]: 10000 }),
+  });
+
+  assert.equal(res.total_ports, 26, 'Must return exact 26 present physical ports');
+  assert.equal(res.up_count, 4, 'Must detect exact 4 UP ports');
+  assert.equal(res.ports[0].name, '2/e1');
+  assert.equal(res.ports[23].name, '2/e24');
+  assert.equal(res.ports[24].name, '2/g1');
+  assert.equal(res.ports[25].name, '2/g2');
+});

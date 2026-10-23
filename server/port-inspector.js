@@ -26,6 +26,7 @@ const IFX_COLS = {
   hcIn: '1.3.6.1.2.1.31.1.1.1.6',     // ifHCInOctets (64-bit)
   hcOut: '1.3.6.1.2.1.31.1.1.1.10',   // ifHCOutOctets (64-bit)
   highSpeed: '1.3.6.1.2.1.31.1.1.1.15', // ifHighSpeed (Mbps)
+  connector: '1.3.6.1.2.1.31.1.1.1.17', // ifConnectorPresent (1=true, 2=false per RFC 2863)
   alias: '1.3.6.1.2.1.31.1.1.1.18',   // ifAlias (port description)
 };
 
@@ -87,19 +88,19 @@ function isPhysicalPort(ifType, name, descr = '') {
   // 2. Loại bỏ các sub-interface ảo (vd: Gi0/1.100, eth0.50)
   if (/^[a-z0-9\-_/]+\.\d+$/i.test(n)) return false;
 
-  // 3. Lọc bỏ các interface có tên hoặc mô tả chứa từ khóa rác
-  if (/(loopback|\blo\d*\b|null|vlan|\bvl\d+\b|tunnel|\btun\d*\b|gre|ipsec|pppoe|ovpn|wireguard|\bwg\d*\b|cpu|control-plane|bridge|\bbr\d*\b|bvi|port-channel|portchannel|\bpo\d+\b|bond|\blag\d*\b|\bae\d+\b|stack-port|eoip)/i.test(combined)) {
+  // 3. Lọc bỏ các interface logic/ảo theo chuẩn chung (loopback, vlan, tunnel, bridge, lag/bond/port-channel, wireless, modem...)
+  if (/(loopback|\blo\d*\b|null|vlan|\bvl\d+\b|tunnel|\btun\d*\b|gre|ipsec|pppoe|ovpn|wireguard|\bwg\d*\b|cpu|control-plane|bridge|\bbr\d*\b|bvi|port-channel|portchannel|\bpo\d+\b|\bch\d+\b|bond|\blag\d*\b|\bae\d+\b|stack-port|eoip|\bmodem\d*\b|vwire|wifi\d*|wlan\d*|\bath\d*|\bwds\d*|ssl\.)/i.test(combined)) {
     return false;
   }
 
-  // 4. Lọc theo tiền tố tên ảo phổ biến
-  if (/^(lo\d*|null\d*|vl\d+|vlan\d*|tun\d*|tunnel\d*|gre\d*|po\d+|bond\d*|br\d*|bvi\d*|cpu|stack)/i.test(n)) {
+  // 4. Lọc theo tiền tố tên interface ảo phổ biến
+  if (/^(lo\d*|null\d*|vl\d+|vlan\d*|tun\d*|tunnel\d*|gre\d*|po\d+|ch\d+|bond\d*|br\d*|bvi\d*|cpu|stack|modem|vwire|wifi|wlan|ath|wds)/i.test(n)) {
     return false;
   }
 
-  // 5. Nhận diện các cổng Ethernet chuẩn
+  // 5. Nhận diện các cổng vật lý theo chuẩn IANA ifType hoặc định dạng cổng/slot tiêu chuẩn
   const isEthType = ETHERNET_PHYSICAL_TYPES.has(ifType);
-  const isEthName = /^(eth|gi|fa|te|ge|xe|sfp|cổng|port|lan|wan|ethernet)/i.test(n);
+  const isEthName = /^(eth|gi|fa|te|ge|xe|sfp|cổng|port|lan|wan|ethernet|\d+\/[a-z]?\d+)/i.test(n);
   return isEthType || isEthName;
 }
 
@@ -159,6 +160,13 @@ class PortInspectorService {
     const dtSec = prevEntry && now > prevEntry.ts ? (now - prevEntry.ts) / 1000 : 0;
     const nextSamplePorts = new Map();
 
+    const hasPresentPorts = Object.values(baseRows).some((r) => {
+      const op = r && r[PORT_COLS.oper];
+      const code = typeof op === 'number' && Number.isFinite(op) ? op : Number(op);
+      return !isNaN(code) && code !== 6;
+    });
+    const hasConnectorFlag = Object.values(ifxRows).some((x) => x && Number(x[IFX_COLS.connector]) === 1);
+
     const ports = [];
     for (const [idx, r] of Object.entries(baseRows)) {
       const x = ifxRows[idx] || {};
@@ -167,15 +175,22 @@ class PortInspectorService {
       const ifName = String(x[IFX_COLS.name] || descr || `Port ${idx}`).trim();
       const alias = String(x[IFX_COLS.alias] || '').trim();
       const ifType = num(r[PORT_COLS.type]) || 6;
+      const connectorCode = num(x[IFX_COLS.connector]);
       const isPhysical = isPhysicalPort(ifType, ifName, descr);
-      if (!includeVirtual && !isPhysical) {
-        continue; // Lọc bỏ rác: loopback, null, vlan, tunnel, cpu, bridge, port-channel...
+      if (!includeVirtual) {
+        if (!isPhysical) continue;
+        // Chuẩn RFC 2863 ifConnectorPresent: nếu thiết bị có báo cáo cờ connector vật lý (1=true), loại bỏ các cổng có connector=2 (false)
+        if (hasConnectorFlag && connectorCode === 2) continue;
       }
       const category = classifyIfType(ifType, ifName);
       const rawAdmin = r[PORT_COLS.admin];
       const adminCode = typeof rawAdmin === 'number' && Number.isFinite(rawAdmin) ? rawAdmin : (rawAdmin !== undefined && rawAdmin !== null && !isNaN(Number(rawAdmin)) ? Number(rawAdmin) : 1);
       const rawOper = r[PORT_COLS.oper];
       const operCode = typeof rawOper === 'number' && Number.isFinite(rawOper) ? rawOper : (rawOper !== undefined && rawOper !== null && !isNaN(Number(rawOper)) ? Number(rawOper) : 2);
+      // Loại bỏ các cổng thuộc Stack Unit / khe cắm không tồn tại thực tế (ifOperStatus = 6: notPresent theo RFC 2863)
+      if (!includeVirtual && hasPresentPorts && operCode === 6) {
+        continue;
+      }
       const adminStatus = adminCode === 1 ? 'up' : (adminCode === 2 ? 'down' : 'testing');
       const operStatus = operCode === 1 ? 'up' : (operCode === 5 ? 'dormant' : 'down');
 

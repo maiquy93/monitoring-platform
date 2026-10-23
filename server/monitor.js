@@ -1145,6 +1145,7 @@ class Monitor extends EventEmitter {
         printer: !!(st.alerts && st.alerts.printer),
       },
       checks: { icmp: !!(d.check_icmp && d.address), agent: !!d.check_agent, snmp: !!(d.snmp_enabled && d.address) },
+      snmp_enabled: !!d.snmp_enabled,
       last_agent_at: st.agent.lastAt,
       pkt_rate: (st.mockDos && st.mockDos.active && Date.now() <= st.mockDos.expiresAt)
         ? st.mockDos.pps

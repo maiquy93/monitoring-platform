@@ -161,12 +161,34 @@ function cleanMap(data) {
     const s = String(p).trim();
     return s ? s.slice(0, 32) : null;
   };
-  const cl = links.map((l) => ({
-    from: String(l.from || ''),
-    to: String(l.to || ''),
-    from_port: cleanPort(l.from_port),
-    to_port: cleanPort(l.to_port),
-  })).filter((l) => ids.has(l.from) && ids.has(l.to) && l.from !== l.to);
+  const cl = links.map((l) => {
+    const rawType = typeof l.link_type === 'string' ? l.link_type.trim().toLowerCase() : '';
+    const isBundle = l.is_bundle !== undefined ? Boolean(l.is_bundle) : (rawType === 'lacp');
+    const linkType = rawType === 'mlag_peer'
+      ? 'mlag_peer'
+      : (isBundle || rawType === 'lacp' ? 'lacp' : 'single');
+    const bundleName = l.bundle_name !== undefined && l.bundle_name !== null
+      ? String(l.bundle_name).trim().slice(0, 40)
+      : '';
+    const rawMembers = Array.isArray(l.members) ? l.members.slice(0, 64) : [];
+    const members = rawMembers.map((m) => {
+      if (!m || typeof m !== 'object') return null;
+      const src = cleanPort(m.src ?? m.from_port);
+      const dst = cleanPort(m.dst ?? m.to_port);
+      if (!src && !dst) return null;
+      return { src: src || '', dst: dst || '' };
+    }).filter(Boolean);
+    return {
+      from: String(l.from || ''),
+      to: String(l.to || ''),
+      from_port: cleanPort(l.from_port),
+      to_port: cleanPort(l.to_port),
+      is_bundle: isBundle,
+      bundle_name: bundleName,
+      members,
+      link_type: linkType,
+    };
+  }).filter((l) => ids.has(l.from) && ids.has(l.to) && l.from !== l.to);
   return { nodes: cn, links: cl };
 }
 
@@ -563,7 +585,7 @@ function createApp(db, monitor, opts = {}) {
   route('GET', '/api/maps/:id', 'any', (ctx) => {
     const m = db.prepare('SELECT * FROM maps WHERE id = ?').get(idOf(ctx.p.id));
     if (!m) throw new HttpError(404, 'Không tìm thấy sơ đồ');
-    send(ctx.res, 200, { id: m.id, name: m.name, ...JSON.parse(m.data) });
+    send(ctx.res, 200, { id: m.id, name: m.name, ...cleanMap(JSON.parse(m.data)) });
   });
   route('POST', '/api/maps', 'operator', async (ctx) => {
     const b = await readBody(ctx.req);
@@ -1180,4 +1202,4 @@ function createApp(db, monitor, opts = {}) {
   return server;
 }
 
-module.exports = { createApp };
+module.exports = { createApp, cleanMap };

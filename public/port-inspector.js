@@ -235,6 +235,9 @@
       if (!silent && refreshBtn) refreshBtn.disabled = true;
       try {
         lastData = await M.api('GET', `/api/devices/${d.id}/ports`);
+        if (M.S && M.S.snmpPorts && lastData && Array.isArray(lastData.ports) && lastData.ports.length > 0) {
+          M.S.snmpPorts.set(d.id, { at: Date.now(), ports: lastData.ports });
+        }
         paint();
         // If this was the first sample (no bandwidth delta yet), schedule one fast follow-up poll in 1.2s
         if (lastData && !lastData.has_rate_sample && !form._secondSampleTriggered) {
